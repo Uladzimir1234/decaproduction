@@ -6,11 +6,11 @@ interface ProgressCircleProps {
   showValue?: boolean;
   label?: string;
   className?: string;
-  colorVariant?: "default" | "success" | "warning" | "danger" | "info";
+  colorVariant?: "default" | "success" | "warning" | "danger" | "info" | "gradient" | "gradient-inverse";
 }
 
 const sizeMap = {
-  sm: { width: 60, stroke: 4, fontSize: "text-xs" },
+  sm: { width: 48, stroke: 4, fontSize: "text-[10px]" },
   md: { width: 80, stroke: 5, fontSize: "text-sm" },
   lg: { width: 100, stroke: 6, fontSize: "text-base" },
   xl: { width: 140, stroke: 8, fontSize: "text-xl" },
@@ -22,6 +22,16 @@ const colorMap = {
   warning: "stroke-warning",
   danger: "stroke-destructive",
   info: "stroke-info",
+  gradient: "",
+  "gradient-inverse": "",
+};
+
+// Returns HSL color interpolating from red to green based on value (0-100)
+const getGradientColor = (value: number, inverse: boolean = false) => {
+  const v = inverse ? 100 - value : value;
+  // Hue: 0 = red, 120 = green
+  const hue = (v / 100) * 120;
+  return `hsl(${hue}, 70%, 45%)`;
 };
 
 export function ProgressCircle({
@@ -44,8 +54,13 @@ export function ProgressCircle({
     return "danger";
   };
 
+  const isGradient = colorVariant === "gradient" || colorVariant === "gradient-inverse";
+  const strokeColor = isGradient 
+    ? getGradientColor(value, colorVariant === "gradient-inverse")
+    : undefined;
+
   return (
-    <div className={cn("flex flex-col items-center gap-2", className)}>
+    <div className={cn("flex flex-col items-center gap-1", className)}>
       <div className="relative" style={{ width, height: width }}>
         <svg
           className="transform -rotate-90"
@@ -67,7 +82,11 @@ export function ProgressCircle({
             cy={width / 2}
             r={radius}
             fill="none"
-            className={cn("transition-all duration-700 ease-out", colorMap[getColorVariant()])}
+            className={cn(
+              "transition-all duration-700 ease-out",
+              !isGradient && colorMap[getColorVariant()]
+            )}
+            style={isGradient ? { stroke: strokeColor } : undefined}
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -83,7 +102,7 @@ export function ProgressCircle({
         )}
       </div>
       {label && (
-        <span className="text-xs text-muted-foreground text-center font-medium">
+        <span className="text-[10px] text-muted-foreground text-center font-medium leading-tight">
           {label}
         </span>
       )}

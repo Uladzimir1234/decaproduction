@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrderEditDialog } from "@/components/OrderEditDialog";
@@ -325,33 +326,20 @@ export default function Orders() {
                         )}
                       </Link>
 
-                      <div className="flex items-center gap-4">
-                        <div className="flex flex-col gap-2 min-w-[120px]">
-                          <div>
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-muted-foreground">Fulfillment</span>
-                              <span className="font-medium">{order.fulfillment_percentage}%</span>
-                            </div>
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full transition-all" style={{
-                          width: `${order.fulfillment_percentage}%`
-                        }} />
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-muted-foreground">Time Left</span>
-                              <span className={`font-medium ${daysUntil < 0 ? 'text-destructive' : ''}`}>
-                                {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `${daysUntil}d`}
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${timeLeft < 20 ? 'bg-destructive' : timeLeft < 50 ? 'bg-amber-500' : 'bg-sky-500'}`} style={{
-                          width: `${Math.max(0, timeLeft)}%`
-                        }} />
-                            </div>
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <ProgressCircle
+                          value={order.fulfillment_percentage}
+                          size="sm"
+                          colorVariant="gradient"
+                          label="Fulfillment"
+                        />
+                        <ProgressCircle
+                          value={Math.max(0, timeLeft)}
+                          size="sm"
+                          colorVariant="gradient-inverse"
+                          label={daysUntil < 0 ? `${Math.abs(daysUntil)}d over` : `${daysUntil}d left`}
+                          showValue={false}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
