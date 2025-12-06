@@ -229,9 +229,46 @@ export default function OrderDetail() {
     }
   };
 
-  const updateFulfillment = (key: keyof OrderFulfillment, value: any) => {
-    if (!fulfillment) return;
-    setFulfillment({ ...fulfillment, [key]: value });
+  const updateFulfillment = async (key: keyof OrderFulfillment, value: any) => {
+    if (!fulfillment || !order) return;
+    
+    const updatedFulfillment = { ...fulfillment, [key]: value };
+    setFulfillment(updatedFulfillment);
+
+    // Auto-save on change
+    setSaving(true);
+    try {
+      const newPercentage = calculateFulfillmentPercentage(updatedFulfillment);
+
+      const { error: fulfillmentError } = await supabase
+        .from("order_fulfillment")
+        .update(updatedFulfillment)
+        .eq("id", fulfillment.id);
+
+      if (fulfillmentError) throw fulfillmentError;
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({ fulfillment_percentage: newPercentage })
+        .eq("id", order.id);
+
+      if (orderError) throw orderError;
+
+      setOrder({ ...order, fulfillment_percentage: newPercentage });
+
+      toast({
+        title: "Saved",
+        description: "Order fulfillment updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save changes",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getDaysUntilDelivery = () => {
