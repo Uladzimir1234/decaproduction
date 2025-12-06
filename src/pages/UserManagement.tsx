@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Shield, Ban, CheckCircle, Loader2, Copy, Users } from "lucide-react";
+import { UserPlus, Shield, Ban, CheckCircle, Loader2, Copy, Users, Pencil } from "lucide-react";
 import { createAuditLog } from "@/lib/auditLog";
+import { UserEditDialog } from "@/components/UserEditDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -40,6 +41,8 @@ export default function UserManagement() {
     password: "",
   });
   const [generatedCredentials, setGeneratedCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [editUser, setEditUser] = useState<UserWithRole | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (isAdmin) {
@@ -430,23 +433,36 @@ export default function UserManagement() {
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
                     <TableCell className="text-right">
                       {user.email !== "ulad@decawindows.com" && (
-                        <Button
-                          variant={user.status === "active" ? "destructive" : "outline"}
-                          size="sm"
-                          onClick={() => handleToggleStatus(user)}
-                        >
-                          {user.status === "active" ? (
-                            <>
-                              <Ban className="h-3 w-3 mr-1" />
-                              Block
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Activate
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditUser(user);
+                              setEditDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant={user.status === "active" ? "destructive" : "outline"}
+                            size="sm"
+                            onClick={() => handleToggleStatus(user)}
+                          >
+                            {user.status === "active" ? (
+                              <>
+                                <Ban className="h-3 w-3 mr-1" />
+                                Block
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Activate
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -506,6 +522,13 @@ export default function UserManagement() {
           </div>
         </CardContent>
       </Card>
+
+      <UserEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        user={editUser}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }
