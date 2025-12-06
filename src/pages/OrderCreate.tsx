@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Plus, X } from "lucide-react";
 import { createAuditLog } from "@/lib/auditLog";
+import { useRole } from "@/hooks/useRole";
 
 interface SlidingDoorEntry {
   type: string;
@@ -55,6 +56,8 @@ export default function OrderCreate() {
   const {
     toast
   } = useToast();
+  const { isSeller } = useRole();
+  const totalSteps = isSeller ? 2 : 3;
   const [step, setStep] = useState(1);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -252,12 +255,12 @@ export default function OrderCreate() {
           Back to Orders
         </Button>
         <h1 className="text-2xl font-bold">Create New Order</h1>
-        <p className="text-muted-foreground">Step {step} of 3</p>
+        <p className="text-muted-foreground">Step {step} of {totalSteps}</p>
       </div>
 
       {/* Progress indicator */}
       <div className="flex gap-2 mb-6">
-        {[1, 2, 3].map(s => <div key={s} className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-muted"}`} />)}
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => <div key={s} className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-muted"}`} />)}
       </div>
 
       {step === 1 && <Card>
@@ -502,7 +505,7 @@ export default function OrderCreate() {
           </CardContent>
         </Card>}
 
-      {step === 3 && <Card>
+      {step === 3 && !isSeller && <Card>
           <CardHeader>
             <CardTitle>Component Availability</CardTitle>
             <CardDescription>Track materials and hardware status</CardDescription>
@@ -692,7 +695,7 @@ export default function OrderCreate() {
             Back
           </Button> : <div />}
 
-        {step < 3 ? <Button onClick={handleNext}>
+        {step < totalSteps ? <Button onClick={handleNext}>
             Next
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button> : <Button onClick={handleSubmit} disabled={loading}>
