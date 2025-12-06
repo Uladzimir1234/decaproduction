@@ -471,7 +471,7 @@ export default function OrderDetail() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Ordering Stages
+            Ordering Stages - #{order.order_number}
           </CardTitle>
           <CardDescription>Update component availability and order dates</CardDescription>
         </CardHeader>
@@ -849,7 +849,7 @@ export default function OrderDetail() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            Manufacturing Stages
+            Manufacturing Stages - #{order.order_number}
           </CardTitle>
           <CardDescription>Track progress through each manufacturing step</CardDescription>
         </CardHeader>
