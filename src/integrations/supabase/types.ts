@@ -50,6 +50,7 @@ export type Database = {
           doors_assembled: boolean | null
           doors_glass_available: boolean | null
           doors_glass_installed: boolean | null
+          doors_image_url: string | null
           doors_notes: string | null
           frame_sash_assembled: boolean | null
           frames_welded: boolean | null
@@ -67,6 +68,7 @@ export type Database = {
           sliding_doors_assembled: boolean | null
           sliding_doors_glass_available: boolean | null
           sliding_doors_glass_installed: boolean | null
+          sliding_doors_image_url: string | null
           sliding_doors_notes: string | null
         }
         Insert: {
@@ -74,6 +76,7 @@ export type Database = {
           doors_assembled?: boolean | null
           doors_glass_available?: boolean | null
           doors_glass_installed?: boolean | null
+          doors_image_url?: string | null
           doors_notes?: string | null
           frame_sash_assembled?: boolean | null
           frames_welded?: boolean | null
@@ -91,6 +94,7 @@ export type Database = {
           sliding_doors_assembled?: boolean | null
           sliding_doors_glass_available?: boolean | null
           sliding_doors_glass_installed?: boolean | null
+          sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
         }
         Update: {
@@ -98,6 +102,7 @@ export type Database = {
           doors_assembled?: boolean | null
           doors_glass_available?: boolean | null
           doors_glass_installed?: boolean | null
+          doors_image_url?: string | null
           doors_notes?: string | null
           frame_sash_assembled?: boolean | null
           frames_welded?: boolean | null
@@ -115,6 +120,7 @@ export type Database = {
           sliding_doors_assembled?: boolean | null
           sliding_doors_glass_available?: boolean | null
           sliding_doors_glass_installed?: boolean | null
+          sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
         }
         Relationships: [
