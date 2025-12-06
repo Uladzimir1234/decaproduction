@@ -160,8 +160,8 @@ export default function Orders() {
     if (!f) return [];
     
     const stages: string[] = [];
-    if (f.reinforcement_cutting === 'done') stages.push('Reinforcement');
-    if (f.profile_cutting === 'done') stages.push('Profile Cut');
+    if (f.reinforcement_cutting === 'complete') stages.push('Reinforcement');
+    if (f.profile_cutting === 'complete') stages.push('Profile Cut');
     if (f.frames_welded) stages.push('Welding');
     if (order.doors_count && order.doors_count > 0 && f.doors_assembled && f.doors_glass_installed) stages.push('Doors');
     if (order.has_sliding_doors && f.sliding_doors_assembled && f.sliding_doors_glass_installed) stages.push('Sliding Doors');
