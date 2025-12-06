@@ -1,30 +1,25 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardList, LogOut, Menu, X, FileText } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, Menu, X, FileText, Users } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useRole } from "@/hooks/useRole";
 import logo from "@/assets/logo.png";
-
-const navigation = [{
-  name: "Dashboard",
-  href: "/dashboard",
-  icon: LayoutDashboard
-}, {
-  name: "Orders",
-  href: "/orders",
-  icon: ClipboardList
-}, {
-  name: "Logs",
-  href: "/logs",
-  icon: FileText
-}];
 
 export function Header() {
   const location = useLocation();
   const { toast } = useToast();
+  const { isAdmin, loading: roleLoading } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navigation = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Orders", href: "/orders", icon: ClipboardList },
+    { name: "Logs", href: "/logs", icon: FileText },
+    ...(isAdmin ? [{ name: "Users", href: "/users", icon: Users }] : []),
+  ];
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();

@@ -13,6 +13,7 @@ import Orders from "./pages/Orders";
 import OrderCreate from "./pages/OrderCreate";
 import OrderDetail from "./pages/OrderDetail";
 import Logs from "./pages/Logs";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/orders/new" element={<OrderCreate />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
             <Route path="/logs" element={<Logs />} />
+            <Route path="/users" element={<UserManagement />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
