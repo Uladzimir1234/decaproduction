@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList, RefreshCw } from "lucide-react";
+import { ClipboardList, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface AuditLog {
   id: string;
@@ -37,6 +38,7 @@ const formatAction = (action: string): string => {
 const Logs = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -44,7 +46,7 @@ const Logs = () => {
       .from('audit_logs')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (error) {
       console.error('Error fetching logs:', error);
@@ -53,6 +55,15 @@ const Logs = () => {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const filteredLogs = logs.filter(log => 
+    log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    log.user_email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     fetchLogs();
@@ -79,7 +90,18 @@ const Logs = () => {
 
       <Card className="border-border/50 bg-card/50 backdrop-blur">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Recent Activity</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="text-lg">Recent Activity</CardTitle>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by order number..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[600px]">
@@ -93,14 +115,14 @@ const Logs = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.length === 0 && !loading ? (
+                {filteredLogs.length === 0 && !loading ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                      No activity logs found
+                      {searchQuery ? 'No logs found matching your search' : 'No activity logs found'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logs.map((log) => (
+                  filteredLogs.map((log) => (
                     <TableRow key={log.id} className="border-border/30">
                       <TableCell className="font-mono text-sm text-muted-foreground">
                         {format(new Date(log.created_at), 'MMM dd, yyyy HH:mm')}
