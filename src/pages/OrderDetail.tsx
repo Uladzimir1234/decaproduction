@@ -464,8 +464,10 @@ export default function OrderDetail() {
         </CardContent>
       </Card>
 
-      {/* Ordering Stages */}
-      <Card>
+      {/* Ordering and Manufacturing Stages Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Ordering Stages */}
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
@@ -842,8 +844,8 @@ export default function OrderDetail() {
         </CardContent>
       </Card>
 
-      {/* Fulfillment Stages */}
-      <Card>
+        {/* Fulfillment Stages */}
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
@@ -1266,6 +1268,7 @@ export default function OrderDetail() {
           </Accordion>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
