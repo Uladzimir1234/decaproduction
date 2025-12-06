@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Plus, X } from "lucide-react";
+import { createAuditLog } from "@/lib/auditLog";
 
 interface SlidingDoorEntry {
   type: string;
@@ -221,6 +222,14 @@ export default function OrderCreate() {
         fulfillment_percentage: 0
       }).select().single();
       if (error) throw error;
+      
+      await createAuditLog({
+        action: 'order_created',
+        description: `Created order #${orderNumber} for ${finalCustomerName}`,
+        entityType: 'order',
+        entityId: data.id,
+      });
+      
       toast({
         title: "Order created",
         description: `Order #${orderNumber} has been created successfully.`

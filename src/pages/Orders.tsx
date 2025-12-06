@@ -12,6 +12,7 @@ import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { createAuditLog } from "@/lib/auditLog";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -175,6 +176,13 @@ export default function Orders() {
       // Then delete the order
       const { error } = await supabase.from("orders").delete().eq("id", orderToDelete.id);
       if (error) throw error;
+
+      await createAuditLog({
+        action: 'order_deleted',
+        description: `Deleted order #${orderToDelete.order_number}`,
+        entityType: 'order',
+        entityId: orderToDelete.id,
+      });
 
       toast({
         title: "Order deleted",
