@@ -25,21 +25,29 @@ interface OrderFulfillment {
   reinforcement_cutting: string | null;
   profile_cutting: string | null;
   frames_welded: boolean | null;
+  welding_status: string | null;
+  welding_notes: string | null;
   doors_assembled: boolean | null;
   doors_glass_available: boolean | null;
   doors_glass_installed: boolean | null;
+  doors_status: string | null;
   doors_notes: string | null;
   doors_image_url: string | null;
   sliding_doors_assembled: boolean | null;
   sliding_doors_glass_available: boolean | null;
   sliding_doors_glass_installed: boolean | null;
+  sliding_doors_status: string | null;
   sliding_doors_notes: string | null;
   sliding_doors_image_url: string | null;
   frame_sash_assembled: boolean | null;
+  assembly_status: string | null;
+  assembly_notes: string | null;
   glass_delivered: boolean | null;
   glass_not_delivered_notes: string | null;
   glass_installed: boolean | null;
   glass_not_installed_notes: string | null;
+  glass_status: string | null;
+  glass_notes: string | null;
   screens_made: boolean | null;
   screens_delivered: boolean | null;
   screens_cutting: string | null;
@@ -921,7 +929,10 @@ export default function OrderDetail() {
             <AccordionItem value="welding">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.frames_welded ? "complete" : "not_started"} />
+                  <StatusBadge status={
+                    fulfillment.welding_status === 'complete' ? 'complete' :
+                    fulfillment.welding_status === 'partial' ? 'partial' : 'not_started'
+                  } />
                   <span>Frames/Sashes Welded</span>
                   {order.windows_profile_status !== 'available' && (
                     <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -931,17 +942,38 @@ export default function OrderDetail() {
                   )}
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-4">
+              <AccordionContent className="pt-4 space-y-4">
                 {order.windows_profile_status !== 'available' ? (
                   <p className="text-sm text-muted-foreground">Windows Profile must be available before this stage can be updated.</p>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={fulfillment.frames_welded}
-                      onCheckedChange={(checked) => updateFulfillment("frames_welded", checked)}
-                    />
-                    <Label>{fulfillment.frames_welded ? "Complete" : "Not Complete"}</Label>
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={fulfillment.welding_status || "not_started"}
+                        onValueChange={(value) => updateFulfillment("welding_status", value)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="partial">Partially Done</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {fulfillment.welding_status === 'partial' && (
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea
+                          placeholder="Add notes about welding progress..."
+                          value={fulfillment.welding_notes || ""}
+                          onChange={(e) => updateFulfillment("welding_notes", e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </AccordionContent>
             </AccordionItem>
@@ -951,7 +983,10 @@ export default function OrderDetail() {
               <AccordionItem value="doors">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
-                    <StatusBadge status={fulfillment.doors_assembled ? "complete" : "not_started"} />
+                    <StatusBadge status={
+                      fulfillment.doors_status === 'complete' ? 'complete' :
+                      fulfillment.doors_status === 'partial' ? 'partial' : 'not_started'
+                    } />
                     <span>Doors Assembled</span>
                     {order.hardware_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -966,35 +1001,32 @@ export default function OrderDetail() {
                     <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                   ) : (
                     <>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.doors_assembled}
-                          onCheckedChange={(checked) => updateFulfillment("doors_assembled", checked)}
-                        />
-                        <Label>Doors Assembled</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.doors_glass_available}
-                          onCheckedChange={(checked) => updateFulfillment("doors_glass_available", checked)}
-                        />
-                        <Label>Glass Available</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.doors_glass_installed}
-                          onCheckedChange={(checked) => updateFulfillment("doors_glass_installed", checked)}
-                        />
-                        <Label>Glass Installed</Label>
-                      </div>
                       <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea
-                          placeholder="Add notes about door assembly..."
-                          value={fulfillment.doors_notes || ""}
-                          onChange={(e) => updateFulfillment("doors_notes", e.target.value)}
-                        />
+                        <Label>Status</Label>
+                        <Select
+                          value={fulfillment.doors_status || "not_started"}
+                          onValueChange={(value) => updateFulfillment("doors_status", value)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="partial">Partially Done</SelectItem>
+                            <SelectItem value="complete">Complete</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+                      {fulfillment.doors_status === 'partial' && (
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Textarea
+                            placeholder="Add notes about door assembly..."
+                            value={fulfillment.doors_notes || ""}
+                            onChange={(e) => updateFulfillment("doors_notes", e.target.value)}
+                          />
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <Label>Photo</Label>
                         <ImageUpload
@@ -1015,7 +1047,10 @@ export default function OrderDetail() {
               <AccordionItem value="sliding">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
-                    <StatusBadge status={fulfillment.sliding_doors_assembled ? "complete" : "not_started"} />
+                    <StatusBadge status={
+                      fulfillment.sliding_doors_status === 'complete' ? 'complete' :
+                      fulfillment.sliding_doors_status === 'partial' ? 'partial' : 'not_started'
+                    } />
                     <span>Sliding Doors Assembled</span>
                     {order.hardware_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1030,35 +1065,32 @@ export default function OrderDetail() {
                     <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                   ) : (
                     <>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.sliding_doors_assembled}
-                          onCheckedChange={(checked) => updateFulfillment("sliding_doors_assembled", checked)}
-                        />
-                        <Label>Sliding Doors Assembled</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.sliding_doors_glass_available}
-                          onCheckedChange={(checked) => updateFulfillment("sliding_doors_glass_available", checked)}
-                        />
-                        <Label>Glass Available</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={fulfillment.sliding_doors_glass_installed}
-                          onCheckedChange={(checked) => updateFulfillment("sliding_doors_glass_installed", checked)}
-                        />
-                        <Label>Glass Installed</Label>
-                      </div>
                       <div className="space-y-2">
-                        <Label>Notes</Label>
-                        <Textarea
-                          placeholder="Add notes about sliding door assembly..."
-                          value={fulfillment.sliding_doors_notes || ""}
-                          onChange={(e) => updateFulfillment("sliding_doors_notes", e.target.value)}
-                        />
+                        <Label>Status</Label>
+                        <Select
+                          value={fulfillment.sliding_doors_status || "not_started"}
+                          onValueChange={(value) => updateFulfillment("sliding_doors_status", value)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="partial">Partially Done</SelectItem>
+                            <SelectItem value="complete">Complete</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+                      {fulfillment.sliding_doors_status === 'partial' && (
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Textarea
+                            placeholder="Add notes about sliding door assembly..."
+                            value={fulfillment.sliding_doors_notes || ""}
+                            onChange={(e) => updateFulfillment("sliding_doors_notes", e.target.value)}
+                          />
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <Label>Photo</Label>
                         <ImageUpload
@@ -1078,7 +1110,10 @@ export default function OrderDetail() {
             <AccordionItem value="frame-sash">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.frame_sash_assembled ? "complete" : "not_started"} />
+                  <StatusBadge status={
+                    fulfillment.assembly_status === 'complete' ? 'complete' :
+                    fulfillment.assembly_status === 'partial' ? 'partial' : 'not_started'
+                  } />
                   <span>Frame & Sash Assembled</span>
                   {order.hardware_status !== 'available' && (
                     <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1088,17 +1123,38 @@ export default function OrderDetail() {
                   )}
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-4">
+              <AccordionContent className="pt-4 space-y-4">
                 {order.hardware_status !== 'available' ? (
                   <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={fulfillment.frame_sash_assembled}
-                      onCheckedChange={(checked) => updateFulfillment("frame_sash_assembled", checked)}
-                    />
-                    <Label>{fulfillment.frame_sash_assembled ? "Complete" : "Not Complete"}</Label>
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={fulfillment.assembly_status || "not_started"}
+                        onValueChange={(value) => updateFulfillment("assembly_status", value)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="partial">Partially Done</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {fulfillment.assembly_status === 'partial' && (
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea
+                          placeholder="Add notes about assembly progress..."
+                          value={fulfillment.assembly_notes || ""}
+                          onChange={(e) => updateFulfillment("assembly_notes", e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </AccordionContent>
             </AccordionItem>
@@ -1108,7 +1164,10 @@ export default function OrderDetail() {
             <AccordionItem value="glass-install">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.glass_installed ? "complete" : "not_started"} />
+                  <StatusBadge status={
+                    fulfillment.glass_status === 'complete' ? 'complete' :
+                    fulfillment.glass_status === 'partial' ? 'partial' : 'not_started'
+                  } />
                   <span>Glass Installed</span>
                   {order.glass_status !== 'available' && (
                     <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1123,20 +1182,29 @@ export default function OrderDetail() {
                   <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={fulfillment.glass_installed}
-                        onCheckedChange={(checked) => updateFulfillment("glass_installed", checked)}
-                      />
-                      <Label>All Glass Installed</Label>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={fulfillment.glass_status || "not_started"}
+                        onValueChange={(value) => updateFulfillment("glass_status", value)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="partial">Partially Done</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    {!fulfillment.glass_installed && (
+                    {fulfillment.glass_status === 'partial' && (
                       <div className="space-y-2">
-                        <Label>Notes (which windows not installed, reason)</Label>
+                        <Label>Notes</Label>
                         <Textarea
-                          placeholder="e.g., Window #7 not installed - waiting for frame adjustment..."
-                          value={fulfillment.glass_not_installed_notes || ""}
-                          onChange={(e) => updateFulfillment("glass_not_installed_notes", e.target.value)}
+                          placeholder="Add notes about glass installation..."
+                          value={fulfillment.glass_notes || ""}
+                          onChange={(e) => updateFulfillment("glass_notes", e.target.value)}
                         />
                       </div>
                     )}

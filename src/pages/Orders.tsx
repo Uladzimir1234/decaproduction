@@ -17,16 +17,27 @@ interface OrderFulfillment {
   reinforcement_cutting: string | null;
   profile_cutting: string | null;
   frames_welded: boolean | null;
+  welding_status: string | null;
+  welding_notes: string | null;
   doors_assembled: boolean | null;
   doors_glass_installed: boolean | null;
+  doors_status: string | null;
+  doors_notes: string | null;
   sliding_doors_assembled: boolean | null;
   sliding_doors_glass_installed: boolean | null;
+  sliding_doors_status: string | null;
+  sliding_doors_notes: string | null;
   frame_sash_assembled: boolean | null;
+  assembly_status: string | null;
+  assembly_notes: string | null;
   glass_delivered: boolean | null;
   glass_installed: boolean | null;
+  glass_status: string | null;
+  glass_notes: string | null;
   screens_made: boolean | null;
   screens_delivered: boolean | null;
   screens_cutting: string | null;
+  screens_notes: string | null;
 }
 
 interface Order {
@@ -161,7 +172,7 @@ export default function Orders() {
     const f = fulfillments[order.id];
     
     type StageStatus = 'complete' | 'partial' | 'not_started';
-    const stages: { name: string; status: StageStatus }[] = [];
+    const stages: { name: string; status: StageStatus; hasNotes: boolean }[] = [];
     
     const getStatus = (value: string | null | undefined): StageStatus => {
       if (value === 'complete') return 'complete';
@@ -169,38 +180,22 @@ export default function Orders() {
       return 'not_started';
     };
     
-    const getBoolStatus = (complete: boolean, partial?: boolean): StageStatus => {
-      if (complete) return 'complete';
-      if (partial) return 'partial';
-      return 'not_started';
-    };
-    
     // Always show these stages
-    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting) });
-    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting) });
-    stages.push({ name: 'Welding', status: getBoolStatus(!!f?.frames_welded) });
+    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting), hasNotes: false });
+    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting), hasNotes: false });
+    stages.push({ name: 'Welding', status: getStatus(f?.welding_status), hasNotes: !!(f?.welding_notes) });
     
     // Conditional stages based on order
     if (order.doors_count && order.doors_count > 0) {
-      const doorsComplete = !!(f?.doors_assembled && f?.doors_glass_installed);
-      const doorsPartial = !!f?.doors_assembled;
-      stages.push({ name: 'Doors', status: getBoolStatus(doorsComplete, doorsPartial) });
+      stages.push({ name: 'Doors', status: getStatus(f?.doors_status), hasNotes: !!(f?.doors_notes) });
     }
     if (order.has_sliding_doors) {
-      const slidingComplete = !!(f?.sliding_doors_assembled && f?.sliding_doors_glass_installed);
-      const slidingPartial = !!f?.sliding_doors_assembled;
-      stages.push({ name: 'Sliding Doors', status: getBoolStatus(slidingComplete, slidingPartial) });
+      stages.push({ name: 'Sliding Doors', status: getStatus(f?.sliding_doors_status), hasNotes: !!(f?.sliding_doors_notes) });
     }
     
-    stages.push({ name: 'Assembly', status: getBoolStatus(!!f?.frame_sash_assembled) });
-    
-    const glassComplete = !!(f?.glass_delivered && f?.glass_installed);
-    const glassPartial = !!(f?.glass_delivered);
-    stages.push({ name: 'Glass', status: getBoolStatus(glassComplete, glassPartial) });
-    
-    const screensStatus = f?.screens_cutting === 'complete' ? 'complete' : 
-                         f?.screens_cutting === 'partial' ? 'partial' : 'not_started';
-    stages.push({ name: 'Screens', status: screensStatus });
+    stages.push({ name: 'Assembly', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes) });
+    stages.push({ name: 'Glass', status: getStatus(f?.glass_status), hasNotes: !!(f?.glass_notes) });
+    stages.push({ name: 'Screens', status: getStatus(f?.screens_cutting), hasNotes: !!(f?.screens_notes) });
     
     return stages;
   };
@@ -351,12 +346,15 @@ export default function Orders() {
                           {manufacturingStages.map((stage) => (
                             <span 
                               key={stage.name} 
-                              className={`inline-flex items-center rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
+                              className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
                                 stage.status === 'complete' ? 'bg-emerald-500' : 
                                 stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
                               }`}
                             >
                               {stage.name}
+                              {stage.hasNotes && (
+                                <AlertCircle className="h-3 w-3" />
+                              )}
                             </span>
                           ))}
                         </div>
