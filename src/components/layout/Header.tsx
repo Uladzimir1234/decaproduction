@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, 
   ClipboardList, 
-  Users, 
   LogOut,
   Menu,
   X
@@ -16,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Orders", href: "/orders", icon: ClipboardList },
-  { name: "Customers", href: "/customers", icon: Users },
 ];
 
 export function Header() {
