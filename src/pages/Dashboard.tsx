@@ -3,122 +3,175 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ProgressCircle } from "@/components/ui/progress-circle";
+import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, ClipboardList, Users, Clock, TrendingUp } from "lucide-react";
-interface DashboardStats {
-  totalOrders: number;
-  totalCustomers: number;
-  ordersByAge: {
-    [key: string]: number;
-  };
-  ordersByFulfillment: {
-    [key: string]: number;
-  };
-  recentOrders: Array<{
-    id: string;
-    order_number: string;
-    customer_name: string;
-    delivery_date: string;
-    fulfillment_percentage: number;
-  }>;
+import { Plus, AlertTriangle, Clock, CheckCircle2, ArrowRight } from "lucide-react";
+
+interface Order {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  delivery_date: string;
+  order_date: string;
+  fulfillment_percentage: number;
 }
+
+interface DashboardData {
+  urgentOrders: Order[];
+  inProgressOrders: Order[];
+  nearCompleteOrders: Order[];
+  completedOrders: Order[];
+}
+
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 0,
-    totalCustomers: 0,
-    ordersByAge: {},
-    ordersByFulfillment: {},
-    recentOrders: []
+  const [data, setData] = useState<DashboardData>({
+    urgentOrders: [],
+    inProgressOrders: [],
+    nearCompleteOrders: [],
+    completedOrders: [],
   });
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    fetchDashboardStats();
-  }, []);
-  const fetchDashboardStats = async () => {
-    try {
-      // Fetch orders
-      const {
-        data: orders,
-        error: ordersError
-      } = await supabase.from("orders").select("*").order("created_at", {
-        ascending: false
-      });
-      if (ordersError) throw ordersError;
 
-      // Fetch customers
-      const {
-        data: customers,
-        error: customersError
-      } = await supabase.from("customers").select("id");
-      if (customersError) throw customersError;
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("delivery_date", { ascending: true });
+
+      if (error) throw error;
+
       const now = new Date();
-      const ordersByAge: {
-        [key: string]: number;
-      } = {
-        "30": 0,
-        "40": 0,
-        "50": 0,
-        "60": 0,
-        "70": 0,
-        "80+": 0
-      };
-      const ordersByFulfillment: {
-        [key: string]: number;
-      } = {
-        "20-40": 0,
-        "40-60": 0,
-        "60-80": 0,
-        "80-90": 0,
-        "90+": 0
-      };
-      orders?.forEach(order => {
-        const orderDate = new Date(order.order_date);
-        const daysOld = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysOld >= 80) ordersByAge["80+"]++;else if (daysOld >= 70) ordersByAge["70"]++;else if (daysOld >= 60) ordersByAge["60"]++;else if (daysOld >= 50) ordersByAge["50"]++;else if (daysOld >= 40) ordersByAge["40"]++;else if (daysOld >= 30) ordersByAge["30"]++;
+      const urgent: Order[] = [];
+      const inProgress: Order[] = [];
+      const nearComplete: Order[] = [];
+      const completed: Order[] = [];
+
+      orders?.forEach((order) => {
+        const deliveryDate = new Date(order.delivery_date);
+        const daysUntil = Math.ceil(
+          (deliveryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
         const fulfillment = order.fulfillment_percentage || 0;
-        if (fulfillment >= 90) ordersByFulfillment["90+"]++;else if (fulfillment >= 80) ordersByFulfillment["80-90"]++;else if (fulfillment >= 60) ordersByFulfillment["60-80"]++;else if (fulfillment >= 40) ordersByFulfillment["40-60"]++;else if (fulfillment >= 20) ordersByFulfillment["20-40"]++;
-      });
-      setStats({
-        totalOrders: orders?.length || 0,
-        totalCustomers: customers?.length || 0,
-        ordersByAge,
-        ordersByFulfillment,
-        recentOrders: orders?.slice(0, 5).map(order => ({
+
+        const mappedOrder: Order = {
           id: order.id,
           order_number: order.order_number,
           customer_name: order.customer_name,
           delivery_date: order.delivery_date,
-          fulfillment_percentage: order.fulfillment_percentage || 0
-        })) || []
+          order_date: order.order_date,
+          fulfillment_percentage: fulfillment,
+        };
+
+        // Categorize by urgency and fulfillment
+        if (fulfillment >= 100) {
+          completed.push(mappedOrder);
+        } else if (daysUntil <= 7 && fulfillment < 80) {
+          urgent.push(mappedOrder);
+        } else if (fulfillment >= 80) {
+          nearComplete.push(mappedOrder);
+        } else {
+          inProgress.push(mappedOrder);
+        }
+      });
+
+      setData({
+        urgentOrders: urgent,
+        inProgressOrders: inProgress,
+        nearCompleteOrders: nearComplete,
+        completedOrders: completed,
       });
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+      console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
   };
+
   const getDaysUntilDelivery = (deliveryDate: string) => {
     const delivery = new Date(deliveryDate);
     const now = new Date();
-    const diff = Math.ceil((delivery.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return diff;
+    return Math.ceil((delivery.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
-  const getDeliveryStatus = (days: number) => {
-    if (days < 0) return "complete";
-    if (days <= 7) return "partial";
-    return "not_started";
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
   };
+
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-pulse text-muted-foreground">Loading dashboard...</div>
-      </div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
   }
-  return <div className="space-y-6 animate-fade-in">
+
+  const OrderCard = ({ order, showUrgency = false }: { order: Order; showUrgency?: boolean }) => {
+    const daysUntil = getDaysUntilDelivery(order.delivery_date);
+    const isOverdue = daysUntil < 0;
+
+    return (
+      <Link
+        to={`/orders/${order.id}`}
+        className="block group"
+      >
+        <div className={`p-4 rounded-lg border transition-all duration-200 hover:shadow-md ${
+          showUrgency 
+            ? "border-destructive/30 bg-destructive/5 hover:border-destructive/50" 
+            : "bg-card hover:border-primary/30"
+        }`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-mono text-sm font-semibold">
+                  #{order.order_number}
+                </span>
+                {showUrgency && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
+                    {isOverdue ? "Overdue" : `${daysUntil}d left`}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground truncate">
+                {order.customer_name}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-2xl font-bold">{order.fulfillment_percentage}%</p>
+              <p className="text-xs text-muted-foreground">
+                Due {formatDate(order.delivery_date)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Progress 
+              value={order.fulfillment_percentage} 
+              className="h-2"
+            />
+          </div>
+        </div>
+      </Link>
+    );
+  };
+
+  const totalActive = data.urgentOrders.length + data.inProgressOrders.length + data.nearCompleteOrders.length;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Manufacturing order overview</p>
+          <h1 className="text-2xl font-bold">Fulfillment Overview</h1>
+          <p className="text-muted-foreground">
+            {totalActive} active order{totalActive !== 1 ? "s" : ""} in progress
+          </p>
         </div>
         <Link to="/orders/new">
           <Button className="gap-2">
@@ -128,104 +181,173 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders}</div>
+      {/* Summary Cards */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card className={data.urgentOrders.length > 0 ? "border-destructive/30 bg-destructive/5" : ""}>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${data.urgentOrders.length > 0 ? "bg-destructive/10" : "bg-muted"}`}>
+                <AlertTriangle className={`h-5 w-5 ${data.urgentOrders.length > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data.urgentOrders.length}</p>
+                <p className="text-xs text-muted-foreground">Needs Attention</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
         
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.ordersByFulfillment["20-40"] + stats.ordersByFulfillment["40-60"] + stats.ordersByFulfillment["60-80"]}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-warning/10">
+                <Clock className="h-5 w-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data.inProgressOrders.length}</p>
+                <p className="text-xs text-muted-foreground">In Progress</p>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Near Complete</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.ordersByFulfillment["80-90"] + stats.ordersByFulfillment["90+"]}
+        
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-info/10">
+                <ArrowRight className="h-5 w-5 text-info" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data.nearCompleteOrders.length}</p>
+                <p className="text-xs text-muted-foreground">Near Complete</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success/10">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data.completedOrders.length}</p>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Urgent Orders */}
+      {data.urgentOrders.length > 0 && (
+        <Card className="border-destructive/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-lg">Needs Attention</CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Orders due within 7 days with less than 80% fulfillment
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {data.urgentOrders.map((order) => (
+                <OrderCard key={order.id} order={order} showUrgency />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* In Progress & Near Complete */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Orders by Age */}
+        {/* In Progress */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Orders by Age (Days)</CardTitle>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5 text-warning" />
+                In Progress
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.inProgressOrders.length} order{data.inProgressOrders.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <Link to="/orders">
+              <Button variant="ghost" size="sm">View All</Button>
+            </Link>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap justify-center gap-6">
-              {Object.entries(stats.ordersByAge).map(([days, count]) => <ProgressCircle key={days} value={stats.totalOrders > 0 ? count / stats.totalOrders * 100 : 0} size="md" label={`${days} days`} colorVariant={parseInt(days) >= 60 ? "danger" : parseInt(days) >= 40 ? "warning" : "success"} />)}
-            </div>
+            {data.inProgressOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No orders in progress
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {data.inProgressOrders.slice(0, 5).map((order) => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+                {data.inProgressOrders.length > 5 && (
+                  <Link to="/orders" className="block text-center py-2 text-sm text-primary hover:underline">
+                    +{data.inProgressOrders.length - 5} more orders
+                  </Link>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Orders by Fulfillment */}
+        {/* Near Complete */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Orders by Fulfillment %</CardTitle>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ArrowRight className="h-5 w-5 text-info" />
+                Near Complete
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                80%+ fulfillment
+              </p>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap justify-center gap-6">
-              {Object.entries(stats.ordersByFulfillment).map(([range, count]) => <ProgressCircle key={range} value={stats.totalOrders > 0 ? count / stats.totalOrders * 100 : 0} size="md" label={`${range}%`} colorVariant={range === "90+" || range === "80-90" ? "success" : range === "60-80" ? "info" : "warning"} />)}
-            </div>
+            {data.nearCompleteOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No orders near completion
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {data.nearCompleteOrders.slice(0, 5).map((order) => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+                {data.nearCompleteOrders.length > 5 && (
+                  <Link to="/orders" className="block text-center py-2 text-sm text-primary hover:underline">
+                    +{data.nearCompleteOrders.length - 5} more orders
+                  </Link>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Orders */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Recent Orders</CardTitle>
-          <Link to="/orders">
-            <Button variant="ghost" size="sm">View All</Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {stats.recentOrders.length === 0 ? <div className="text-center py-8 text-muted-foreground">
-              <p>No orders yet.</p>
-              <Link to="/orders/new">
-                <Button variant="link" className="mt-2">Create your first order</Button>
-              </Link>
-            </div> : <div className="space-y-3">
-              {stats.recentOrders.map(order => {
-            const daysUntil = getDaysUntilDelivery(order.delivery_date);
-            return <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sm font-medium">
-                          #{order.order_number}
-                        </span>
-                        <span className="text-muted-foreground truncate">
-                          {order.customer_name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <StatusBadge status={getDeliveryStatus(daysUntil)} label={daysUntil < 0 ? "Overdue" : `${daysUntil} days`} />
-                      </div>
-                    </div>
-                    <ProgressCircle value={order.fulfillment_percentage} size="sm" />
-                  </Link>;
-          })}
-            </div>}
-        </CardContent>
-      </Card>
-    </div>;
+      {/* Empty State */}
+      {totalActive === 0 && data.completedOrders.length === 0 && (
+        <Card className="py-12">
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4">No orders yet. Create your first order to get started.</p>
+            <Link to="/orders/new">
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Order
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
