@@ -62,6 +62,7 @@ export type Database = {
           order_id: string
           profile_cutting: string | null
           reinforcement_cutting: string | null
+          screens_cutting: string | null
           screens_delivered: boolean | null
           screens_made: boolean | null
           screens_notes: string | null
@@ -88,6 +89,7 @@ export type Database = {
           order_id: string
           profile_cutting?: string | null
           reinforcement_cutting?: string | null
+          screens_cutting?: string | null
           screens_delivered?: boolean | null
           screens_made?: boolean | null
           screens_notes?: string | null
@@ -114,6 +116,7 @@ export type Database = {
           order_id?: string
           profile_cutting?: string | null
           reinforcement_cutting?: string | null
+          screens_cutting?: string | null
           screens_delivered?: boolean | null
           screens_made?: boolean | null
           screens_notes?: string | null
