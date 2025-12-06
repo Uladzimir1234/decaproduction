@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -156,19 +156,27 @@ export default function Orders() {
     }
   };
 
-  const getCompletedStages = (order: Order) => {
+  const getManufacturingStages = (order: Order) => {
     const f = fulfillments[order.id];
-    if (!f) return [];
     
-    const stages: string[] = [];
-    if (f.reinforcement_cutting === 'complete') stages.push('Reinforcement');
-    if (f.profile_cutting === 'complete') stages.push('Profile Cut');
-    if (f.frames_welded) stages.push('Welding');
-    if (order.doors_count && order.doors_count > 0 && f.doors_assembled && f.doors_glass_installed) stages.push('Doors');
-    if (order.has_sliding_doors && f.sliding_doors_assembled && f.sliding_doors_glass_installed) stages.push('Sliding Doors');
-    if (f.frame_sash_assembled) stages.push('Assembly');
-    if (f.glass_delivered && f.glass_installed) stages.push('Glass');
-    if (f.screens_made || f.screens_delivered) stages.push('Screens');
+    const stages: { name: string; complete: boolean }[] = [];
+    
+    // Always show these stages
+    stages.push({ name: 'Reinforcement', complete: f?.reinforcement_cutting === 'complete' });
+    stages.push({ name: 'Profile Cut', complete: f?.profile_cutting === 'complete' });
+    stages.push({ name: 'Welding', complete: !!f?.frames_welded });
+    
+    // Conditional stages based on order
+    if (order.doors_count && order.doors_count > 0) {
+      stages.push({ name: 'Doors', complete: !!(f?.doors_assembled && f?.doors_glass_installed) });
+    }
+    if (order.has_sliding_doors) {
+      stages.push({ name: 'Sliding Doors', complete: !!(f?.sliding_doors_assembled && f?.sliding_doors_glass_installed) });
+    }
+    
+    stages.push({ name: 'Assembly', complete: !!f?.frame_sash_assembled });
+    stages.push({ name: 'Glass', complete: !!(f?.glass_delivered && f?.glass_installed) });
+    stages.push({ name: 'Screens', complete: !!(f?.screens_made || f?.screens_delivered) });
     
     return stages;
   };
@@ -270,7 +278,7 @@ export default function Orders() {
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
             const orderedComponents = getOrderedComponents(order);
-            const completedStages = getCompletedStages(order);
+            const manufacturingStages = getManufacturingStages(order);
             return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
@@ -313,17 +321,20 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                        {completedStages.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mr-1">Manufactured:</span>
-                            {completedStages.map((stage) => (
-                              <span key={stage} className="inline-flex items-center rounded-full bg-emerald-500 text-white text-xs font-medium py-0.5 px-2.5">
-                                {stage}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
+                          {manufacturingStages.map((stage) => (
+                            <span 
+                              key={stage.name} 
+                              className={`inline-flex items-center rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
+                                stage.complete ? 'bg-emerald-500' : 'bg-red-500'
+                              }`}
+                            >
+                              {stage.name}
+                            </span>
+                          ))}
+                        </div>
                       </Link>
 
                       <div className="flex items-center gap-3">
