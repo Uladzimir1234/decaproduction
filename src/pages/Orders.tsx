@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Plus, Search, Filter } from "lucide-react";
 import {
@@ -182,21 +181,32 @@ export default function Orders() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6">
-                        <div className="text-center">
-                          <ProgressCircle
-                            value={order.fulfillment_percentage}
-                            size="md"
-                          />
-                          <span className="text-xs text-muted-foreground mt-1 block">Fulfillment</span>
+                      <div className="flex flex-col gap-2 min-w-[120px]">
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">Fulfillment</span>
+                            <span className="font-medium">{order.fulfillment_percentage}%</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${order.fulfillment_percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <ProgressCircle
-                            value={timeLeft}
-                            size="md"
-                            colorVariant={timeLeft < 20 ? "danger" : timeLeft < 50 ? "warning" : "info"}
-                          />
-                          <span className="text-xs text-muted-foreground mt-1 block">Time Left</span>
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">Time Left</span>
+                            <span className="font-medium">{Math.round(timeLeft)}%</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all ${
+                                timeLeft < 20 ? 'bg-destructive' : timeLeft < 50 ? 'bg-amber-500' : 'bg-sky-500'
+                              }`}
+                              style={{ width: `${Math.max(0, timeLeft)}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
