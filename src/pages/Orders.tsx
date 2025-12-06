@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Pencil } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OrderEditDialog } from "@/components/OrderEditDialog";
+
 interface Order {
   id: string;
   order_number: string;
@@ -18,15 +19,41 @@ interface Order {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
+  has_sliding_doors: boolean | null;
+  sliding_door_type: string | null;
+  has_plisse_screens: boolean | null;
+  plisse_screens_count: number | null;
+  plisse_door_count: number | null;
+  plisse_window_count: number | null;
+  screen_type: string | null;
+  has_nailing_flanges: boolean | null;
+  glass_ordered: boolean | null;
+  screen_profile_available: boolean | null;
+  screen_profile_ordered: boolean | null;
+  windows_profile_type: string | null;
+  windows_profile_available: boolean | null;
+  hidden_hinges_count: number | null;
+  visible_hinges_count: number | null;
+  hardware_available: boolean | null;
 }
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleEditClick = (e: React.MouseEvent, order: Order) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedOrder(order);
+    setEditDialogOpen(true);
+  };
   const fetchOrders = async () => {
     try {
       const {
@@ -115,9 +142,9 @@ export default function Orders() {
               {filteredOrders.map(order => {
             const daysUntil = getDaysUntilDelivery(order.delivery_date);
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
-            return <Link key={order.id} to={`/orders/${order.id}`} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+            return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      <div className="flex-1 min-w-0">
+                      <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
                             #{order.order_number}
@@ -135,42 +162,56 @@ export default function Orders() {
                               <span>{order.sliding_doors_count} Sliding</span>
                             </>}
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          
-                        </div>
-                      </div>
+                      </Link>
 
-                      <div className="flex flex-col gap-2 min-w-[120px]">
-                        <div>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Fulfillment</span>
-                            <span className="font-medium">{order.fulfillment_percentage}%</span>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-2 min-w-[120px]">
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-muted-foreground">Fulfillment</span>
+                              <span className="font-medium">{order.fulfillment_percentage}%</span>
+                            </div>
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full transition-all" style={{
+                          width: `${order.fulfillment_percentage}%`
+                        }} />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full transition-all" style={{
-                        width: `${order.fulfillment_percentage}%`
-                      }} />
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-muted-foreground">Time Left</span>
+                              <span className={`font-medium ${daysUntil < 0 ? 'text-destructive' : ''}`}>
+                                {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `${daysUntil}d`}
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${timeLeft < 20 ? 'bg-destructive' : timeLeft < 50 ? 'bg-amber-500' : 'bg-sky-500'}`} style={{
+                          width: `${Math.max(0, timeLeft)}%`
+                        }} />
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Time Left</span>
-                            <span className={`font-medium ${daysUntil < 0 ? 'text-destructive' : ''}`}>
-                              {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `${daysUntil}d`}
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${timeLeft < 20 ? 'bg-destructive' : timeLeft < 50 ? 'bg-amber-500' : 'bg-sky-500'}`} style={{
-                        width: `${Math.max(0, timeLeft)}%`
-                      }} />
-                          </div>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleEditClick(e, order)}
+                          className="shrink-0"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  </Link>;
+                  </div>;
           })}
             </div>}
         </CardContent>
       </Card>
+
+      <OrderEditDialog
+        order={selectedOrder}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSave={fetchOrders}
+      />
     </div>;
 }
