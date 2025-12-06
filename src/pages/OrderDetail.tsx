@@ -1093,6 +1093,26 @@ export default function OrderDetail() {
                           <Label>Notes</Label>
                           <Textarea placeholder="Add notes about door assembly..." value={fulfillment.doors_notes || ""} onChange={e => updateFulfillment("doors_notes", e.target.value)} />
                         </div>}
+                      
+                      {/* Doors Glass Installation - locked until doors assembled */}
+                      <div className="border-t pt-4 mt-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Label>Glass Installed</Label>
+                          {fulfillment.doors_status !== 'complete' && <Badge variant="outline" className="text-muted-foreground gap-1">
+                              <Lock className="h-3 w-3" />
+                              Doors Not Assembled
+                            </Badge>}
+                        </div>
+                        {fulfillment.doors_status !== 'complete' ? (
+                          <p className="text-sm text-muted-foreground">Doors must be assembled before glass can be installed.</p>
+                        ) : (
+                          <Switch 
+                            checked={fulfillment.doors_glass_installed || false} 
+                            onCheckedChange={checked => updateFulfillment("doors_glass_installed", checked)} 
+                          />
+                        )}
+                      </div>
+                      
                       <div className="space-y-2">
                         <Label>Photo</Label>
                         <ImageUpload value={fulfillment.doors_image_url} onChange={url => updateFulfillment("doors_image_url", url)} folder={`doors/${order.id}`} disabled={saving} />
@@ -1132,6 +1152,26 @@ export default function OrderDetail() {
                           <Label>Notes</Label>
                           <Textarea placeholder="Add notes about sliding door assembly..." value={fulfillment.sliding_doors_notes || ""} onChange={e => updateFulfillment("sliding_doors_notes", e.target.value)} />
                         </div>}
+                      
+                      {/* Sliding Doors Glass Installation - locked until sliding doors assembled */}
+                      <div className="border-t pt-4 mt-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Label>Glass Installed</Label>
+                          {fulfillment.sliding_doors_status !== 'complete' && <Badge variant="outline" className="text-muted-foreground gap-1">
+                              <Lock className="h-3 w-3" />
+                              Sliding Doors Not Assembled
+                            </Badge>}
+                        </div>
+                        {fulfillment.sliding_doors_status !== 'complete' ? (
+                          <p className="text-sm text-muted-foreground">Sliding doors must be assembled before glass can be installed.</p>
+                        ) : (
+                          <Switch 
+                            checked={fulfillment.sliding_doors_glass_installed || false} 
+                            onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)} 
+                          />
+                        )}
+                      </div>
+                      
                       <div className="space-y-2">
                         <Label>Photo</Label>
                         <ImageUpload value={fulfillment.sliding_doors_image_url} onChange={url => updateFulfillment("sliding_doors_image_url", url)} folder={`sliding-doors/${order.id}`} disabled={saving} />
@@ -1186,10 +1226,18 @@ export default function OrderDetail() {
                       <Lock className="h-3 w-3" />
                       Glass {order.glass_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
                     </Badge>}
+                  {order.glass_status === 'available' && fulfillment.assembly_status !== 'complete' && <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                      <Lock className="h-3 w-3" />
+                      Frame & Sash Not Complete
+                    </Badge>}
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-4 space-y-4">
-                {order.glass_status !== 'available' ? <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p> : <>
+                {order.glass_status !== 'available' ? (
+                  <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p>
+                ) : fulfillment.assembly_status !== 'complete' ? (
+                  <p className="text-sm text-muted-foreground">Frame & Sash must be assembled before glass can be installed.</p>
+                ) : <>
                     <div className="space-y-2">
                       <Label>Status</Label>
                       <Select value={fulfillment.glass_status || "not_started"} onValueChange={value => updateFulfillment("glass_status", value)}>
