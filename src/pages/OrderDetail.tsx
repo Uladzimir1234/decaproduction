@@ -18,24 +18,24 @@ type StageStatus = "not_started" | "partial" | "complete";
 interface OrderFulfillment {
   id: string;
   order_id: string;
-  reinforcement_cutting: StageStatus;
-  profile_cutting: StageStatus;
-  frames_welded: boolean;
-  doors_assembled: boolean;
-  doors_glass_available: boolean;
-  doors_glass_installed: boolean;
+  reinforcement_cutting: string | null;
+  profile_cutting: string | null;
+  frames_welded: boolean | null;
+  doors_assembled: boolean | null;
+  doors_glass_available: boolean | null;
+  doors_glass_installed: boolean | null;
   doors_notes: string | null;
-  sliding_doors_assembled: boolean;
-  sliding_doors_glass_available: boolean;
-  sliding_doors_glass_installed: boolean;
+  sliding_doors_assembled: boolean | null;
+  sliding_doors_glass_available: boolean | null;
+  sliding_doors_glass_installed: boolean | null;
   sliding_doors_notes: string | null;
-  frame_sash_assembled: boolean;
-  glass_delivered: boolean;
+  frame_sash_assembled: boolean | null;
+  glass_delivered: boolean | null;
   glass_not_delivered_notes: string | null;
-  glass_installed: boolean;
+  glass_installed: boolean | null;
   glass_not_installed_notes: string | null;
-  screens_made: boolean;
-  screens_delivered: boolean;
+  screens_made: boolean | null;
+  screens_delivered: boolean | null;
   screens_notes: string | null;
 }
 
@@ -348,7 +348,7 @@ export default function OrderDetail() {
             <AccordionItem value="reinforcement">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.reinforcement_cutting} />
+                  <StatusBadge status={(fulfillment.reinforcement_cutting as "not_started" | "partial" | "complete") || "not_started"} />
                   <span>Reinforcement Cutting</span>
                 </div>
               </AccordionTrigger>
@@ -373,7 +373,7 @@ export default function OrderDetail() {
             <AccordionItem value="profile">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.profile_cutting} />
+                  <StatusBadge status={(fulfillment.profile_cutting as "not_started" | "partial" | "complete") || "not_started"} />
                   <span>Profile Cutting</span>
                 </div>
               </AccordionTrigger>
