@@ -11,8 +11,9 @@ import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calendar, Package, Wrench, Lock } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type StageStatus = "not_started" | "partial" | "complete";
@@ -340,6 +341,81 @@ export default function OrderDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Component Availability Summary */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Component Availability
+          </CardTitle>
+          <CardDescription>Status of components needed for manufacturing</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            <TooltipProvider>
+              {[
+                { name: 'Reinforcement', status: order.reinforcement_status },
+                { name: 'Windows Profile', status: order.windows_profile_status },
+                { name: 'Glass', status: order.glass_status },
+                { name: 'Screens', status: order.screens_status },
+                { name: 'Plisse Screens', status: order.plisse_screens_status },
+                { name: 'Nail Fins', status: order.nail_fins_status },
+                { name: 'Hardware', status: order.hardware_status },
+              ].map((component) => {
+                const status = component.status || 'not_ordered';
+                const isAvailable = status === 'available';
+                const isOrdered = status === 'ordered';
+                const isNotOrdered = status === 'not_ordered';
+
+                return (
+                  <Tooltip key={component.name}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-colors ${
+                          isAvailable
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                            : isOrdered
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                            : 'bg-destructive/10 border-destructive/30 text-destructive'
+                        }`}
+                      >
+                        {isAvailable ? (
+                          <CheckCircle2 className="h-5 w-5 mb-1" />
+                        ) : isOrdered ? (
+                          <Clock className="h-5 w-5 mb-1" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 mb-1" />
+                        )}
+                        <span className="text-xs font-medium text-center leading-tight">
+                          {component.name}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{component.name}: {isAvailable ? 'Available' : isOrdered ? 'Ordered' : 'Not Ordered'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Available</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-amber-500" />
+              <span>Ordered</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+              <span>Not Ordered</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Fulfillment Stages */}
       <Card>
