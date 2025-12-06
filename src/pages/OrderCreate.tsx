@@ -37,6 +37,7 @@ export default function OrderCreate() {
   // Step 1: Basic Info
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -82,16 +83,24 @@ export default function OrderCreate() {
   };
 
   const handleCustomerChange = (value: string) => {
-    setCustomerId(value);
-    const customer = customers.find((c) => c.id === value);
-    if (customer) {
-      setCustomerName(customer.name);
+    if (value === "new") {
+      setIsNewCustomer(true);
+      setCustomerId("");
+      setCustomerName("");
+    } else {
+      setIsNewCustomer(false);
+      setCustomerId(value);
+      const customer = customers.find((c) => c.id === value);
+      if (customer) {
+        setCustomerName(customer.name);
+      }
     }
   };
 
   const validateStep = () => {
     if (step === 1) {
-      if (!customerId || !orderNumber || !orderDate || !deliveryDate) {
+      const hasCustomer = isNewCustomer ? customerName.trim() : customerId;
+      if (!hasCustomer || !orderNumber || !orderDate || !deliveryDate) {
         toast({
           title: "Missing fields",
           description: "Please fill in all required fields",
@@ -131,10 +140,29 @@ export default function OrderCreate() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      let finalCustomerId = customerId;
+      let finalCustomerName = customerName;
+
+      // Create new customer if needed
+      if (isNewCustomer && customerName.trim()) {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
+          .insert({
+            user_id: user.id,
+            name: customerName.trim(),
+          })
+          .select()
+          .single();
+
+        if (customerError) throw customerError;
+        finalCustomerId = newCustomer.id;
+        finalCustomerName = newCustomer.name;
+      }
+
       const { data, error } = await supabase.from("orders").insert({
         user_id: user.id,
-        customer_id: customerId,
-        customer_name: customerName,
+        customer_id: finalCustomerId,
+        customer_name: finalCustomerName,
         order_number: orderNumber,
         order_date: orderDate,
         delivery_date: deliveryDate,
@@ -211,11 +239,14 @@ export default function OrderCreate() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Customer *</Label>
-              <Select value={customerId} onValueChange={handleCustomerChange}>
+              <Select value={isNewCustomer ? "new" : customerId} onValueChange={handleCustomerChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a customer" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="new" className="text-primary font-medium">
+                    + Add New Customer
+                  </SelectItem>
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
@@ -224,6 +255,16 @@ export default function OrderCreate() {
                 </SelectContent>
               </Select>
             </div>
+            {isNewCustomer && (
+              <div className="space-y-2">
+                <Label>Customer Name *</Label>
+                <Input
+                  placeholder="Enter customer name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Order Number *</Label>
               <Input
