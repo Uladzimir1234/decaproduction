@@ -499,7 +499,16 @@ export default function OrderCreate() {
             <div className="space-y-4 p-4 rounded-lg border">
               <div className="space-y-2">
                 <Label>Windows Profile Type</Label>
-                <Input placeholder="e.g., uPVC 70mm" value={windowsProfileType} onChange={e => setWindowsProfileType(e.target.value)} />
+                <Select value={windowsProfileType} onValueChange={setWindowsProfileType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select profile type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="s8000">S8000</SelectItem>
+                    <SelectItem value="linear">Linear</SelectItem>
+                    <SelectItem value="deca70">Deca 70</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Profile Available</Label>
