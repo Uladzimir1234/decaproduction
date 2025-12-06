@@ -337,8 +337,8 @@ export default function Orders() {
                           value={Math.max(0, timeLeft)}
                           size="sm"
                           colorVariant="gradient"
-                          label={daysUntil < 0 ? `${Math.abs(daysUntil)}d over` : `${daysUntil}d left`}
-                          showValue={false}
+                          customValue={daysUntil < 0 ? `${Math.abs(daysUntil)}d` : `${daysUntil}d`}
+                          label={daysUntil < 0 ? "Overdue" : "Time Left"}
                         />
                         <Button
                           variant="ghost"

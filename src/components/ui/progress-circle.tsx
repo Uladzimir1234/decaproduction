@@ -4,6 +4,7 @@ interface ProgressCircleProps {
   value: number;
   size?: "sm" | "md" | "lg" | "xl";
   showValue?: boolean;
+  customValue?: string;
   label?: string;
   className?: string;
   colorVariant?: "default" | "success" | "warning" | "danger" | "info" | "gradient" | "gradient-inverse";
@@ -38,6 +39,7 @@ export function ProgressCircle({
   value,
   size = "md",
   showValue = true,
+  customValue,
   label,
   className,
   colorVariant = "default",
@@ -93,10 +95,10 @@ export function ProgressCircle({
             strokeDashoffset={offset}
           />
         </svg>
-        {showValue && (
+        {(showValue || customValue) && (
           <div className="absolute inset-0 flex items-center justify-center">
             <span className={cn("font-semibold", fontSize)}>
-              {Math.round(value)}%
+              {customValue || `${Math.round(value)}%`}
             </span>
           </div>
         )}
