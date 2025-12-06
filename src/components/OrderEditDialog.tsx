@@ -47,14 +47,23 @@ interface Order {
   plisse_window_count: number | null;
   screen_type: string | null;
   has_nailing_flanges: boolean | null;
-  glass_ordered: boolean | null;
-  screen_profile_available: boolean | null;
-  screen_profile_ordered: boolean | null;
   windows_profile_type: string | null;
-  windows_profile_available: boolean | null;
   hidden_hinges_count: number | null;
   visible_hinges_count: number | null;
-  hardware_available: boolean | null;
+  reinforcement_status: string | null;
+  reinforcement_order_date: string | null;
+  windows_profile_status: string | null;
+  windows_profile_order_date: string | null;
+  glass_status: string | null;
+  glass_order_date: string | null;
+  screens_status: string | null;
+  screens_order_date: string | null;
+  plisse_screens_status: string | null;
+  plisse_screens_order_date: string | null;
+  nail_fins_status: string | null;
+  nail_fins_order_date: string | null;
+  hardware_status: string | null;
+  hardware_order_date: string | null;
 }
 
 interface OrderEditDialogProps {
@@ -100,14 +109,23 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
   const [hasNailingFlanges, setHasNailingFlanges] = useState(false);
 
   // Step 3: Component Availability
-  const [glassOrdered, setGlassOrdered] = useState(false);
-  const [screenProfileAvailable, setScreenProfileAvailable] = useState(false);
-  const [screenProfileOrdered, setScreenProfileOrdered] = useState(false);
+  const [reinforcementStatus, setReinforcementStatus] = useState("not_ordered");
+  const [reinforcementOrderDate, setReinforcementOrderDate] = useState("");
   const [windowsProfileType, setWindowsProfileType] = useState("");
-  const [windowsProfileAvailable, setWindowsProfileAvailable] = useState(false);
+  const [windowsProfileStatus, setWindowsProfileStatus] = useState("not_ordered");
+  const [windowsProfileOrderDate, setWindowsProfileOrderDate] = useState("");
+  const [glassStatus, setGlassStatus] = useState("not_ordered");
+  const [glassOrderDate, setGlassOrderDate] = useState("");
+  const [screensStatus, setScreensStatus] = useState("not_ordered");
+  const [screensOrderDate, setScreensOrderDate] = useState("");
+  const [plisseScreensStatus, setPlisseScreensStatus] = useState("not_ordered");
+  const [plisseScreensOrderDate, setPlisseScreensOrderDate] = useState("");
+  const [nailFinsStatus, setNailFinsStatus] = useState("not_ordered");
+  const [nailFinsOrderDate, setNailFinsOrderDate] = useState("");
+  const [hardwareStatus, setHardwareStatus] = useState("not_ordered");
+  const [hardwareOrderDate, setHardwareOrderDate] = useState("");
   const [hiddenHingesCount, setHiddenHingesCount] = useState(0);
   const [visibleHingesCount, setVisibleHingesCount] = useState(0);
-  const [hardwareAvailable, setHardwareAvailable] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -157,14 +175,23 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
       setPlisseScreenEntries(plisseEntries.length > 0 ? plisseEntries : [{ type: "", count: 1 }]);
       setScreenType(order.screen_type || "");
       setHasNailingFlanges(order.has_nailing_flanges || false);
-      setGlassOrdered(order.glass_ordered || false);
-      setScreenProfileAvailable(order.screen_profile_available || false);
-      setScreenProfileOrdered(order.screen_profile_ordered || false);
+      setReinforcementStatus(order.reinforcement_status || "not_ordered");
+      setReinforcementOrderDate(order.reinforcement_order_date || "");
       setWindowsProfileType(order.windows_profile_type || "");
-      setWindowsProfileAvailable(order.windows_profile_available || false);
+      setWindowsProfileStatus(order.windows_profile_status || "not_ordered");
+      setWindowsProfileOrderDate(order.windows_profile_order_date || "");
+      setGlassStatus(order.glass_status || "not_ordered");
+      setGlassOrderDate(order.glass_order_date || "");
+      setScreensStatus(order.screens_status || "not_ordered");
+      setScreensOrderDate(order.screens_order_date || "");
+      setPlisseScreensStatus(order.plisse_screens_status || "not_ordered");
+      setPlisseScreensOrderDate(order.plisse_screens_order_date || "");
+      setNailFinsStatus(order.nail_fins_status || "not_ordered");
+      setNailFinsOrderDate(order.nail_fins_order_date || "");
+      setHardwareStatus(order.hardware_status || "not_ordered");
+      setHardwareOrderDate(order.hardware_order_date || "");
       setHiddenHingesCount(order.hidden_hinges_count || 0);
       setVisibleHingesCount(order.visible_hinges_count || 0);
-      setHardwareAvailable(order.hardware_available || false);
     }
   }, [order, open]);
 
@@ -243,14 +270,23 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
           plisse_window_count: hasPlisseScreens ? plisseScreenEntries.filter(e => e.type === 'window').reduce((sum, e) => sum + e.count, 0) : 0,
           screen_type: screenType || null,
           has_nailing_flanges: hasNailingFlanges,
-          glass_ordered: glassOrdered,
-          screen_profile_available: screenType === "deca" ? screenProfileAvailable : null,
-          screen_profile_ordered: screenType === "flex" ? screenProfileOrdered : null,
+          reinforcement_status: reinforcementStatus,
+          reinforcement_order_date: reinforcementStatus === "ordered" ? reinforcementOrderDate || null : null,
           windows_profile_type: windowsProfileType || null,
-          windows_profile_available: windowsProfileAvailable,
+          windows_profile_status: windowsProfileStatus,
+          windows_profile_order_date: windowsProfileStatus === "ordered" ? windowsProfileOrderDate || null : null,
+          glass_status: glassStatus,
+          glass_order_date: glassStatus === "ordered" ? glassOrderDate || null : null,
+          screens_status: screensStatus,
+          screens_order_date: screensStatus === "ordered" ? screensOrderDate || null : null,
+          plisse_screens_status: plisseScreensStatus,
+          plisse_screens_order_date: plisseScreensStatus === "ordered" ? plisseScreensOrderDate || null : null,
+          nail_fins_status: nailFinsStatus,
+          nail_fins_order_date: nailFinsStatus === "ordered" ? nailFinsOrderDate || null : null,
+          hardware_status: hardwareStatus,
+          hardware_order_date: hardwareStatus === "ordered" ? hardwareOrderDate || null : null,
           hidden_hinges_count: hiddenHingesCount,
           visible_hinges_count: visibleHingesCount,
-          hardware_available: hardwareAvailable,
         })
         .eq("id", order.id);
 
@@ -558,78 +594,180 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
 
         {step === 3 && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 rounded-lg border">
-              <Label>Glass Ordered</Label>
-              <Switch checked={glassOrdered} onCheckedChange={setGlassOrdered} />
+            {/* Reinforcement */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Reinforcement</Label>
+              <Select value={reinforcementStatus} onValueChange={setReinforcementStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                </SelectContent>
+              </Select>
+              {reinforcementStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={reinforcementOrderDate} onChange={e => setReinforcementOrderDate(e.target.value)} />
+                </div>
+              )}
             </div>
 
-            {screenType === "deca" && (
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <Label>Deca Screen Profile Available</Label>
-                <Switch
-                  checked={screenProfileAvailable}
-                  onCheckedChange={setScreenProfileAvailable}
-                />
-              </div>
-            )}
-
-            {screenType === "flex" && (
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <Label>Flex Screen Profile Ordered</Label>
-                <Switch
-                  checked={screenProfileOrdered}
-                  onCheckedChange={setScreenProfileOrdered}
-                />
-              </div>
-            )}
-
-            <div className="space-y-4 p-4 rounded-lg border">
+            {/* Windows Profile */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Windows Profile</Label>
               <div className="space-y-2">
-                <Label>Windows Profile Type</Label>
-                <Input
-                  placeholder="e.g., uPVC 70mm"
-                  value={windowsProfileType}
-                  onChange={(e) => setWindowsProfileType(e.target.value)}
-                />
+                <Label>Profile Type</Label>
+                <Select value={windowsProfileType} onValueChange={setWindowsProfileType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select profile type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="s8000">S8000</SelectItem>
+                    <SelectItem value="linear">Linear</SelectItem>
+                    <SelectItem value="deca70">Deca 70</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>Profile Available</Label>
-                <Switch
-                  checked={windowsProfileAvailable}
-                  onCheckedChange={setWindowsProfileAvailable}
-                />
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={windowsProfileStatus} onValueChange={setWindowsProfileStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="available">Available</SelectItem>
+                    <SelectItem value="ordered">Ordered</SelectItem>
+                    <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              {windowsProfileStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={windowsProfileOrderDate} onChange={e => setWindowsProfileOrderDate(e.target.value)} />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-4 p-4 rounded-lg border">
-              <Label className="text-base font-medium">Hardware (Hinges)</Label>
+            {/* Glass */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Glass</Label>
+              <Select value={glassStatus} onValueChange={setGlassStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                </SelectContent>
+              </Select>
+              {glassStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={glassOrderDate} onChange={e => setGlassOrderDate(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            {/* Screens */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Screens</Label>
+              <Select value={screensStatus} onValueChange={setScreensStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                </SelectContent>
+              </Select>
+              {screensStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={screensOrderDate} onChange={e => setScreensOrderDate(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            {/* Plisse Screens */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Plisse Screens</Label>
+              <Select value={plisseScreensStatus} onValueChange={setPlisseScreensStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                </SelectContent>
+              </Select>
+              {plisseScreensStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={plisseScreensOrderDate} onChange={e => setPlisseScreensOrderDate(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            {/* Nail Fins */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Nail Fins</Label>
+              <Select value={nailFinsStatus} onValueChange={setNailFinsStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                </SelectContent>
+              </Select>
+              {nailFinsStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={nailFinsOrderDate} onChange={e => setNailFinsOrderDate(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            {/* Hardware */}
+            <div className="space-y-3 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Hardware</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Hidden Hinges Count</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={hiddenHingesCount}
-                    onChange={(e) => setHiddenHingesCount(parseInt(e.target.value) || 0)}
-                  />
+                  <Input type="number" min="0" value={hiddenHingesCount} onChange={e => setHiddenHingesCount(parseInt(e.target.value) || 0)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Visible Hinges Count</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={visibleHingesCount}
-                    onChange={(e) => setVisibleHingesCount(parseInt(e.target.value) || 0)}
-                  />
+                  <Input type="number" min="0" value={visibleHingesCount} onChange={e => setVisibleHingesCount(parseInt(e.target.value) || 0)} />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>Hardware Available</Label>
-                <Switch
-                  checked={hardwareAvailable}
-                  onCheckedChange={setHardwareAvailable}
-                />
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={hardwareStatus} onValueChange={setHardwareStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="available">Available</SelectItem>
+                    <SelectItem value="ordered">Ordered</SelectItem>
+                    <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              {hardwareStatus === "ordered" && (
+                <div className="space-y-2">
+                  <Label>Order Date</Label>
+                  <Input type="date" value={hardwareOrderDate} onChange={e => setHardwareOrderDate(e.target.value)} />
+                </div>
+              )}
             </div>
           </div>
         )}
