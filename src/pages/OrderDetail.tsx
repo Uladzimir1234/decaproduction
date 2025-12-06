@@ -1102,46 +1102,6 @@ export default function OrderDetail() {
               </AccordionContent>
             </AccordionItem>
 
-            {/* Glass Delivered */}
-            <AccordionItem value="glass-delivery">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={fulfillment.glass_delivered ? "complete" : "not_started"} />
-                  <span>Glass Delivered</span>
-                  {order.glass_status !== 'available' && (
-                    <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
-                      <Lock className="h-3 w-3" />
-                      Glass {order.glass_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pt-4 space-y-4">
-                {order.glass_status !== 'available' ? (
-                  <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={fulfillment.glass_delivered}
-                        onCheckedChange={(checked) => updateFulfillment("glass_delivered", checked)}
-                      />
-                      <Label>All Glass Delivered</Label>
-                    </div>
-                    {!fulfillment.glass_delivered && (
-                      <div className="space-y-2">
-                        <Label>Notes (window numbers not delivered, reason)</Label>
-                        <Textarea
-                          placeholder="e.g., Windows #3, #5 not delivered - back-ordered..."
-                          value={fulfillment.glass_not_delivered_notes || ""}
-                          onChange={(e) => updateFulfillment("glass_not_delivered_notes", e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </AccordionContent>
-            </AccordionItem>
 
             {/* Glass Installed */}
             <AccordionItem value="glass-install">
