@@ -368,7 +368,7 @@ export default function OrderCreate() {
                     <Input type="number" min="0" value={plisseScreensCount} onChange={e => setPlisseScreensCount(parseInt(e.target.value) || 0)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Door Type</Label>
+                    <Label>Door Type (low threshold)</Label>
                     <Input type="number" min="0" value={plisseDoorCount} onChange={e => setPlisseDoorCount(parseInt(e.target.value) || 0)} />
                   </div>
                   <div className="space-y-2">
