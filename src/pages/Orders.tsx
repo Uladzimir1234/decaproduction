@@ -245,28 +245,67 @@ export default function Orders() {
     return remaining;
   };
 
+  const componentFieldMap: Record<string, string> = {
+    'Reinforcement': 'reinforcement_status',
+    'Windows Profile': 'windows_profile_status',
+    'Glass': 'glass_status',
+    'Screens': 'screens_status',
+    'Plisse Screens': 'plisse_screens_status',
+    'Nail Fins': 'nail_fins_status',
+    'Hardware': 'hardware_status',
+  };
+
   const getNotOrderedComponents = (order: Order) => {
-    const components: string[] = [];
-    if (order.reinforcement_status === 'not_ordered') components.push('Reinforcement');
-    if (order.windows_profile_status === 'not_ordered') components.push('Windows Profile');
-    if (order.glass_status === 'not_ordered') components.push('Glass');
-    if (order.screens_status === 'not_ordered') components.push('Screens');
-    if (order.plisse_screens_status === 'not_ordered') components.push('Plisse Screens');
-    if (order.nail_fins_status === 'not_ordered') components.push('Nail Fins');
-    if (order.hardware_status === 'not_ordered') components.push('Hardware');
+    const components: { name: string; field: string }[] = [];
+    if (order.reinforcement_status === 'not_ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
+    if (order.windows_profile_status === 'not_ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
+    if (order.glass_status === 'not_ordered') components.push({ name: 'Glass', field: 'glass_status' });
+    if (order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status' });
+    if (order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
+    if (order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
+    if (order.hardware_status === 'not_ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
     return components;
   };
 
   const getOrderedComponents = (order: Order) => {
-    const components: string[] = [];
-    if (order.reinforcement_status === 'ordered') components.push('Reinforcement');
-    if (order.windows_profile_status === 'ordered') components.push('Windows Profile');
-    if (order.glass_status === 'ordered') components.push('Glass');
-    if (order.screens_status === 'ordered') components.push('Screens');
-    if (order.plisse_screens_status === 'ordered') components.push('Plisse Screens');
-    if (order.nail_fins_status === 'ordered') components.push('Nail Fins');
-    if (order.hardware_status === 'ordered') components.push('Hardware');
+    const components: { name: string; field: string }[] = [];
+    if (order.reinforcement_status === 'ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
+    if (order.windows_profile_status === 'ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
+    if (order.glass_status === 'ordered') components.push({ name: 'Glass', field: 'glass_status' });
+    if (order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status' });
+    if (order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
+    if (order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
+    if (order.hardware_status === 'ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
     return components;
+  };
+
+  const handleComponentStatusChange = async (orderId: string, field: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ [field]: newStatus })
+        .eq("id", orderId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, [field]: newStatus }
+          : order
+      ));
+      
+      toast({
+        title: "Status updated",
+        description: `Component updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
   };
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -354,9 +393,46 @@ export default function Orders() {
                             <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                             <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
                             {notOrderedComponents.map((component) => (
-                              <Badge key={component} variant="destructive" className="text-xs py-0 px-1.5">
-                                {component}
-                              </Badge>
+                              <Popover key={component.name}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.preventDefault()}>
+                                    <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                      {component.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-1" align="start">
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'not_ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded bg-red-100 text-red-700"
+                                    >
+                                      Not Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'available');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Available
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             ))}
                           </div>
                         )}
@@ -365,9 +441,46 @@ export default function Orders() {
                             <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium mr-1">Ordered:</span>
                             {orderedComponents.map((component) => (
-                              <Badge key={component} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
-                                {component}
-                              </Badge>
+                              <Popover key={component.name}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.preventDefault()}>
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
+                                      {component.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-1" align="start">
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'not_ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Not Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded bg-amber-100 text-amber-700"
+                                    >
+                                      Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleComponentStatusChange(order.id, component.field, 'available');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Available
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             ))}
                           </div>
                         )}
