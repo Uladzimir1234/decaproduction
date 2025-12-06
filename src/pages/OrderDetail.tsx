@@ -11,7 +11,7 @@ import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Calendar, Package, Wrench } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Wrench } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type StageStatus = "not_started" | "partial" | "complete";
@@ -191,44 +191,6 @@ export default function OrderDetail() {
     return Math.round((completedSteps / totalSteps) * 100);
   };
 
-  const handleSave = async () => {
-    if (!fulfillment || !order) return;
-
-    setSaving(true);
-    try {
-      const newPercentage = calculateFulfillmentPercentage(fulfillment);
-
-      const { error: fulfillmentError } = await supabase
-        .from("order_fulfillment")
-        .update(fulfillment)
-        .eq("id", fulfillment.id);
-
-      if (fulfillmentError) throw fulfillmentError;
-
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update({ fulfillment_percentage: newPercentage })
-        .eq("id", order.id);
-
-      if (orderError) throw orderError;
-
-      setOrder({ ...order, fulfillment_percentage: newPercentage });
-
-      toast({
-        title: "Saved",
-        description: "Order fulfillment updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save changes",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const updateFulfillment = async (key: keyof OrderFulfillment, value: any) => {
     if (!fulfillment || !order) return;
     
@@ -314,10 +276,7 @@ export default function OrderDetail() {
           <h1 className="text-2xl font-bold">Order #{order.order_number}</h1>
           <p className="text-muted-foreground">{order.customer_name}</p>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
+        {saving && <span className="text-sm text-muted-foreground">Saving...</span>}
       </div>
 
       {/* Overview Cards */}
