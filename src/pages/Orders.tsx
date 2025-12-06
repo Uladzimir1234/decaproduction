@@ -40,6 +40,16 @@ interface OrderFulfillment {
   screens_notes: string | null;
 }
 
+interface CustomStep {
+  id: string;
+  order_id: string;
+  step_type: 'ordering' | 'manufacturing';
+  name: string;
+  status: string;
+  order_date: string | null;
+  notes: string | null;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -89,11 +99,57 @@ export default function Orders() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
 
   useEffect(() => {
     fetchOrders();
     fetchFulfillments();
+    fetchCustomSteps();
   }, []);
+
+  const fetchCustomSteps = async () => {
+    try {
+      const { data, error } = await supabase.from("custom_steps").select("*");
+      if (error) throw error;
+      setCustomSteps((data || []) as CustomStep[]);
+    } catch (error) {
+      console.error("Error fetching custom steps:", error);
+    }
+  };
+
+  const handleCustomStepStatusChange = async (stepId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("custom_steps")
+        .update({ status: newStatus })
+        .eq("id", stepId);
+      
+      if (error) throw error;
+      
+      setCustomSteps(prev => prev.map(step => 
+        step.id === stepId ? { ...step, status: newStatus } : step
+      ));
+      
+      toast({
+        title: "Status updated",
+        description: `Custom step updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getCustomOrderingSteps = (orderId: string) => {
+    return customSteps.filter(s => s.order_id === orderId && s.step_type === 'ordering');
+  };
+
+  const getCustomManufacturingSteps = (orderId: string) => {
+    return customSteps.filter(s => s.order_id === orderId && s.step_type === 'manufacturing');
+  };
 
   const handleEditClick = (e: React.MouseEvent, order: Order) => {
     e.preventDefault();
@@ -368,6 +424,8 @@ export default function Orders() {
             const notOrderedComponents = getNotOrderedComponents(order);
             const orderedComponents = getOrderedComponents(order);
             const manufacturingStages = getManufacturingStages(order);
+            const customOrderingSteps = getCustomOrderingSteps(order.id);
+            const customManufacturingSteps = getCustomManufacturingSteps(order.id);
             return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
@@ -536,7 +594,190 @@ export default function Orders() {
                               </PopoverContent>
                             </Popover>
                           ))}
+                          {/* Custom Manufacturing Steps */}
+                          {customManufacturingSteps.map((step) => (
+                            <Popover key={step.id}>
+                              <PopoverTrigger asChild>
+                                <button 
+                                  onClick={(e) => e.preventDefault()}
+                                  className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity border-2 border-dashed border-white/30 ${
+                                    step.status === 'complete' ? 'bg-emerald-500' : 
+                                    step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                  }`}
+                                >
+                                  {step.name}
+                                  {step.notes && (
+                                    <AlertCircle className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-40 p-1" align="start">
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleCustomStepStatusChange(step.id, 'not_started');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'not_started' ? 'bg-red-100 text-red-700' : ''}`}
+                                  >
+                                    Not Started
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleCustomStepStatusChange(step.id, 'partial');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'partial' ? 'bg-amber-100 text-amber-700' : ''}`}
+                                  >
+                                    Partial
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleCustomStepStatusChange(step.id, 'complete');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : ''}`}
+                                  >
+                                    Complete
+                                  </button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          ))}
                         </div>
+                        {/* Custom Ordering Steps */}
+                        {customOrderingSteps.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground font-medium mr-1">Custom:</span>
+                            {customOrderingSteps.filter(s => s.status === 'not_ordered').map((step) => (
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.preventDefault()}>
+                                    <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-1" align="start">
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'not_ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded bg-red-100 text-red-700"
+                                    >
+                                      Not Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'available');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Available
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            ))}
+                            {customOrderingSteps.filter(s => s.status === 'ordered').map((step) => (
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.preventDefault()}>
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-1" align="start">
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'not_ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Not Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded bg-amber-100 text-amber-700"
+                                    >
+                                      Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'available');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Available
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            ))}
+                            {customOrderingSteps.filter(s => s.status === 'available').map((step) => (
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.preventDefault()}>
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-40 p-1" align="start">
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'not_ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Not Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'ordered');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
+                                    >
+                                      Ordered
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCustomStepStatusChange(step.id, 'available');
+                                      }}
+                                      className="text-left px-3 py-1.5 text-sm rounded bg-emerald-100 text-emerald-700"
+                                    >
+                                      Available
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            ))}
+                          </div>
+                        )}
                       </Link>
 
                       <div className="flex items-center gap-3">
