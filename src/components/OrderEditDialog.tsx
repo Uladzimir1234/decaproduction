@@ -14,6 +14,16 @@ interface SlidingDoorEntry {
   count: number;
 }
 
+interface PlisseScreenEntry {
+  type: string;
+  count: number;
+}
+
+const PLISSE_SCREEN_TYPES = [
+  { value: "door", label: "Door Type (low threshold)" },
+  { value: "window", label: "Window Type" },
+];
+
 interface Customer {
   id: string;
   name: string;
@@ -85,9 +95,7 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
   const [hasSlidingDoors, setHasSlidingDoors] = useState(false);
   const [slidingDoorEntries, setSlidingDoorEntries] = useState<SlidingDoorEntry[]>([{ type: "", count: 1 }]);
   const [hasPlisseScreens, setHasPlisseScreens] = useState(false);
-  const [plisseScreensCount, setPlisseScreensCount] = useState(0);
-  const [plisseDoorCount, setPlisseDoorCount] = useState(0);
-  const [plisseWindowCount, setPlisseWindowCount] = useState(0);
+  const [plisseScreenEntries, setPlisseScreenEntries] = useState<PlisseScreenEntry[]>([{ type: "", count: 1 }]);
   const [screenType, setScreenType] = useState("");
   const [hasNailingFlanges, setHasNailingFlanges] = useState(false);
 
@@ -138,9 +146,15 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
         }
       }
       setHasPlisseScreens(order.has_plisse_screens || false);
-      setPlisseScreensCount(order.plisse_screens_count || 0);
-      setPlisseDoorCount(order.plisse_door_count || 0);
-      setPlisseWindowCount(order.plisse_window_count || 0);
+      // Build plisse screen entries from door/window counts
+      const plisseEntries: PlisseScreenEntry[] = [];
+      if (order.plisse_door_count && order.plisse_door_count > 0) {
+        plisseEntries.push({ type: "door", count: order.plisse_door_count });
+      }
+      if (order.plisse_window_count && order.plisse_window_count > 0) {
+        plisseEntries.push({ type: "window", count: order.plisse_window_count });
+      }
+      setPlisseScreenEntries(plisseEntries.length > 0 ? plisseEntries : [{ type: "", count: 1 }]);
       setScreenType(order.screen_type || "");
       setHasNailingFlanges(order.has_nailing_flanges || false);
       setGlassOrdered(order.glass_ordered || false);
@@ -224,9 +238,9 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
           sliding_doors_count: hasSlidingDoors ? slidingDoorEntries.reduce((sum, e) => sum + e.count, 0) : 0,
           sliding_door_type: hasSlidingDoors ? JSON.stringify(slidingDoorEntries.filter(e => e.type)) : null,
           has_plisse_screens: hasPlisseScreens,
-          plisse_screens_count: hasPlisseScreens ? plisseScreensCount : 0,
-          plisse_door_count: hasPlisseScreens ? plisseDoorCount : 0,
-          plisse_window_count: hasPlisseScreens ? plisseWindowCount : 0,
+          plisse_screens_count: hasPlisseScreens ? plisseScreenEntries.reduce((sum, e) => sum + e.count, 0) : 0,
+          plisse_door_count: hasPlisseScreens ? plisseScreenEntries.filter(e => e.type === 'door').reduce((sum, e) => sum + e.count, 0) : 0,
+          plisse_window_count: hasPlisseScreens ? plisseScreenEntries.filter(e => e.type === 'window').reduce((sum, e) => sum + e.count, 0) : 0,
           screen_type: screenType || null,
           has_nailing_flanges: hasNailingFlanges,
           glass_ordered: glassOrdered,
@@ -427,34 +441,69 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
                 <Switch checked={hasPlisseScreens} onCheckedChange={setHasPlisseScreens} />
               </div>
               {hasPlisseScreens && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Total Count</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseScreensCount}
-                      onChange={(e) => setPlisseScreensCount(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Door Type</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseDoorCount}
-                      onChange={(e) => setPlisseDoorCount(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Window Type</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseWindowCount}
-                      onChange={(e) => setPlisseWindowCount(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
+                <div className="space-y-3">
+                  {plisseScreenEntries.map((entry, index) => (
+                    <div key={index} className="flex items-end gap-2">
+                      <div className="flex-1 space-y-2">
+                        <Label>Type</Label>
+                        <Select 
+                          value={entry.type} 
+                          onValueChange={(value) => {
+                            const updated = [...plisseScreenEntries];
+                            updated[index].type = value;
+                            setPlisseScreenEntries(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PLISSE_SCREEN_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-24 space-y-2">
+                        <Label>Count</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={entry.count}
+                          onChange={(e) => {
+                            const updated = [...plisseScreenEntries];
+                            updated[index].count = parseInt(e.target.value) || 1;
+                            setPlisseScreenEntries(updated);
+                          }}
+                        />
+                      </div>
+                      {plisseScreenEntries.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setPlisseScreenEntries(plisseScreenEntries.filter((_, i) => i !== index));
+                          }}
+                          className="shrink-0 text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPlisseScreenEntries([...plisseScreenEntries, { type: "", count: 1 }])}
+                    className="w-full gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Another Type
+                  </Button>
                 </div>
               )}
             </div>
