@@ -26,6 +26,7 @@ interface OrderFulfillment {
   glass_installed: boolean | null;
   screens_made: boolean | null;
   screens_delivered: boolean | null;
+  screens_cutting: string | null;
 }
 
 interface Order {
@@ -197,8 +198,9 @@ export default function Orders() {
     const glassPartial = !!(f?.glass_delivered);
     stages.push({ name: 'Glass', status: getBoolStatus(glassComplete, glassPartial) });
     
-    const screensComplete = !!(f?.screens_made || f?.screens_delivered);
-    stages.push({ name: 'Screens', status: getBoolStatus(screensComplete) });
+    const screensStatus = f?.screens_cutting === 'complete' ? 'complete' : 
+                         f?.screens_cutting === 'partial' ? 'partial' : 'not_started';
+    stages.push({ name: 'Screens', status: screensStatus });
     
     return stages;
   };

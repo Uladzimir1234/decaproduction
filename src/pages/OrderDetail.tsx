@@ -42,6 +42,7 @@ interface OrderFulfillment {
   glass_not_installed_notes: string | null;
   screens_made: boolean | null;
   screens_delivered: boolean | null;
+  screens_cutting: string | null;
   screens_notes: string | null;
 }
 
@@ -1144,63 +1145,58 @@ export default function OrderDetail() {
               </AccordionContent>
             </AccordionItem>
 
-            {/* Screens */}
-            {order.screen_type && (
-              <AccordionItem value="screens">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <StatusBadge 
-                      status={
-                        (order.screen_type === "deca" && fulfillment.screens_made) || 
-                        (order.screen_type === "flex" && fulfillment.screens_delivered) 
-                          ? "complete" 
-                          : "not_started"
-                      } 
-                    />
-                    <span>Screens ({order.screen_type === "deca" ? "Deca Aluminum" : "Flex"})</span>
-                    {order.screens_status !== 'available' && (
-                      <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
-                        <Lock className="h-3 w-3" />
-                        Screens {order.screens_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
-                      </Badge>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  {order.screens_status !== 'available' ? (
-                    <p className="text-sm text-muted-foreground">Screens must be available before this stage can be updated.</p>
-                  ) : (
-                    <>
-                      {order.screen_type === "deca" ? (
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={fulfillment.screens_made}
-                            onCheckedChange={(checked) => updateFulfillment("screens_made", checked)}
-                          />
-                          <Label>Screens Made</Label>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={fulfillment.screens_delivered}
-                            onCheckedChange={(checked) => updateFulfillment("screens_delivered", checked)}
-                          />
-                          <Label>Screens Delivered</Label>
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label>Notes (reason if not complete, expected date)</Label>
-                        <Textarea
-                          placeholder="Add notes about screens..."
-                          value={fulfillment.screens_notes || ""}
-                          onChange={(e) => updateFulfillment("screens_notes", e.target.value)}
-                        />
-                      </div>
-                    </>
+            {/* Made Screens */}
+            <AccordionItem value="screens">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge 
+                    status={
+                      fulfillment.screens_cutting === 'complete' ? 'complete' :
+                      fulfillment.screens_cutting === 'partial' ? 'partial' : 'not_started'
+                    } 
+                  />
+                  <span>Made Screens</span>
+                  {order.screens_status !== 'available' && (
+                    <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                      <Lock className="h-3 w-3" />
+                      Screens {order.screens_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                    </Badge>
                   )}
-                </AccordionContent>
-              </AccordionItem>
-            )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                {order.screens_status !== 'available' ? (
+                  <p className="text-sm text-muted-foreground">Screens must be available before this stage can be updated.</p>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={fulfillment.screens_cutting || "not_started"}
+                        onValueChange={(value) => updateFulfillment("screens_cutting", value)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="partial">Partially Done</SelectItem>
+                          <SelectItem value="complete">Complete</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes (reason if not complete, expected date)</Label>
+                      <Textarea
+                        placeholder="Add notes about screens..."
+                        value={fulfillment.screens_notes || ""}
+                        onChange={(e) => updateFulfillment("screens_notes", e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </CardContent>
       </Card>
