@@ -336,7 +336,7 @@ export default function Orders() {
                         <ProgressCircle
                           value={Math.max(0, timeLeft)}
                           size="sm"
-                          colorVariant="gradient-inverse"
+                          colorVariant="gradient"
                           label={daysUntil < 0 ? `${Math.abs(daysUntil)}d over` : `${daysUntil}d left`}
                           showValue={false}
                         />
