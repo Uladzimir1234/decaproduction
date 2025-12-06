@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -172,7 +172,7 @@ export default function Orders() {
     const f = fulfillments[order.id];
     
     type StageStatus = 'complete' | 'partial' | 'not_started';
-    const stages: { name: string; status: StageStatus; hasNotes: boolean }[] = [];
+    const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string }[] = [];
     
     const getStatus = (value: string | null | undefined): StageStatus => {
       if (value === 'complete') return 'complete';
@@ -181,23 +181,54 @@ export default function Orders() {
     };
     
     // Always show these stages
-    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting), hasNotes: false });
-    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting), hasNotes: false });
-    stages.push({ name: 'Welding', status: getStatus(f?.welding_status), hasNotes: !!(f?.welding_notes) });
+    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting), hasNotes: false, field: 'reinforcement_cutting' });
+    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting), hasNotes: false, field: 'profile_cutting' });
+    stages.push({ name: 'Welding', status: getStatus(f?.welding_status), hasNotes: !!(f?.welding_notes), field: 'welding_status' });
     
     // Conditional stages based on order
     if (order.doors_count && order.doors_count > 0) {
-      stages.push({ name: 'Doors', status: getStatus(f?.doors_status), hasNotes: !!(f?.doors_notes) });
+      stages.push({ name: 'Doors', status: getStatus(f?.doors_status), hasNotes: !!(f?.doors_notes), field: 'doors_status' });
     }
     if (order.has_sliding_doors) {
-      stages.push({ name: 'Sliding Doors', status: getStatus(f?.sliding_doors_status), hasNotes: !!(f?.sliding_doors_notes) });
+      stages.push({ name: 'Sliding Doors', status: getStatus(f?.sliding_doors_status), hasNotes: !!(f?.sliding_doors_notes), field: 'sliding_doors_status' });
     }
     
-    stages.push({ name: 'Assembly', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes) });
-    stages.push({ name: 'Glass', status: getStatus(f?.glass_status), hasNotes: !!(f?.glass_notes) });
-    stages.push({ name: 'Screens', status: getStatus(f?.screens_cutting), hasNotes: !!(f?.screens_notes) });
+    stages.push({ name: 'Assembly', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes), field: 'assembly_status' });
+    stages.push({ name: 'Glass', status: getStatus(f?.glass_status), hasNotes: !!(f?.glass_notes), field: 'glass_status' });
+    stages.push({ name: 'Screens', status: getStatus(f?.screens_cutting), hasNotes: !!(f?.screens_notes), field: 'screens_cutting' });
     
     return stages;
+  };
+
+  const handleStageStatusChange = async (orderId: string, field: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("order_fulfillment")
+        .update({ [field]: newStatus })
+        .eq("order_id", orderId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setFulfillments(prev => ({
+        ...prev,
+        [orderId]: {
+          ...prev[orderId],
+          [field]: newStatus
+        }
+      }));
+      
+      toast({
+        title: "Status updated",
+        description: `Stage updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
   };
   const getDaysUntilDelivery = (deliveryDate: string) => {
     const delivery = new Date(deliveryDate);
@@ -344,18 +375,53 @@ export default function Orders() {
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
                           {manufacturingStages.map((stage) => (
-                            <span 
-                              key={stage.name} 
-                              className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
-                                stage.status === 'complete' ? 'bg-emerald-500' : 
-                                stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                              }`}
-                            >
-                              {stage.name}
-                              {stage.hasNotes && (
-                                <AlertCircle className="h-3 w-3" />
-                              )}
-                            </span>
+                            <Popover key={stage.name}>
+                              <PopoverTrigger asChild>
+                                <button 
+                                  onClick={(e) => e.preventDefault()}
+                                  className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity ${
+                                    stage.status === 'complete' ? 'bg-emerald-500' : 
+                                    stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                  }`}
+                                >
+                                  {stage.name}
+                                  {stage.hasNotes && (
+                                    <AlertCircle className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-40 p-1" align="start">
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleStageStatusChange(order.id, stage.field, 'not_started');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'not_started' ? 'bg-red-100 text-red-700' : ''}`}
+                                  >
+                                    Not Started
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleStageStatusChange(order.id, stage.field, 'partial');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'partial' ? 'bg-amber-100 text-amber-700' : ''}`}
+                                  >
+                                    Partial
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleStageStatusChange(order.id, stage.field, 'complete');
+                                    }}
+                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : ''}`}
+                                  >
+                                    Complete
+                                  </button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           ))}
                         </div>
                       </Link>
