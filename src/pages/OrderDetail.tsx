@@ -1,0 +1,629 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { ProgressCircle } from "@/components/ui/progress-circle";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Save, Calendar, Package, Wrench } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
+type StageStatus = "not_started" | "partial" | "complete";
+
+interface OrderFulfillment {
+  id: string;
+  order_id: string;
+  reinforcement_cutting: StageStatus;
+  profile_cutting: StageStatus;
+  frames_welded: boolean;
+  doors_assembled: boolean;
+  doors_glass_available: boolean;
+  doors_glass_installed: boolean;
+  doors_notes: string | null;
+  sliding_doors_assembled: boolean;
+  sliding_doors_glass_available: boolean;
+  sliding_doors_glass_installed: boolean;
+  sliding_doors_notes: string | null;
+  frame_sash_assembled: boolean;
+  glass_delivered: boolean;
+  glass_not_delivered_notes: string | null;
+  glass_installed: boolean;
+  glass_not_installed_notes: string | null;
+  screens_made: boolean;
+  screens_delivered: boolean;
+  screens_notes: string | null;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  order_date: string;
+  delivery_date: string;
+  fulfillment_percentage: number;
+  windows_count: number;
+  doors_count: number;
+  has_sliding_doors: boolean;
+  sliding_doors_count: number;
+  sliding_door_type: string | null;
+  screen_type: string | null;
+  has_plisse_screens: boolean;
+  glass_ordered: boolean;
+}
+
+export default function OrderDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      fetchOrder();
+    }
+  }, [id]);
+
+  const fetchOrder = async () => {
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (orderError) throw orderError;
+      if (!orderData) {
+        navigate("/orders");
+        return;
+      }
+
+      setOrder(orderData);
+
+      // Fetch or create fulfillment record
+      let { data: fulfillmentData, error: fulfillmentError } = await supabase
+        .from("order_fulfillment")
+        .select("*")
+        .eq("order_id", id)
+        .maybeSingle();
+
+      if (fulfillmentError && fulfillmentError.code !== "PGRST116") throw fulfillmentError;
+
+      if (!fulfillmentData) {
+        // Create fulfillment record
+        const { data: newFulfillment, error: createError } = await supabase
+          .from("order_fulfillment")
+          .insert({
+            order_id: id,
+            reinforcement_cutting: "not_started",
+            profile_cutting: "not_started",
+            frames_welded: false,
+            doors_assembled: false,
+            doors_glass_available: false,
+            doors_glass_installed: false,
+            sliding_doors_assembled: false,
+            sliding_doors_glass_available: false,
+            sliding_doors_glass_installed: false,
+            frame_sash_assembled: false,
+            glass_delivered: false,
+            glass_installed: false,
+            screens_made: false,
+            screens_delivered: false,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        fulfillmentData = newFulfillment;
+      }
+
+      setFulfillment(fulfillmentData);
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load order details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateFulfillmentPercentage = (data: Partial<OrderFulfillment>) => {
+    let totalSteps = 0;
+    let completedSteps = 0;
+
+    // Reinforcement cutting (weight: 10%)
+    totalSteps += 10;
+    if (data.reinforcement_cutting === "complete") completedSteps += 10;
+    else if (data.reinforcement_cutting === "partial") completedSteps += 5;
+
+    // Profile cutting (weight: 10%)
+    totalSteps += 10;
+    if (data.profile_cutting === "complete") completedSteps += 10;
+    else if (data.profile_cutting === "partial") completedSteps += 5;
+
+    // Frames welded (weight: 10%)
+    totalSteps += 10;
+    if (data.frames_welded) completedSteps += 10;
+
+    // Doors assembled (if applicable) (weight: 10%)
+    if (order?.doors_count && order.doors_count > 0) {
+      totalSteps += 10;
+      if (data.doors_assembled) completedSteps += 10;
+    }
+
+    // Sliding doors assembled (if applicable) (weight: 10%)
+    if (order?.has_sliding_doors) {
+      totalSteps += 10;
+      if (data.sliding_doors_assembled) completedSteps += 10;
+    }
+
+    // Frame/sash assembled (weight: 15%)
+    totalSteps += 15;
+    if (data.frame_sash_assembled) completedSteps += 15;
+
+    // Glass delivered (weight: 10%)
+    totalSteps += 10;
+    if (data.glass_delivered) completedSteps += 10;
+
+    // Glass installed (weight: 15%)
+    totalSteps += 15;
+    if (data.glass_installed) completedSteps += 15;
+
+    // Screens (weight: 10%)
+    totalSteps += 10;
+    if (order?.screen_type === "deca" && data.screens_made) completedSteps += 10;
+    else if (order?.screen_type === "flex" && data.screens_delivered) completedSteps += 10;
+    else if (!order?.screen_type) totalSteps -= 10;
+
+    return Math.round((completedSteps / totalSteps) * 100);
+  };
+
+  const handleSave = async () => {
+    if (!fulfillment || !order) return;
+
+    setSaving(true);
+    try {
+      const newPercentage = calculateFulfillmentPercentage(fulfillment);
+
+      const { error: fulfillmentError } = await supabase
+        .from("order_fulfillment")
+        .update(fulfillment)
+        .eq("id", fulfillment.id);
+
+      if (fulfillmentError) throw fulfillmentError;
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({ fulfillment_percentage: newPercentage })
+        .eq("id", order.id);
+
+      if (orderError) throw orderError;
+
+      setOrder({ ...order, fulfillment_percentage: newPercentage });
+
+      toast({
+        title: "Saved",
+        description: "Order fulfillment updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save changes",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateFulfillment = (key: keyof OrderFulfillment, value: any) => {
+    if (!fulfillment) return;
+    setFulfillment({ ...fulfillment, [key]: value });
+  };
+
+  const getDaysUntilDelivery = () => {
+    if (!order) return 0;
+    const delivery = new Date(order.delivery_date);
+    const now = new Date();
+    return Math.ceil((delivery.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getTimePercentage = () => {
+    if (!order) return 0;
+    const orderDate = new Date(order.order_date);
+    const delivery = new Date(order.delivery_date);
+    const now = new Date();
+    const total = delivery.getTime() - orderDate.getTime();
+    const elapsed = now.getTime() - orderDate.getTime();
+    return Math.max(0, Math.min(100, 100 - (elapsed / total) * 100));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse text-muted-foreground">Loading order...</div>
+      </div>
+    );
+  }
+
+  if (!order || !fulfillment) {
+    return null;
+  }
+
+  const daysUntil = getDaysUntilDelivery();
+  const timeLeft = getTimePercentage();
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <Button variant="ghost" onClick={() => navigate("/orders")} className="gap-2 mb-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Orders
+          </Button>
+          <h1 className="text-2xl font-bold">Order #{order.order_number}</h1>
+          <p className="text-muted-foreground">{order.customer_name}</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Fulfillment</p>
+                <p className="text-2xl font-bold">{order.fulfillment_percentage}%</p>
+              </div>
+              <ProgressCircle value={order.fulfillment_percentage} size="md" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Time Left</p>
+                <p className="text-2xl font-bold">{daysUntil}d</p>
+              </div>
+              <ProgressCircle 
+                value={timeLeft} 
+                size="md" 
+                colorVariant={daysUntil < 0 ? "danger" : daysUntil < 7 ? "warning" : "info"} 
+              />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 flex items-center gap-3">
+            <Package className="h-8 w-8 text-muted-foreground" />
+            <div>
+              <p className="text-sm text-muted-foreground">Products</p>
+              <p className="font-medium">
+                {order.windows_count}W / {order.doors_count}D
+                {order.has_sliding_doors && ` / ${order.sliding_doors_count}S`}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 flex items-center gap-3">
+            <Calendar className="h-8 w-8 text-muted-foreground" />
+            <div>
+              <p className="text-sm text-muted-foreground">Delivery</p>
+              <p className="font-medium">
+                {new Date(order.delivery_date).toLocaleDateString()}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Fulfillment Stages */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Manufacturing Stages
+          </CardTitle>
+          <CardDescription>Track progress through each manufacturing step</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Accordion type="multiple" className="w-full">
+            {/* Reinforcement Cutting */}
+            <AccordionItem value="reinforcement">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.reinforcement_cutting} />
+                  <span>Reinforcement Cutting</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                <Select
+                  value={fulfillment.reinforcement_cutting}
+                  onValueChange={(value: StageStatus) => updateFulfillment("reinforcement_cutting", value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not Started</SelectItem>
+                    <SelectItem value="partial">Partially Done</SelectItem>
+                    <SelectItem value="complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Profile Cutting */}
+            <AccordionItem value="profile">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.profile_cutting} />
+                  <span>Profile Cutting</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                <Select
+                  value={fulfillment.profile_cutting}
+                  onValueChange={(value: StageStatus) => updateFulfillment("profile_cutting", value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not Started</SelectItem>
+                    <SelectItem value="partial">Partially Done</SelectItem>
+                    <SelectItem value="complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Frames Welded */}
+            <AccordionItem value="welding">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.frames_welded ? "complete" : "not_started"} />
+                  <span>Frames/Sashes Welded</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={fulfillment.frames_welded}
+                    onCheckedChange={(checked) => updateFulfillment("frames_welded", checked)}
+                  />
+                  <Label>{fulfillment.frames_welded ? "Complete" : "Not Complete"}</Label>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Doors Assembled - only if order has doors */}
+            {order.doors_count > 0 && (
+              <AccordionItem value="doors">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={fulfillment.doors_assembled ? "complete" : "not_started"} />
+                    <span>Doors Assembled</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.doors_assembled}
+                      onCheckedChange={(checked) => updateFulfillment("doors_assembled", checked)}
+                    />
+                    <Label>Doors Assembled</Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.doors_glass_available}
+                      onCheckedChange={(checked) => updateFulfillment("doors_glass_available", checked)}
+                    />
+                    <Label>Glass Available</Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.doors_glass_installed}
+                      onCheckedChange={(checked) => updateFulfillment("doors_glass_installed", checked)}
+                    />
+                    <Label>Glass Installed</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Add notes about door assembly..."
+                      value={fulfillment.doors_notes || ""}
+                      onChange={(e) => updateFulfillment("doors_notes", e.target.value)}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Sliding Doors Assembled - only if order has sliding doors */}
+            {order.has_sliding_doors && (
+              <AccordionItem value="sliding">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={fulfillment.sliding_doors_assembled ? "complete" : "not_started"} />
+                    <span>Sliding Doors Assembled</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.sliding_doors_assembled}
+                      onCheckedChange={(checked) => updateFulfillment("sliding_doors_assembled", checked)}
+                    />
+                    <Label>Sliding Doors Assembled</Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.sliding_doors_glass_available}
+                      onCheckedChange={(checked) => updateFulfillment("sliding_doors_glass_available", checked)}
+                    />
+                    <Label>Glass Available</Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={fulfillment.sliding_doors_glass_installed}
+                      onCheckedChange={(checked) => updateFulfillment("sliding_doors_glass_installed", checked)}
+                    />
+                    <Label>Glass Installed</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Add notes about sliding door assembly..."
+                      value={fulfillment.sliding_doors_notes || ""}
+                      onChange={(e) => updateFulfillment("sliding_doors_notes", e.target.value)}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+
+            {/* Frame & Sash Assembled */}
+            <AccordionItem value="frame-sash">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.frame_sash_assembled ? "complete" : "not_started"} />
+                  <span>Frame & Sash Assembled</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={fulfillment.frame_sash_assembled}
+                    onCheckedChange={(checked) => updateFulfillment("frame_sash_assembled", checked)}
+                  />
+                  <Label>{fulfillment.frame_sash_assembled ? "Complete" : "Not Complete"}</Label>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Glass Delivered */}
+            <AccordionItem value="glass-delivery">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.glass_delivered ? "complete" : "not_started"} />
+                  <span>Glass Delivered</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={fulfillment.glass_delivered}
+                    onCheckedChange={(checked) => updateFulfillment("glass_delivered", checked)}
+                  />
+                  <Label>All Glass Delivered</Label>
+                </div>
+                {!fulfillment.glass_delivered && (
+                  <div className="space-y-2">
+                    <Label>Notes (window numbers not delivered, reason)</Label>
+                    <Textarea
+                      placeholder="e.g., Windows #3, #5 not delivered - back-ordered..."
+                      value={fulfillment.glass_not_delivered_notes || ""}
+                      onChange={(e) => updateFulfillment("glass_not_delivered_notes", e.target.value)}
+                    />
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Glass Installed */}
+            <AccordionItem value="glass-install">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={fulfillment.glass_installed ? "complete" : "not_started"} />
+                  <span>Glass Installed</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={fulfillment.glass_installed}
+                    onCheckedChange={(checked) => updateFulfillment("glass_installed", checked)}
+                  />
+                  <Label>All Glass Installed</Label>
+                </div>
+                {!fulfillment.glass_installed && (
+                  <div className="space-y-2">
+                    <Label>Notes (which windows not installed, reason)</Label>
+                    <Textarea
+                      placeholder="e.g., Window #7 not installed - waiting for frame adjustment..."
+                      value={fulfillment.glass_not_installed_notes || ""}
+                      onChange={(e) => updateFulfillment("glass_not_installed_notes", e.target.value)}
+                    />
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Screens */}
+            {order.screen_type && (
+              <AccordionItem value="screens">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge 
+                      status={
+                        (order.screen_type === "deca" && fulfillment.screens_made) || 
+                        (order.screen_type === "flex" && fulfillment.screens_delivered) 
+                          ? "complete" 
+                          : "not_started"
+                      } 
+                    />
+                    <span>Screens ({order.screen_type === "deca" ? "Deca Aluminum" : "Flex"})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  {order.screen_type === "deca" ? (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={fulfillment.screens_made}
+                        onCheckedChange={(checked) => updateFulfillment("screens_made", checked)}
+                      />
+                      <Label>Screens Made</Label>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={fulfillment.screens_delivered}
+                        onCheckedChange={(checked) => updateFulfillment("screens_delivered", checked)}
+                      />
+                      <Label>Screens Delivered</Label>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label>Notes (reason if not complete, expected date)</Label>
+                    <Textarea
+                      placeholder="Add notes about screens..."
+                      value={fulfillment.screens_notes || ""}
+                      onChange={(e) => updateFulfillment("screens_notes", e.target.value)}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+          </Accordion>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
