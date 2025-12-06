@@ -9,27 +9,35 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-
 interface Customer {
   id: string;
   name: string;
 }
-
-const SLIDING_DOOR_TYPES = [
-  { value: "multi_slide", label: "Multi Slide" },
-  { value: "smart_slide", label: "Smart Slide" },
-  { value: "lift_and_slide", label: "Lift and Slide" },
-  { value: "psk", label: "PSK" },
-];
-
-const SCREEN_TYPES = [
-  { value: "flex", label: "Flex Screen" },
-  { value: "deca", label: "Deca Aluminum Screen" },
-];
-
+const SLIDING_DOOR_TYPES = [{
+  value: "multi_slide",
+  label: "Multi Slide"
+}, {
+  value: "smart_slide",
+  label: "Smart Slide"
+}, {
+  value: "lift_and_slide",
+  label: "Lift and Slide"
+}, {
+  value: "psk",
+  label: "PSK"
+}];
+const SCREEN_TYPES = [{
+  value: "flex",
+  label: "Flex Screen"
+}, {
+  value: "deca",
+  label: "Deca Aluminum Screen"
+}];
 export default function OrderCreate() {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [step, setStep] = useState(1);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,24 +72,20 @@ export default function OrderCreate() {
   const [hiddenHingesCount, setHiddenHingesCount] = useState(0);
   const [visibleHingesCount, setVisibleHingesCount] = useState(0);
   const [hardwareAvailable, setHardwareAvailable] = useState(false);
-
   useEffect(() => {
     fetchCustomers();
   }, []);
-
   const fetchCustomers = async () => {
-    const { data, error } = await supabase
-      .from("customers")
-      .select("id, name")
-      .order("name");
-
+    const {
+      data,
+      error
+    } = await supabase.from("customers").select("id, name").order("name");
     if (error) {
       console.error("Error fetching customers:", error);
     } else {
       setCustomers(data || []);
     }
   };
-
   const handleCustomerChange = (value: string) => {
     if (value === "new") {
       setIsNewCustomer(true);
@@ -90,13 +94,12 @@ export default function OrderCreate() {
     } else {
       setIsNewCustomer(false);
       setCustomerId(value);
-      const customer = customers.find((c) => c.id === value);
+      const customer = customers.find(c => c.id === value);
       if (customer) {
         setCustomerName(customer.name);
       }
     }
   };
-
   const validateStep = () => {
     if (step === 1) {
       const hasCustomer = isNewCustomer ? customerName.trim() : customerId;
@@ -104,7 +107,7 @@ export default function OrderCreate() {
         toast({
           title: "Missing fields",
           description: "Please fill in all required fields",
-          variant: "destructive",
+          variant: "destructive"
         });
         return false;
       }
@@ -114,52 +117,51 @@ export default function OrderCreate() {
         toast({
           title: "No products",
           description: "Please add at least one window, door, or sliding door",
-          variant: "destructive",
+          variant: "destructive"
         });
         return false;
       }
     }
     return true;
   };
-
   const handleNext = () => {
     if (validateStep()) {
       setStep(step + 1);
     }
   };
-
   const handleBack = () => {
     setStep(step - 1);
   };
-
   const handleSubmit = async () => {
     if (!validateStep()) return;
-
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
       let finalCustomerId = customerId;
       let finalCustomerName = customerName;
 
       // Create new customer if needed
       if (isNewCustomer && customerName.trim()) {
-        const { data: newCustomer, error: customerError } = await supabase
-          .from("customers")
-          .insert({
-            user_id: user.id,
-            name: customerName.trim(),
-          })
-          .select()
-          .single();
-
+        const {
+          data: newCustomer,
+          error: customerError
+        } = await supabase.from("customers").insert({
+          user_id: user.id,
+          name: customerName.trim()
+        }).select().single();
         if (customerError) throw customerError;
         finalCustomerId = newCustomer.id;
         finalCustomerName = newCustomer.name;
       }
-
-      const { data, error } = await supabase.from("orders").insert({
+      const {
+        data,
+        error
+      } = await supabase.from("orders").insert({
         user_id: user.id,
         customer_id: finalCustomerId,
         customer_name: finalCustomerName,
@@ -185,30 +187,25 @@ export default function OrderCreate() {
         hidden_hinges_count: hiddenHingesCount,
         visible_hinges_count: visibleHingesCount,
         hardware_available: hardwareAvailable,
-        fulfillment_percentage: 0,
+        fulfillment_percentage: 0
       }).select().single();
-
       if (error) throw error;
-
       toast({
         title: "Order created",
-        description: `Order #${orderNumber} has been created successfully.`,
+        description: `Order #${orderNumber} has been created successfully.`
       });
-
       navigate(`/orders/${data.id}`);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to create order",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
-  return (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+  return <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate("/orders")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" />
@@ -220,18 +217,10 @@ export default function OrderCreate() {
 
       {/* Progress indicator */}
       <div className="flex gap-2 mb-6">
-        {[1, 2, 3].map((s) => (
-          <div
-            key={s}
-            className={`h-2 flex-1 rounded-full transition-colors ${
-              s <= step ? "bg-primary" : "bg-muted"
-            }`}
-          />
-        ))}
+        {[1, 2, 3].map(s => <div key={s} className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-muted"}`} />)}
       </div>
 
-      {step === 1 && (
-        <Card>
+      {step === 1 && <Card>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
             <CardDescription>Customer and order details</CardDescription>
@@ -247,79 +236,47 @@ export default function OrderCreate() {
                   <SelectItem value="new" className="text-primary font-medium">
                     + Add New Customer
                   </SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
+                  {customers.map(customer => <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            {isNewCustomer && (
-              <div className="space-y-2">
+            {isNewCustomer && <div className="space-y-2">
                 <Label>Customer Name *</Label>
-                <Input
-                  placeholder="Enter customer name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-            )}
+                <Input placeholder="Enter customer name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+              </div>}
             <div className="space-y-2">
               <Label>Order Number *</Label>
-              <Input
-                placeholder="e.g., ORD-2024-001"
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-              />
+              <Input placeholder="e.g., ORD-2024-001" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Order Date *</Label>
-                <Input
-                  type="date"
-                  value={orderDate}
-                  onChange={(e) => setOrderDate(e.target.value)}
-                />
+                <Input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Delivery Date *</Label>
-                <Input
-                  type="date"
-                  value={deliveryDate}
-                  onChange={(e) => setDeliveryDate(e.target.value)}
-                />
+                <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
-      {step === 2 && (
-        <Card>
+      {step === 2 && <Card>
           <CardHeader>
-            <CardTitle>Product Details</CardTitle>
+            <CardTitle>Order Details</CardTitle>
             <CardDescription>Windows, doors, and accessories</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Number of Windows</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={windowsCount}
-                  onChange={(e) => setWindowsCount(parseInt(e.target.value) || 0)}
-                />
+                <Input type="number" min="0" value={windowsCount} onChange={e => setWindowsCount(parseInt(e.target.value) || 0)} />
               </div>
               <div className="space-y-2">
                 <Label>Number of Doors</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={doorsCount}
-                  onChange={(e) => setDoorsCount(parseInt(e.target.value) || 0)}
-                />
+                <Input type="number" min="0" value={doorsCount} onChange={e => setDoorsCount(parseInt(e.target.value) || 0)} />
               </div>
             </div>
 
@@ -328,16 +285,10 @@ export default function OrderCreate() {
                 <Label>Sliding Doors</Label>
                 <Switch checked={hasSlidingDoors} onCheckedChange={setHasSlidingDoors} />
               </div>
-              {hasSlidingDoors && (
-                <div className="grid grid-cols-2 gap-4">
+              {hasSlidingDoors && <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Count</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={slidingDoorsCount}
-                      onChange={(e) => setSlidingDoorsCount(parseInt(e.target.value) || 0)}
-                    />
+                    <Input type="number" min="1" value={slidingDoorsCount} onChange={e => setSlidingDoorsCount(parseInt(e.target.value) || 0)} />
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
@@ -346,16 +297,13 @@ export default function OrderCreate() {
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SLIDING_DOOR_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
+                        {SLIDING_DOOR_TYPES.map(type => <SelectItem key={type.value} value={type.value}>
                             {type.label}
-                          </SelectItem>
-                        ))}
+                          </SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-              )}
+                </div>}
             </div>
 
             <div className="space-y-4 p-4 rounded-lg border">
@@ -363,37 +311,20 @@ export default function OrderCreate() {
                 <Label>Plisse Screens</Label>
                 <Switch checked={hasPlisseScreens} onCheckedChange={setHasPlisseScreens} />
               </div>
-              {hasPlisseScreens && (
-                <div className="grid grid-cols-3 gap-4">
+              {hasPlisseScreens && <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Total Count</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseScreensCount}
-                      onChange={(e) => setPlisseScreensCount(parseInt(e.target.value) || 0)}
-                    />
+                    <Input type="number" min="0" value={plisseScreensCount} onChange={e => setPlisseScreensCount(parseInt(e.target.value) || 0)} />
                   </div>
                   <div className="space-y-2">
                     <Label>Door Type</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseDoorCount}
-                      onChange={(e) => setPlisseDoorCount(parseInt(e.target.value) || 0)}
-                    />
+                    <Input type="number" min="0" value={plisseDoorCount} onChange={e => setPlisseDoorCount(parseInt(e.target.value) || 0)} />
                   </div>
                   <div className="space-y-2">
                     <Label>Window Type</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={plisseWindowCount}
-                      onChange={(e) => setPlisseWindowCount(parseInt(e.target.value) || 0)}
-                    />
+                    <Input type="number" min="0" value={plisseWindowCount} onChange={e => setPlisseWindowCount(parseInt(e.target.value) || 0)} />
                   </div>
-                </div>
-              )}
+                </div>}
             </div>
 
             <div className="space-y-2">
@@ -403,11 +334,9 @@ export default function OrderCreate() {
                   <SelectValue placeholder="Select screen type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCREEN_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
+                  {SCREEN_TYPES.map(type => <SelectItem key={type.value} value={type.value}>
                       {type.label}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -417,11 +346,9 @@ export default function OrderCreate() {
               <Switch checked={hasNailingFlanges} onCheckedChange={setHasNailingFlanges} />
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
-      {step === 3 && (
-        <Card>
+      {step === 3 && <Card>
           <CardHeader>
             <CardTitle>Component Availability</CardTitle>
             <CardDescription>Track materials and hardware status</CardDescription>
@@ -432,28 +359,20 @@ export default function OrderCreate() {
               <Switch checked={glassOrdered} onCheckedChange={setGlassOrdered} />
             </div>
 
-            {screenType === "deca" && (
-              <div className="flex items-center justify-between p-4 rounded-lg border">
+            {screenType === "deca" && <div className="flex items-center justify-between p-4 rounded-lg border">
                 <Label>Deca Screen Profile Available</Label>
                 <Switch checked={screenProfileAvailable} onCheckedChange={setScreenProfileAvailable} />
-              </div>
-            )}
+              </div>}
 
-            {screenType === "flex" && (
-              <div className="flex items-center justify-between p-4 rounded-lg border">
+            {screenType === "flex" && <div className="flex items-center justify-between p-4 rounded-lg border">
                 <Label>Flex Screen Profile Ordered</Label>
                 <Switch checked={screenProfileOrdered} onCheckedChange={setScreenProfileOrdered} />
-              </div>
-            )}
+              </div>}
 
             <div className="space-y-4 p-4 rounded-lg border">
               <div className="space-y-2">
                 <Label>Windows Profile Type</Label>
-                <Input
-                  placeholder="e.g., uPVC 70mm"
-                  value={windowsProfileType}
-                  onChange={(e) => setWindowsProfileType(e.target.value)}
-                />
+                <Input placeholder="e.g., uPVC 70mm" value={windowsProfileType} onChange={e => setWindowsProfileType(e.target.value)} />
               </div>
               <div className="flex items-center justify-between">
                 <Label>Profile Available</Label>
@@ -466,21 +385,11 @@ export default function OrderCreate() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Hidden Hinges Count</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={hiddenHingesCount}
-                    onChange={(e) => setHiddenHingesCount(parseInt(e.target.value) || 0)}
-                  />
+                  <Input type="number" min="0" value={hiddenHingesCount} onChange={e => setHiddenHingesCount(parseInt(e.target.value) || 0)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Visible Hinges Count</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={visibleHingesCount}
-                    onChange={(e) => setVisibleHingesCount(parseInt(e.target.value) || 0)}
-                  />
+                  <Input type="number" min="0" value={visibleHingesCount} onChange={e => setVisibleHingesCount(parseInt(e.target.value) || 0)} />
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -489,31 +398,21 @@ export default function OrderCreate() {
               </div>
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       <div className="flex justify-between mt-6">
-        {step > 1 ? (
-          <Button variant="outline" onClick={handleBack}>
+        {step > 1 ? <Button variant="outline" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
-          </Button>
-        ) : (
-          <div />
-        )}
+          </Button> : <div />}
 
-        {step < 3 ? (
-          <Button onClick={handleNext}>
+        {step < 3 ? <Button onClick={handleNext}>
             Next
             <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        ) : (
-          <Button onClick={handleSubmit} disabled={loading}>
+          </Button> : <Button onClick={handleSubmit} disabled={loading}>
             <Check className="h-4 w-4 mr-2" />
             {loading ? "Creating..." : "Create Order"}
-          </Button>
-        )}
+          </Button>}
       </div>
-    </div>
-  );
+    </div>;
 }
