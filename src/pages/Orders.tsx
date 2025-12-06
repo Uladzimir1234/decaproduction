@@ -159,24 +159,46 @@ export default function Orders() {
   const getManufacturingStages = (order: Order) => {
     const f = fulfillments[order.id];
     
-    const stages: { name: string; complete: boolean }[] = [];
+    type StageStatus = 'complete' | 'partial' | 'not_started';
+    const stages: { name: string; status: StageStatus }[] = [];
+    
+    const getStatus = (value: string | null | undefined): StageStatus => {
+      if (value === 'complete') return 'complete';
+      if (value === 'partial') return 'partial';
+      return 'not_started';
+    };
+    
+    const getBoolStatus = (complete: boolean, partial?: boolean): StageStatus => {
+      if (complete) return 'complete';
+      if (partial) return 'partial';
+      return 'not_started';
+    };
     
     // Always show these stages
-    stages.push({ name: 'Reinforcement', complete: f?.reinforcement_cutting === 'complete' });
-    stages.push({ name: 'Profile Cut', complete: f?.profile_cutting === 'complete' });
-    stages.push({ name: 'Welding', complete: !!f?.frames_welded });
+    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting) });
+    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting) });
+    stages.push({ name: 'Welding', status: getBoolStatus(!!f?.frames_welded) });
     
     // Conditional stages based on order
     if (order.doors_count && order.doors_count > 0) {
-      stages.push({ name: 'Doors', complete: !!(f?.doors_assembled && f?.doors_glass_installed) });
+      const doorsComplete = !!(f?.doors_assembled && f?.doors_glass_installed);
+      const doorsPartial = !!f?.doors_assembled;
+      stages.push({ name: 'Doors', status: getBoolStatus(doorsComplete, doorsPartial) });
     }
     if (order.has_sliding_doors) {
-      stages.push({ name: 'Sliding Doors', complete: !!(f?.sliding_doors_assembled && f?.sliding_doors_glass_installed) });
+      const slidingComplete = !!(f?.sliding_doors_assembled && f?.sliding_doors_glass_installed);
+      const slidingPartial = !!f?.sliding_doors_assembled;
+      stages.push({ name: 'Sliding Doors', status: getBoolStatus(slidingComplete, slidingPartial) });
     }
     
-    stages.push({ name: 'Assembly', complete: !!f?.frame_sash_assembled });
-    stages.push({ name: 'Glass', complete: !!(f?.glass_delivered && f?.glass_installed) });
-    stages.push({ name: 'Screens', complete: !!(f?.screens_made || f?.screens_delivered) });
+    stages.push({ name: 'Assembly', status: getBoolStatus(!!f?.frame_sash_assembled) });
+    
+    const glassComplete = !!(f?.glass_delivered && f?.glass_installed);
+    const glassPartial = !!(f?.glass_delivered);
+    stages.push({ name: 'Glass', status: getBoolStatus(glassComplete, glassPartial) });
+    
+    const screensComplete = !!(f?.screens_made || f?.screens_delivered);
+    stages.push({ name: 'Screens', status: getBoolStatus(screensComplete) });
     
     return stages;
   };
@@ -328,7 +350,8 @@ export default function Orders() {
                             <span 
                               key={stage.name} 
                               className={`inline-flex items-center rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
-                                stage.complete ? 'bg-emerald-500' : 'bg-red-500'
+                                stage.status === 'complete' ? 'bg-emerald-500' : 
+                                stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
                               }`}
                             >
                               {stage.name}
