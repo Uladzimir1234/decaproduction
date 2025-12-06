@@ -4,12 +4,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+
+interface OrderFulfillment {
+  order_id: string;
+  reinforcement_cutting: string | null;
+  profile_cutting: string | null;
+  frames_welded: boolean | null;
+  doors_assembled: boolean | null;
+  doors_glass_installed: boolean | null;
+  sliding_doors_assembled: boolean | null;
+  sliding_doors_glass_installed: boolean | null;
+  frame_sash_assembled: boolean | null;
+  glass_delivered: boolean | null;
+  glass_installed: boolean | null;
+  screens_made: boolean | null;
+  screens_delivered: boolean | null;
+}
 
 interface Order {
   id: string;
@@ -51,6 +67,7 @@ interface Order {
 export default function Orders() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -62,6 +79,7 @@ export default function Orders() {
 
   useEffect(() => {
     fetchOrders();
+    fetchFulfillments();
   }, []);
 
   const handleEditClick = (e: React.MouseEvent, order: Order) => {
@@ -121,6 +139,37 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFulfillments = async () => {
+    try {
+      const { data, error } = await supabase.from("order_fulfillment").select("*");
+      if (error) throw error;
+      const fulfillmentMap: Record<string, OrderFulfillment> = {};
+      data?.forEach((f) => {
+        fulfillmentMap[f.order_id] = f;
+      });
+      setFulfillments(fulfillmentMap);
+    } catch (error) {
+      console.error("Error fetching fulfillments:", error);
+    }
+  };
+
+  const getCompletedStages = (order: Order) => {
+    const f = fulfillments[order.id];
+    if (!f) return [];
+    
+    const stages: string[] = [];
+    if (f.reinforcement_cutting === 'done') stages.push('Reinforcement');
+    if (f.profile_cutting === 'done') stages.push('Profile Cut');
+    if (f.frames_welded) stages.push('Welding');
+    if (order.doors_count && order.doors_count > 0 && f.doors_assembled && f.doors_glass_installed) stages.push('Doors');
+    if (order.has_sliding_doors && f.sliding_doors_assembled && f.sliding_doors_glass_installed) stages.push('Sliding Doors');
+    if (f.frame_sash_assembled) stages.push('Assembly');
+    if (f.glass_delivered && f.glass_installed) stages.push('Glass');
+    if (f.screens_made || f.screens_delivered) stages.push('Screens');
+    
+    return stages;
   };
   const getDaysUntilDelivery = (deliveryDate: string) => {
     const delivery = new Date(deliveryDate);
@@ -220,6 +269,7 @@ export default function Orders() {
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
             const orderedComponents = getOrderedComponents(order);
+            const completedStages = getCompletedStages(order);
             return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
@@ -258,6 +308,17 @@ export default function Orders() {
                             {orderedComponents.map((component) => (
                               <Badge key={component} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
                                 {component}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {completedStages.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mr-1">Manufactured:</span>
+                            {completedStages.map((stage) => (
+                              <Badge key={stage} variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                                {stage}
                               </Badge>
                             ))}
                           </div>
