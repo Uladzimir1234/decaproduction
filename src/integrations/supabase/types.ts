@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_steps: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          order_date: string | null
+          order_id: string
+          status: string
+          step_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          order_date?: string | null
+          order_id: string
+          status?: string
+          step_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          order_date?: string | null
+          order_id?: string
+          status?: string
+          step_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_steps_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null

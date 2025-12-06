@@ -11,13 +11,24 @@ import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 type StageStatus = "not_started" | "partial" | "complete";
+
+interface CustomStep {
+  id: string;
+  order_id: string;
+  step_type: 'ordering' | 'manufacturing';
+  name: string;
+  status: string;
+  order_date: string | null;
+  notes: string | null;
+}
 
 interface OrderFulfillment {
   id: string;
@@ -94,12 +105,106 @@ export default function OrderDetail() {
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
+  const [newOrderingStepName, setNewOrderingStepName] = useState("");
+  const [newManufacturingStepName, setNewManufacturingStepName] = useState("");
+  const [orderingDialogOpen, setOrderingDialogOpen] = useState(false);
+  const [manufacturingDialogOpen, setManufacturingDialogOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchOrder();
+      fetchCustomSteps();
     }
   }, [id]);
+
+  const fetchCustomSteps = async () => {
+    if (!id) return;
+    const { data, error } = await supabase
+      .from("custom_steps")
+      .select("*")
+      .eq("order_id", id)
+      .order("created_at");
+    
+    if (!error && data) {
+      setCustomSteps(data as CustomStep[]);
+    }
+  };
+
+  const addCustomStep = async (stepType: 'ordering' | 'manufacturing', name: string) => {
+    if (!id || !name.trim()) return;
+    
+    const defaultStatus = stepType === 'ordering' ? 'not_ordered' : 'not_started';
+    
+    const { data, error } = await supabase
+      .from("custom_steps")
+      .insert({
+        order_id: id,
+        step_type: stepType,
+        name: name.trim(),
+        status: defaultStatus,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add custom step",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCustomSteps([...customSteps, data as CustomStep]);
+    toast({ title: "Added", description: `Custom ${stepType} step added` });
+    
+    if (stepType === 'ordering') {
+      setNewOrderingStepName("");
+      setOrderingDialogOpen(false);
+    } else {
+      setNewManufacturingStepName("");
+      setManufacturingDialogOpen(false);
+    }
+  };
+
+  const updateCustomStep = async (stepId: string, updates: Partial<CustomStep>) => {
+    const { error } = await supabase
+      .from("custom_steps")
+      .update(updates)
+      .eq("id", stepId);
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update custom step",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCustomSteps(customSteps.map(s => s.id === stepId ? { ...s, ...updates } : s));
+    toast({ title: "Saved", description: "Custom step updated" });
+  };
+
+  const deleteCustomStep = async (stepId: string) => {
+    const { error } = await supabase
+      .from("custom_steps")
+      .delete()
+      .eq("id", stepId);
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete custom step",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCustomSteps(customSteps.filter(s => s.id !== stepId));
+    toast({ title: "Deleted", description: "Custom step removed" });
+  };
 
   const fetchOrder = async () => {
     try {
@@ -469,11 +574,46 @@ export default function OrderDetail() {
         {/* Ordering Stages */}
         <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Ordering Stages - #{order.order_number}
-          </CardTitle>
-          <CardDescription>Update component availability and order dates</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Ordering Stages - #{order.order_number}
+              </CardTitle>
+              <CardDescription>Update component availability and order dates</CardDescription>
+            </div>
+            <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add Step
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Custom Ordering Step</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Step Name</Label>
+                    <Input
+                      placeholder="e.g., Special Hardware, Custom Seals..."
+                      value={newOrderingStepName}
+                      onChange={(e) => setNewOrderingStepName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addCustomStep('ordering', newOrderingStepName)}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => addCustomStep('ordering', newOrderingStepName)}
+                    disabled={!newOrderingStepName.trim()}
+                    className="w-full"
+                  >
+                    Add Step
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="w-full">
@@ -840,6 +980,77 @@ export default function OrderDetail() {
                 </div>
               </AccordionContent>
             </AccordionItem>
+
+            {/* Custom Ordering Steps */}
+            {customSteps.filter(s => s.step_type === 'ordering').map((step) => (
+              <AccordionItem key={step.id} value={`custom-ordering-${step.id}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    {step.status === 'available' ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : step.status === 'ordered' ? (
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    )}
+                    <span>{step.name}</span>
+                    <Badge variant="outline" className="ml-2 capitalize">
+                      {step.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={step.status}
+                        onValueChange={(value) => updateCustomStep(step.id, { 
+                          status: value,
+                          order_date: value === 'ordered' ? step.order_date || new Date().toISOString().split('T')[0] : null
+                        })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_ordered">Not Ordered</SelectItem>
+                          <SelectItem value="ordered">Ordered</SelectItem>
+                          <SelectItem value="available">Available</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {step.status === 'ordered' && (
+                      <div className="space-y-2">
+                        <Label>Order Date</Label>
+                        <Input
+                          type="date"
+                          value={step.order_date || ''}
+                          onChange={(e) => updateCustomStep(step.id, { order_date: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Add notes..."
+                      value={step.notes || ""}
+                      onChange={(e) => updateCustomStep(step.id, { notes: e.target.value })}
+                    />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteCustomStep(step.id)}
+                    className="gap-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Step
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </CardContent>
       </Card>
@@ -847,11 +1058,46 @@ export default function OrderDetail() {
         {/* Fulfillment Stages */}
         <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Manufacturing Stages - #{order.order_number}
-          </CardTitle>
-          <CardDescription>Track progress through each manufacturing step</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Manufacturing Stages - #{order.order_number}
+              </CardTitle>
+              <CardDescription>Track progress through each manufacturing step</CardDescription>
+            </div>
+            <Dialog open={manufacturingDialogOpen} onOpenChange={setManufacturingDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add Step
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Custom Manufacturing Step</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Step Name</Label>
+                    <Input
+                      placeholder="e.g., Quality Check, Packaging..."
+                      value={newManufacturingStepName}
+                      onChange={(e) => setNewManufacturingStepName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addCustomStep('manufacturing', newManufacturingStepName)}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => addCustomStep('manufacturing', newManufacturingStepName)}
+                    disabled={!newManufacturingStepName.trim()}
+                    className="w-full"
+                  >
+                    Add Step
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="w-full">
@@ -1265,6 +1511,58 @@ export default function OrderDetail() {
                 )}
               </AccordionContent>
             </AccordionItem>
+
+            {/* Custom Manufacturing Steps */}
+            {customSteps.filter(s => s.step_type === 'manufacturing').map((step) => (
+              <AccordionItem key={step.id} value={`custom-manufacturing-${step.id}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge 
+                      status={
+                        step.status === 'complete' ? 'complete' :
+                        step.status === 'partial' ? 'partial' : 'not_started'
+                      } 
+                    />
+                    <span>{step.name}</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={step.status}
+                      onValueChange={(value) => updateCustomStep(step.id, { status: value })}
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_started">Not Started</SelectItem>
+                        <SelectItem value="partial">Partially Done</SelectItem>
+                        <SelectItem value="complete">Complete</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Add notes..."
+                      value={step.notes || ""}
+                      onChange={(e) => updateCustomStep(step.id, { notes: e.target.value })}
+                    />
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteCustomStep(step.id)}
+                    className="gap-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Step
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </CardContent>
       </Card>
