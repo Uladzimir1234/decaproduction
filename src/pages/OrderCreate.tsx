@@ -345,6 +345,21 @@ export default function OrderCreate() {
               <Label>Nailing Flanges</Label>
               <Switch checked={hasNailingFlanges} onCheckedChange={setHasNailingFlanges} />
             </div>
+
+            <div className="space-y-4 p-4 rounded-lg border">
+              <Label className="text-base font-medium">Hardware Type (Hinges)</Label>
+              <p className="text-sm text-muted-foreground">Enter counts for each hinge type used in this order</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Hidden Hinges Count</Label>
+                  <Input type="number" min="0" value={hiddenHingesCount} onChange={e => setHiddenHingesCount(parseInt(e.target.value) || 0)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Visible Hinges Count</Label>
+                  <Input type="number" min="0" value={visibleHingesCount} onChange={e => setVisibleHingesCount(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>}
 
