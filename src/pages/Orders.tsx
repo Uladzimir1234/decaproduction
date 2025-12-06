@@ -197,7 +197,9 @@ export default function Orders() {
                         <div>
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span className="text-muted-foreground">Time Left</span>
-                            <span className="font-medium">{Math.round(timeLeft)}%</span>
+                            <span className={`font-medium ${daysUntil < 0 ? 'text-destructive' : ''}`}>
+                              {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `${daysUntil}d`}
+                            </span>
                           </div>
                           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                             <div 
