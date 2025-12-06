@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrderEditDialog } from "@/components/OrderEditDialog";
@@ -148,6 +148,18 @@ export default function Orders() {
     if (order.hardware_status === 'not_ordered') components.push('Hardware');
     return components;
   };
+
+  const getOrderedComponents = (order: Order) => {
+    const components: string[] = [];
+    if (order.reinforcement_status === 'ordered') components.push('Reinforcement');
+    if (order.windows_profile_status === 'ordered') components.push('Windows Profile');
+    if (order.glass_status === 'ordered') components.push('Glass');
+    if (order.screens_status === 'ordered') components.push('Screens');
+    if (order.plisse_screens_status === 'ordered') components.push('Plisse Screens');
+    if (order.nail_fins_status === 'ordered') components.push('Nail Fins');
+    if (order.hardware_status === 'ordered') components.push('Hardware');
+    return components;
+  };
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === "all") return matchesSearch;
@@ -207,6 +219,7 @@ export default function Orders() {
             const daysUntil = getDaysUntilDelivery(order.delivery_date);
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
+            const orderedComponents = getOrderedComponents(order);
             return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
@@ -233,6 +246,17 @@ export default function Orders() {
                             <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
                             {notOrderedComponents.map((component) => (
                               <Badge key={component} variant="destructive" className="text-xs py-0 px-1.5">
+                                {component}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {orderedComponents.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium mr-1">Ordered:</span>
+                            {orderedComponents.map((component) => (
+                              <Badge key={component} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
                                 {component}
                               </Badge>
                             ))}
