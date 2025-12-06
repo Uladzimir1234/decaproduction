@@ -446,12 +446,18 @@ export default function Orders() {
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span>{order.windows_count} Windows</span>
+                          <span className={fulfillments[order.id]?.assembly_status === 'complete' ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                            {order.windows_count} Windows
+                          </span>
                           <span>•</span>
-                          <span>{order.doors_count} Doors</span>
+                          <span className={fulfillments[order.id]?.doors_status === 'complete' ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                            {order.doors_count} Doors
+                          </span>
                           {order.sliding_doors_count > 0 && <>
                               <span>•</span>
-                              <span>{order.sliding_doors_count} Sliding</span>
+                              <span className={fulfillments[order.id]?.sliding_doors_status === 'complete' ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                                {order.sliding_doors_count} Sliding
+                              </span>
                             </>}
                         </div>
                         {notOrderedComponents.length > 0 && (
