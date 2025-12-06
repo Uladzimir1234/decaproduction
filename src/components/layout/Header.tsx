@@ -56,7 +56,7 @@ export function Header() {
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-sky-200 text-black"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
@@ -105,7 +105,7 @@ export function Header() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-sky-200 text-black"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
