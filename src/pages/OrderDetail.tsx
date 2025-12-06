@@ -539,7 +539,7 @@ export default function OrderDetail() {
                 <ShoppingCart className="h-5 w-5" />
                 Ordering Stages - #{order.order_number}
               </CardTitle>
-              <CardDescription className="my-[4px] py-[8px]">Update component availability and order dates</CardDescription>
+              <CardDescription className="my-[4px] py-[8px] pt-[16px]">Update component availability and order dates</CardDescription>
             </div>
             <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
               <DialogTrigger asChild>
