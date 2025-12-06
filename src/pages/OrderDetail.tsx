@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, Calendar, Package, Wrench } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -25,10 +26,12 @@ interface OrderFulfillment {
   doors_glass_available: boolean | null;
   doors_glass_installed: boolean | null;
   doors_notes: string | null;
+  doors_image_url: string | null;
   sliding_doors_assembled: boolean | null;
   sliding_doors_glass_available: boolean | null;
   sliding_doors_glass_installed: boolean | null;
   sliding_doors_notes: string | null;
+  sliding_doors_image_url: string | null;
   frame_sash_assembled: boolean | null;
   glass_delivered: boolean | null;
   glass_not_delivered_notes: string | null;
@@ -452,6 +455,15 @@ export default function OrderDetail() {
                       onChange={(e) => updateFulfillment("doors_notes", e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Photo</Label>
+                    <ImageUpload
+                      value={fulfillment.doors_image_url}
+                      onChange={(url) => updateFulfillment("doors_image_url", url)}
+                      folder={`doors/${order.id}`}
+                      disabled={saving}
+                    />
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             )}
@@ -493,6 +505,15 @@ export default function OrderDetail() {
                       placeholder="Add notes about sliding door assembly..."
                       value={fulfillment.sliding_doors_notes || ""}
                       onChange={(e) => updateFulfillment("sliding_doors_notes", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Photo</Label>
+                    <ImageUpload
+                      value={fulfillment.sliding_doors_image_url}
+                      onChange={(url) => updateFulfillment("sliding_doors_image_url", url)}
+                      folder={`sliding-doors/${order.id}`}
+                      disabled={saving}
                     />
                   </div>
                 </AccordionContent>
