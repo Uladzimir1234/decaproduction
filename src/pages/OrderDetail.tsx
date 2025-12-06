@@ -171,49 +171,47 @@ export default function OrderDetail() {
     let totalSteps = 0;
     let completedSteps = 0;
 
+    const getStatusPoints = (status: string | null | undefined, weight: number) => {
+      if (status === 'complete') return weight;
+      if (status === 'partial') return weight * 0.5;
+      return 0;
+    };
+
     // Reinforcement cutting (weight: 10%)
     totalSteps += 10;
-    if (data.reinforcement_cutting === "complete") completedSteps += 10;
-    else if (data.reinforcement_cutting === "partial") completedSteps += 5;
+    completedSteps += getStatusPoints(data.reinforcement_cutting, 10);
 
     // Profile cutting (weight: 10%)
     totalSteps += 10;
-    if (data.profile_cutting === "complete") completedSteps += 10;
-    else if (data.profile_cutting === "partial") completedSteps += 5;
+    completedSteps += getStatusPoints(data.profile_cutting, 10);
 
-    // Frames welded (weight: 10%)
+    // Welding (weight: 10%)
     totalSteps += 10;
-    if (data.frames_welded) completedSteps += 10;
+    completedSteps += getStatusPoints(data.welding_status, 10);
 
     // Doors assembled (if applicable) (weight: 10%)
     if (order?.doors_count && order.doors_count > 0) {
       totalSteps += 10;
-      if (data.doors_assembled) completedSteps += 10;
+      completedSteps += getStatusPoints(data.doors_status, 10);
     }
 
     // Sliding doors assembled (if applicable) (weight: 10%)
     if (order?.has_sliding_doors) {
       totalSteps += 10;
-      if (data.sliding_doors_assembled) completedSteps += 10;
+      completedSteps += getStatusPoints(data.sliding_doors_status, 10);
     }
 
     // Frame/sash assembled (weight: 15%)
     totalSteps += 15;
-    if (data.frame_sash_assembled) completedSteps += 15;
+    completedSteps += getStatusPoints(data.assembly_status, 15);
 
-    // Glass delivered (weight: 10%)
-    totalSteps += 10;
-    if (data.glass_delivered) completedSteps += 10;
-
-    // Glass installed (weight: 15%)
-    totalSteps += 15;
-    if (data.glass_installed) completedSteps += 15;
+    // Glass installed (weight: 25%)
+    totalSteps += 25;
+    completedSteps += getStatusPoints(data.glass_status, 25);
 
     // Screens (weight: 10%)
     totalSteps += 10;
-    if (order?.screen_type === "deca" && data.screens_made) completedSteps += 10;
-    else if (order?.screen_type === "flex" && data.screens_delivered) completedSteps += 10;
-    else if (!order?.screen_type) totalSteps -= 10;
+    completedSteps += getStatusPoints(data.screens_cutting, 10);
 
     return Math.round((completedSteps / totalSteps) * 100);
   };
