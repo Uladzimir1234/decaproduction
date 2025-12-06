@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -135,6 +136,18 @@ export default function Orders() {
     const remaining = Math.max(0, Math.min(100, 100 - elapsed / total * 100));
     return remaining;
   };
+
+  const getNotOrderedComponents = (order: Order) => {
+    const components: string[] = [];
+    if (order.reinforcement_status === 'not_ordered') components.push('Reinforcement');
+    if (order.windows_profile_status === 'not_ordered') components.push('Windows Profile');
+    if (order.glass_status === 'not_ordered') components.push('Glass');
+    if (order.screens_status === 'not_ordered') components.push('Screens');
+    if (order.plisse_screens_status === 'not_ordered') components.push('Plisse Screens');
+    if (order.nail_fins_status === 'not_ordered') components.push('Nail Fins');
+    if (order.hardware_status === 'not_ordered') components.push('Hardware');
+    return components;
+  };
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === "all") return matchesSearch;
@@ -193,6 +206,7 @@ export default function Orders() {
               {filteredOrders.map(order => {
             const daysUntil = getDaysUntilDelivery(order.delivery_date);
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
+            const notOrderedComponents = getNotOrderedComponents(order);
             return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
@@ -213,6 +227,17 @@ export default function Orders() {
                               <span>{order.sliding_doors_count} Sliding</span>
                             </>}
                         </div>
+                        {notOrderedComponents.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                            <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
+                            {notOrderedComponents.map((component) => (
+                              <Badge key={component} variant="destructive" className="text-xs py-0 px-1.5">
+                                {component}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </Link>
 
                       <div className="flex items-center gap-4">
