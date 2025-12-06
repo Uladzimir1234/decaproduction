@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus, X } from "lucide-react";
+
+interface SlidingDoorEntry {
+  type: string;
+  count: number;
+}
 interface Customer {
   id: string;
   name: string;
@@ -54,8 +59,7 @@ export default function OrderCreate() {
   const [windowsCount, setWindowsCount] = useState(0);
   const [doorsCount, setDoorsCount] = useState(0);
   const [hasSlidingDoors, setHasSlidingDoors] = useState(false);
-  const [slidingDoorsCount, setSlidingDoorsCount] = useState(0);
-  const [slidingDoorType, setSlidingDoorType] = useState("");
+  const [slidingDoorEntries, setSlidingDoorEntries] = useState<SlidingDoorEntry[]>([{ type: "", count: 1 }]);
   const [hasPlisseScreens, setHasPlisseScreens] = useState(false);
   const [plisseScreensCount, setPlisseScreensCount] = useState(0);
   const [plisseDoorCount, setPlisseDoorCount] = useState(0);
@@ -171,8 +175,8 @@ export default function OrderCreate() {
         windows_count: windowsCount,
         doors_count: doorsCount,
         has_sliding_doors: hasSlidingDoors,
-        sliding_doors_count: hasSlidingDoors ? slidingDoorsCount : 0,
-        sliding_door_type: hasSlidingDoors ? slidingDoorType : null,
+        sliding_doors_count: hasSlidingDoors ? slidingDoorEntries.reduce((sum, e) => sum + e.count, 0) : 0,
+        sliding_door_type: hasSlidingDoors ? JSON.stringify(slidingDoorEntries.filter(e => e.type)) : null,
         has_plisse_screens: hasPlisseScreens,
         plisse_screens_count: hasPlisseScreens ? plisseScreensCount : 0,
         plisse_door_count: hasPlisseScreens ? plisseDoorCount : 0,
@@ -285,25 +289,72 @@ export default function OrderCreate() {
                 <Label>Sliding Doors</Label>
                 <Switch checked={hasSlidingDoors} onCheckedChange={setHasSlidingDoors} />
               </div>
-              {hasSlidingDoors && <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Count</Label>
-                    <Input type="number" min="1" value={slidingDoorsCount} onChange={e => setSlidingDoorsCount(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={slidingDoorType} onValueChange={setSlidingDoorType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SLIDING_DOOR_TYPES.map(type => <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>}
+              {hasSlidingDoors && (
+                <div className="space-y-3">
+                  {slidingDoorEntries.map((entry, index) => (
+                    <div key={index} className="flex items-end gap-2">
+                      <div className="flex-1 space-y-2">
+                        <Label>Type</Label>
+                        <Select 
+                          value={entry.type} 
+                          onValueChange={(value) => {
+                            const updated = [...slidingDoorEntries];
+                            updated[index].type = value;
+                            setSlidingDoorEntries(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SLIDING_DOOR_TYPES.map(type => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-24 space-y-2">
+                        <Label>Count</Label>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={entry.count} 
+                          onChange={e => {
+                            const updated = [...slidingDoorEntries];
+                            updated[index].count = parseInt(e.target.value) || 1;
+                            setSlidingDoorEntries(updated);
+                          }} 
+                        />
+                      </div>
+                      {slidingDoorEntries.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSlidingDoorEntries(slidingDoorEntries.filter((_, i) => i !== index));
+                          }}
+                          className="shrink-0 text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSlidingDoorEntries([...slidingDoorEntries, { type: "", count: 1 }])}
+                    className="w-full gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Another Type
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 p-4 rounded-lg border">
