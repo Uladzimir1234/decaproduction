@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Plus, X } from "lucide-react";
+import { createAuditLog } from "@/lib/auditLog";
 
 interface SlidingDoorEntry {
   type: string;
@@ -291,6 +292,13 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
         .eq("id", order.id);
 
       if (error) throw error;
+
+      await createAuditLog({
+        action: 'order_updated',
+        description: `Edited order #${orderNumber} (${customerName})`,
+        entityType: 'order',
+        entityId: order.id,
+      });
 
       toast({
         title: "Order updated",

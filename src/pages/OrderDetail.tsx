@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { createAuditLog } from "@/lib/auditLog";
 type StageStatus = "not_started" | "partial" | "complete";
 interface CustomStep {
   id: string;
@@ -148,6 +149,14 @@ export default function OrderDetail() {
       return;
     }
     setCustomSteps([...customSteps, data as CustomStep]);
+    
+    await createAuditLog({
+      action: 'custom_step_created',
+      description: `Added custom ${stepType} step "${name.trim()}" to order #${order?.order_number}`,
+      entityType: 'custom_step',
+      entityId: data.id,
+    });
+    
     toast({
       title: "Added",
       description: `Custom ${stepType} step added`
@@ -176,12 +185,22 @@ export default function OrderDetail() {
       ...s,
       ...updates
     } : s));
+    
+    const step = customSteps.find(s => s.id === stepId);
+    await createAuditLog({
+      action: 'custom_step_updated',
+      description: `Updated custom step "${step?.name}" on order #${order?.order_number}`,
+      entityType: 'custom_step',
+      entityId: stepId,
+    });
+    
     toast({
       title: "Saved",
       description: "Custom step updated"
     });
   };
   const deleteCustomStep = async (stepId: string) => {
+    const step = customSteps.find(s => s.id === stepId);
     const {
       error
     } = await supabase.from("custom_steps").delete().eq("id", stepId);
@@ -194,6 +213,14 @@ export default function OrderDetail() {
       return;
     }
     setCustomSteps(customSteps.filter(s => s.id !== stepId));
+    
+    await createAuditLog({
+      action: 'custom_step_deleted',
+      description: `Deleted custom step "${step?.name}" from order #${order?.order_number}`,
+      entityType: 'custom_step',
+      entityId: stepId,
+    });
+    
     toast({
       title: "Deleted",
       description: "Custom step removed"
@@ -327,6 +354,15 @@ export default function OrderDetail() {
         ...order,
         fulfillment_percentage: newPercentage
       });
+      
+      const fieldLabel = String(key).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      await createAuditLog({
+        action: 'fulfillment_updated',
+        description: `Updated "${fieldLabel}" to "${value}" on order #${order.order_number}`,
+        entityType: 'order_fulfillment',
+        entityId: order.id,
+      });
+      
       toast({
         title: "Saved",
         description: "Order fulfillment updated successfully."
@@ -354,6 +390,16 @@ export default function OrderDetail() {
         error
       } = await supabase.from("orders").update(updates).eq("id", order.id);
       if (error) throw error;
+      
+      const updateKeys = Object.keys(updates);
+      const fieldLabel = updateKeys.map(k => k.replace(/_/g, ' ')).join(', ');
+      await createAuditLog({
+        action: 'order_updated',
+        description: `Updated component availability (${fieldLabel}) on order #${order.order_number}`,
+        entityType: 'order',
+        entityId: order.id,
+      });
+      
       toast({
         title: "Saved",
         description: "Component availability updated successfully."

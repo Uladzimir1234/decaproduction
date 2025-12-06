@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardList, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, Menu, X, FileText } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,10 @@ const navigation = [{
   name: "Orders",
   href: "/orders",
   icon: ClipboardList
+}, {
+  name: "Logs",
+  href: "/logs",
+  icon: FileText
 }];
 export function Header() {
   const location = useLocation();
