@@ -29,14 +29,23 @@ interface Order {
   plisse_window_count: number | null;
   screen_type: string | null;
   has_nailing_flanges: boolean | null;
-  glass_ordered: boolean | null;
-  screen_profile_available: boolean | null;
-  screen_profile_ordered: boolean | null;
   windows_profile_type: string | null;
-  windows_profile_available: boolean | null;
   hidden_hinges_count: number | null;
   visible_hinges_count: number | null;
-  hardware_available: boolean | null;
+  reinforcement_status: string | null;
+  reinforcement_order_date: string | null;
+  windows_profile_status: string | null;
+  windows_profile_order_date: string | null;
+  glass_status: string | null;
+  glass_order_date: string | null;
+  screens_status: string | null;
+  screens_order_date: string | null;
+  plisse_screens_status: string | null;
+  plisse_screens_order_date: string | null;
+  nail_fins_status: string | null;
+  nail_fins_order_date: string | null;
+  hardware_status: string | null;
+  hardware_order_date: string | null;
 }
 export default function Orders() {
   const { toast } = useToast();

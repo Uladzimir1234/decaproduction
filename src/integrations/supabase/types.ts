@@ -141,27 +141,41 @@ export type Database = {
           delivery_date: string
           doors_count: number | null
           fulfillment_percentage: number | null
+          glass_order_date: string | null
           glass_ordered: boolean | null
+          glass_status: string | null
           hardware_available: boolean | null
+          hardware_order_date: string | null
+          hardware_status: string | null
           has_nailing_flanges: boolean | null
           has_plisse_screens: boolean | null
           has_sliding_doors: boolean | null
           hidden_hinges_count: number | null
           id: string
+          nail_fins_order_date: string | null
+          nail_fins_status: string | null
           order_date: string
           order_number: string
           plisse_door_count: number | null
           plisse_screens_count: number | null
+          plisse_screens_order_date: string | null
+          plisse_screens_status: string | null
           plisse_window_count: number | null
+          reinforcement_order_date: string | null
+          reinforcement_status: string | null
           screen_profile_available: boolean | null
           screen_profile_ordered: boolean | null
           screen_type: string | null
+          screens_order_date: string | null
+          screens_status: string | null
           sliding_door_type: string | null
           sliding_doors_count: number | null
           user_id: string
           visible_hinges_count: number | null
           windows_count: number | null
           windows_profile_available: boolean | null
+          windows_profile_order_date: string | null
+          windows_profile_status: string | null
           windows_profile_type: string | null
         }
         Insert: {
@@ -171,27 +185,41 @@ export type Database = {
           delivery_date: string
           doors_count?: number | null
           fulfillment_percentage?: number | null
+          glass_order_date?: string | null
           glass_ordered?: boolean | null
+          glass_status?: string | null
           hardware_available?: boolean | null
+          hardware_order_date?: string | null
+          hardware_status?: string | null
           has_nailing_flanges?: boolean | null
           has_plisse_screens?: boolean | null
           has_sliding_doors?: boolean | null
           hidden_hinges_count?: number | null
           id?: string
+          nail_fins_order_date?: string | null
+          nail_fins_status?: string | null
           order_date: string
           order_number: string
           plisse_door_count?: number | null
           plisse_screens_count?: number | null
+          plisse_screens_order_date?: string | null
+          plisse_screens_status?: string | null
           plisse_window_count?: number | null
+          reinforcement_order_date?: string | null
+          reinforcement_status?: string | null
           screen_profile_available?: boolean | null
           screen_profile_ordered?: boolean | null
           screen_type?: string | null
+          screens_order_date?: string | null
+          screens_status?: string | null
           sliding_door_type?: string | null
           sliding_doors_count?: number | null
           user_id: string
           visible_hinges_count?: number | null
           windows_count?: number | null
           windows_profile_available?: boolean | null
+          windows_profile_order_date?: string | null
+          windows_profile_status?: string | null
           windows_profile_type?: string | null
         }
         Update: {
@@ -201,27 +229,41 @@ export type Database = {
           delivery_date?: string
           doors_count?: number | null
           fulfillment_percentage?: number | null
+          glass_order_date?: string | null
           glass_ordered?: boolean | null
+          glass_status?: string | null
           hardware_available?: boolean | null
+          hardware_order_date?: string | null
+          hardware_status?: string | null
           has_nailing_flanges?: boolean | null
           has_plisse_screens?: boolean | null
           has_sliding_doors?: boolean | null
           hidden_hinges_count?: number | null
           id?: string
+          nail_fins_order_date?: string | null
+          nail_fins_status?: string | null
           order_date?: string
           order_number?: string
           plisse_door_count?: number | null
           plisse_screens_count?: number | null
+          plisse_screens_order_date?: string | null
+          plisse_screens_status?: string | null
           plisse_window_count?: number | null
+          reinforcement_order_date?: string | null
+          reinforcement_status?: string | null
           screen_profile_available?: boolean | null
           screen_profile_ordered?: boolean | null
           screen_type?: string | null
+          screens_order_date?: string | null
+          screens_status?: string | null
           sliding_door_type?: string | null
           sliding_doors_count?: number | null
           user_id?: string
           visible_hinges_count?: number | null
           windows_count?: number | null
           windows_profile_available?: boolean | null
+          windows_profile_order_date?: string | null
+          windows_profile_status?: string | null
           windows_profile_type?: string | null
         }
         Relationships: [
