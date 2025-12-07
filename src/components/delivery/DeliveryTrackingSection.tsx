@@ -24,6 +24,14 @@ interface CustomShippingItem {
   created_at: string;
 }
 
+interface CustomDeliveryItem {
+  id: string;
+  order_id: string;
+  name: string;
+  is_delivered: boolean;
+  created_at: string;
+}
+
 interface DeliveryLog {
   id: string;
   order_id: string;
@@ -118,9 +126,15 @@ export function DeliveryTrackingSection({
   const [newCustomItemName, setNewCustomItemName] = useState("");
   const [newCustomItemQty, setNewCustomItemQty] = useState(1);
 
+  // Custom delivery items state
+  const [customDeliveryItems, setCustomDeliveryItems] = useState<CustomDeliveryItem[]>([]);
+  const [customDeliveryDialogOpen, setCustomDeliveryDialogOpen] = useState(false);
+  const [newCustomDeliveryName, setNewCustomDeliveryName] = useState("");
+
   useEffect(() => {
     fetchDeliveryLogs();
     fetchCustomShippingItems();
+    fetchCustomDeliveryItems();
   }, [order.id]);
 
   const fetchCustomShippingItems = async () => {
@@ -215,6 +229,107 @@ export function DeliveryTrackingSection({
       toast({
         title: "Item deleted",
         description: "Custom shipping item removed"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete item",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Custom delivery items functions
+  const fetchCustomDeliveryItems = async () => {
+    const { data, error } = await supabase
+      .from("custom_delivery_items")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      setCustomDeliveryItems(data as CustomDeliveryItem[]);
+    }
+  };
+
+  const addCustomDeliveryItem = async () => {
+    if (!newCustomDeliveryName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an item name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("custom_delivery_items")
+        .insert({
+          order_id: order.id,
+          name: newCustomDeliveryName.trim(),
+          is_delivered: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCustomDeliveryItems([...customDeliveryItems, data as CustomDeliveryItem]);
+      setNewCustomDeliveryName("");
+      setCustomDeliveryDialogOpen(false);
+      
+      toast({
+        title: "Item added",
+        description: "Custom delivery item added successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add item",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleCustomDeliveryItem = async (itemId: string, isDelivered: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("custom_delivery_items")
+        .update({ is_delivered: isDelivered })
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      setCustomDeliveryItems(prev => 
+        prev.map(item => item.id === itemId ? { ...item, is_delivered: isDelivered } : item)
+      );
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update item",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteCustomDeliveryItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("custom_delivery_items")
+        .delete()
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      setCustomDeliveryItems(prev => prev.filter(item => item.id !== itemId));
+      
+      toast({
+        title: "Item deleted",
+        description: "Custom delivery item removed"
       });
     } catch (error: any) {
       toast({
@@ -340,17 +455,20 @@ export function DeliveryTrackingSection({
     return true;
   });
 
-  // Calculate delivery progress
-  const deliveredCount = applicableItems.filter(item => 
+  // Calculate delivery progress (including custom items)
+  const builtInDeliveredCount = applicableItems.filter(item => 
     fulfillment?.[item.key as keyof DeliveryFulfillment] === true
   ).length;
-  const totalItems = applicableItems.length;
-  const allDelivered = deliveredCount === totalItems;
+  const customDeliveredCount = customDeliveryItems.filter(item => item.is_delivered).length;
+  const deliveredCount = builtInDeliveredCount + customDeliveredCount;
+  const totalItems = applicableItems.length + customDeliveryItems.length;
+  const allDelivered = deliveredCount === totalItems && totalItems > 0;
 
-  // Get pending items
+  // Get pending items (built-in only for warning display)
   const pendingItems = applicableItems.filter(item => 
     fulfillment?.[item.key as keyof DeliveryFulfillment] !== true
   );
+  const pendingCustomItems = customDeliveryItems.filter(item => !item.is_delivered);
 
   // Calculate shipping prep progress (including custom items)
   const builtInShippingComplete = SHIPPING_PREP_ITEMS.filter(item =>
@@ -543,14 +661,49 @@ export function DeliveryTrackingSection({
 
         {/* Delivery Items Checklist */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-emerald-500" />
-            <h4 className="text-sm font-medium">Delivery Tracking</h4>
-            {isLocked && (
-              <Badge variant="secondary" className="text-xs gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Manufacturing {"<"}90%
-              </Badge>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-emerald-500" />
+              <h4 className="text-sm font-medium">Delivery Tracking</h4>
+              {isLocked && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Manufacturing {"<"}90%
+                </Badge>
+              )}
+            </div>
+            {canEdit && !isLocked && (
+              <Dialog open={customDeliveryDialogOpen} onOpenChange={setCustomDeliveryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Plus className="h-4 w-4" />
+                    Add Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Custom Delivery Item</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Item Name</Label>
+                      <Input
+                        placeholder="e.g., Extra parts, Special hardware"
+                        value={newCustomDeliveryName}
+                        onChange={(e) => setNewCustomDeliveryName(e.target.value)}
+                        maxLength={100}
+                      />
+                    </div>
+                    <Button 
+                      onClick={addCustomDeliveryItem} 
+                      disabled={saving || !newCustomDeliveryName.trim()}
+                      className="w-full"
+                    >
+                      {saving ? "Adding..." : "Add Item"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -580,19 +733,55 @@ export function DeliveryTrackingSection({
                 </div>
               );
             })}
+            {/* Custom delivery items */}
+            {customDeliveryItems.map(item => (
+              <div 
+                key={item.id}
+                className={`flex items-center justify-between gap-2 p-3 rounded-lg border border-dashed transition-colors ${
+                  item.is_delivered 
+                    ? 'bg-emerald-500/10 border-emerald-500/30' 
+                    : 'bg-card border-border'
+                } ${isLocked ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id={`delivery-custom-${item.id}`}
+                    checked={item.is_delivered}
+                    onCheckedChange={(checked) => toggleCustomDeliveryItem(item.id, checked as boolean)}
+                    disabled={isLocked || !canEdit}
+                  />
+                  <Label 
+                    htmlFor={`delivery-custom-${item.id}`}
+                    className={`text-sm cursor-pointer ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                  >
+                    {item.name}
+                  </Label>
+                </div>
+                {canEdit && !isLocked && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteCustomDeliveryItem(item.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Pending Delivery Warning */}
-        {pendingItems.length > 0 && !isLocked && (
+        {(pendingItems.length > 0 || pendingCustomItems.length > 0) && !isLocked && (
           <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
             <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                Pending Delivery ({pendingItems.length} items)
+                Pending Delivery ({pendingItems.length + pendingCustomItems.length} items)
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {pendingItems.map(i => i.label).join(', ')} still need to be delivered
+                {[...pendingItems.map(i => i.label), ...pendingCustomItems.map(i => i.name)].join(', ')} still need to be delivered
               </p>
             </div>
           </div>
