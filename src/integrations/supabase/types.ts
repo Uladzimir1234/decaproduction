@@ -54,6 +54,7 @@ export type Database = {
           is_delivered: boolean
           name: string
           order_id: string
+          quantity: number
         }
         Insert: {
           created_at?: string
@@ -61,6 +62,7 @@ export type Database = {
           is_delivered?: boolean
           name: string
           order_id: string
+          quantity?: number
         }
         Update: {
           created_at?: string
@@ -68,6 +70,7 @@ export type Database = {
           is_delivered?: boolean
           name?: string
           order_id?: string
+          quantity?: number
         }
         Relationships: [
           {
@@ -220,10 +223,12 @@ export type Database = {
           assembly_notes: string | null
           assembly_status: string | null
           brackets_delivered: boolean | null
+          brackets_delivered_qty: number | null
           created_at: string
           delivery_notes: string | null
           doors_assembled: boolean | null
           doors_delivered: boolean | null
+          doors_delivered_qty: number | null
           doors_glass_available: boolean | null
           doors_glass_installed: boolean | null
           doors_image_url: string | null
@@ -233,20 +238,24 @@ export type Database = {
           frames_welded: boolean | null
           glass_delivered: boolean | null
           glass_delivered_final: boolean | null
+          glass_delivered_qty: number | null
           glass_installed: boolean | null
           glass_not_delivered_notes: string | null
           glass_not_installed_notes: string | null
           glass_notes: string | null
           glass_status: string | null
           handles_delivered: boolean | null
+          handles_delivered_qty: number | null
           id: string
           nailing_fins_delivered: boolean | null
+          nailing_fins_delivered_qty: number | null
           order_id: string
           profile_cutting: string | null
           reinforcement_cutting: string | null
           screens_cutting: string | null
           screens_delivered: boolean | null
           screens_delivered_final: boolean | null
+          screens_delivered_qty: number | null
           screens_made: boolean | null
           screens_notes: string | null
           shipping_brackets: boolean | null
@@ -263,6 +272,7 @@ export type Database = {
           shipping_weeping_qty: number | null
           sliding_doors_assembled: boolean | null
           sliding_doors_delivered: boolean | null
+          sliding_doors_delivered_qty: number | null
           sliding_doors_glass_available: boolean | null
           sliding_doors_glass_installed: boolean | null
           sliding_doors_image_url: string | null
@@ -271,15 +281,18 @@ export type Database = {
           welding_notes: string | null
           welding_status: string | null
           windows_delivered: boolean | null
+          windows_delivered_qty: number | null
         }
         Insert: {
           assembly_notes?: string | null
           assembly_status?: string | null
           brackets_delivered?: boolean | null
+          brackets_delivered_qty?: number | null
           created_at?: string
           delivery_notes?: string | null
           doors_assembled?: boolean | null
           doors_delivered?: boolean | null
+          doors_delivered_qty?: number | null
           doors_glass_available?: boolean | null
           doors_glass_installed?: boolean | null
           doors_image_url?: string | null
@@ -289,20 +302,24 @@ export type Database = {
           frames_welded?: boolean | null
           glass_delivered?: boolean | null
           glass_delivered_final?: boolean | null
+          glass_delivered_qty?: number | null
           glass_installed?: boolean | null
           glass_not_delivered_notes?: string | null
           glass_not_installed_notes?: string | null
           glass_notes?: string | null
           glass_status?: string | null
           handles_delivered?: boolean | null
+          handles_delivered_qty?: number | null
           id?: string
           nailing_fins_delivered?: boolean | null
+          nailing_fins_delivered_qty?: number | null
           order_id: string
           profile_cutting?: string | null
           reinforcement_cutting?: string | null
           screens_cutting?: string | null
           screens_delivered?: boolean | null
           screens_delivered_final?: boolean | null
+          screens_delivered_qty?: number | null
           screens_made?: boolean | null
           screens_notes?: string | null
           shipping_brackets?: boolean | null
@@ -319,6 +336,7 @@ export type Database = {
           shipping_weeping_qty?: number | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
+          sliding_doors_delivered_qty?: number | null
           sliding_doors_glass_available?: boolean | null
           sliding_doors_glass_installed?: boolean | null
           sliding_doors_image_url?: string | null
@@ -327,15 +345,18 @@ export type Database = {
           welding_notes?: string | null
           welding_status?: string | null
           windows_delivered?: boolean | null
+          windows_delivered_qty?: number | null
         }
         Update: {
           assembly_notes?: string | null
           assembly_status?: string | null
           brackets_delivered?: boolean | null
+          brackets_delivered_qty?: number | null
           created_at?: string
           delivery_notes?: string | null
           doors_assembled?: boolean | null
           doors_delivered?: boolean | null
+          doors_delivered_qty?: number | null
           doors_glass_available?: boolean | null
           doors_glass_installed?: boolean | null
           doors_image_url?: string | null
@@ -345,20 +366,24 @@ export type Database = {
           frames_welded?: boolean | null
           glass_delivered?: boolean | null
           glass_delivered_final?: boolean | null
+          glass_delivered_qty?: number | null
           glass_installed?: boolean | null
           glass_not_delivered_notes?: string | null
           glass_not_installed_notes?: string | null
           glass_notes?: string | null
           glass_status?: string | null
           handles_delivered?: boolean | null
+          handles_delivered_qty?: number | null
           id?: string
           nailing_fins_delivered?: boolean | null
+          nailing_fins_delivered_qty?: number | null
           order_id?: string
           profile_cutting?: string | null
           reinforcement_cutting?: string | null
           screens_cutting?: string | null
           screens_delivered?: boolean | null
           screens_delivered_final?: boolean | null
+          screens_delivered_qty?: number | null
           screens_made?: boolean | null
           screens_notes?: string | null
           shipping_brackets?: boolean | null
@@ -375,6 +400,7 @@ export type Database = {
           shipping_weeping_qty?: number | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
+          sliding_doors_delivered_qty?: number | null
           sliding_doors_glass_available?: boolean | null
           sliding_doors_glass_installed?: boolean | null
           sliding_doors_image_url?: string | null
@@ -383,6 +409,7 @@ export type Database = {
           welding_notes?: string | null
           welding_status?: string | null
           windows_delivered?: boolean | null
+          windows_delivered_qty?: number | null
         }
         Relationships: [
           {
