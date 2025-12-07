@@ -103,6 +103,10 @@ export function DeliveryBatchCard({
   const [newCustomQty, setNewCustomQty] = useState(1);
   const [saving, setSaving] = useState(false);
 
+  // Local state for quantities to prevent layout shift during edits
+  const [localShippingQty, setLocalShippingQty] = useState<Record<string, number>>({});
+  const [localDeliveryQty, setLocalDeliveryQty] = useState<Record<string, number>>({});
+
   // Calculate progress
   const totalShipping = shippingItems.length + customShippingItems.length;
   const completedShipping = shippingItems.filter(i => i.is_complete).length + 
@@ -126,13 +130,13 @@ export function DeliveryBatchCard({
   };
 
   const updateShippingQty = async (itemId: string, quantity: number) => {
+    setLocalShippingQty(prev => ({ ...prev, [itemId]: quantity }));
     try {
       const { error } = await supabase
         .from("batch_shipping_items")
         .update({ quantity })
         .eq("id", itemId);
       if (error) throw error;
-      // Don't refresh to avoid layout shift
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -152,13 +156,13 @@ export function DeliveryBatchCard({
   };
 
   const updateDeliveryQty = async (itemId: string, quantity: number) => {
+    setLocalDeliveryQty(prev => ({ ...prev, [itemId]: quantity }));
     try {
       const { error } = await supabase
         .from("batch_delivery_items")
         .update({ quantity })
         .eq("id", itemId);
       if (error) throw error;
-      // Don't refresh to avoid layout shift
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -340,7 +344,7 @@ export function DeliveryBatchCard({
                       {getItemLabel(item.item_type, SHIPPING_ITEM_TYPES)}
                     </span>
                     {canEdit ? (
-                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateShippingQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
+                      <Input type="number" min={0} value={localShippingQty[item.id] ?? item.quantity} onChange={(e) => updateShippingQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
                     ) : item.quantity > 0 && (
                       <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     )}
@@ -407,7 +411,7 @@ export function DeliveryBatchCard({
                       {getItemLabel(item.item_type, DELIVERY_ITEM_TYPES)}
                     </span>
                     {canEdit ? (
-                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateDeliveryQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
+                      <Input type="number" min={0} value={localDeliveryQty[item.id] ?? item.quantity} onChange={(e) => updateDeliveryQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
                     ) : item.quantity > 0 && (
                       <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     )}
