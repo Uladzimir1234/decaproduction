@@ -17,6 +17,7 @@ import { PriorityOrderCard } from "@/components/dashboard/PriorityOrderCard";
 import { ComponentProcurement } from "@/components/dashboard/ComponentProcurement";
 import { ManufacturingWorkload } from "@/components/dashboard/ManufacturingWorkload";
 import { BlockersList } from "@/components/dashboard/BlockersList";
+import { PendingDeliveries, type PendingDeliveryOrder } from "@/components/dashboard/PendingDeliveries";
 
 export default function Dashboard() {
   const { orders, metrics, componentSummary, manufacturingWorkload, loading } = useDashboardData();
@@ -34,6 +35,20 @@ export default function Dashboard() {
   const atRiskOrders = orders.filter(o => o.healthStatus === 'at-risk');
   const readyToShip = orders.filter(o => o.manufacturingProgress >= 90 && o.healthStatus !== 'critical');
   const topPriorityOrders = orders.slice(0, 6);
+  
+  // Pending deliveries - orders with 90%+ manufacturing but items still to deliver
+  const pendingDeliveryOrders: PendingDeliveryOrder[] = orders
+    .filter(o => o.manufacturingProgress >= 90 && o.deliveryProgress.deliveredCount < o.deliveryProgress.totalItems)
+    .map(o => ({
+      id: o.id,
+      order_number: o.order_number,
+      customer_name: o.customer_name,
+      daysUntilDelivery: o.daysUntilDelivery,
+      deliveredCount: o.deliveryProgress.deliveredCount,
+      totalItems: o.deliveryProgress.totalItems,
+      pendingItems: o.deliveryProgress.pendingItems,
+      manufacturingProgress: o.manufacturingProgress,
+    }));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -139,6 +154,9 @@ export default function Dashboard() {
 
           {/* Manufacturing Workload */}
           <ManufacturingWorkload workload={manufacturingWorkload} />
+
+          {/* Pending Deliveries */}
+          <PendingDeliveries orders={pendingDeliveryOrders} />
 
           {/* Ready to Ship */}
           {readyToShip.length > 0 && (

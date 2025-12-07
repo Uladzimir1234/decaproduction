@@ -11,6 +11,9 @@ export interface OrderWithFulfillment {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
+  has_sliding_doors: boolean;
+  screen_type: string | null;
+  delivery_complete: boolean;
   // Component status
   reinforcement_status: string | null;
   windows_profile_status: string | null;
@@ -32,6 +35,15 @@ export interface OrderWithFulfillment {
     doors_glass_installed: boolean | null;
     sliding_doors_glass_installed: boolean | null;
     screens_cutting: string | null;
+    // Delivery fields
+    windows_delivered: boolean | null;
+    doors_delivered: boolean | null;
+    sliding_doors_delivered: boolean | null;
+    screens_delivered_final: boolean | null;
+    handles_delivered: boolean | null;
+    glass_delivered_final: boolean | null;
+    nailing_fins_delivered: boolean | null;
+    brackets_delivered: boolean | null;
   } | null;
 }
 
@@ -43,6 +55,11 @@ export interface PriorityOrder extends OrderWithFulfillment {
   nextAction: string;
   componentReadiness: number;
   manufacturingProgress: number;
+  deliveryProgress: {
+    deliveredCount: number;
+    totalItems: number;
+    pendingItems: string[];
+  };
 }
 
 export interface ComponentSummary {
@@ -69,6 +86,7 @@ export interface DashboardMetrics {
   pendingComponents: number;
   avgDaysToDelivery: number;
   readyToShip: number;
+  pendingDeliveries: number;
 }
 
 const COMPONENT_FIELDS = [
@@ -181,6 +199,45 @@ const getBlockers = (order: OrderWithFulfillment): string[] => {
   return blockers;
 };
 
+const DELIVERY_ITEMS = [
+  { key: 'windows_delivered', label: 'Windows' },
+  { key: 'doors_delivered', label: 'Doors' },
+  { key: 'sliding_doors_delivered', label: 'Sliding Doors' },
+  { key: 'glass_delivered_final', label: 'Glass' },
+  { key: 'screens_delivered_final', label: 'Screens' },
+  { key: 'handles_delivered', label: 'Handles' },
+  { key: 'nailing_fins_delivered', label: 'Nailing Fins' },
+  { key: 'brackets_delivered', label: 'Brackets' },
+] as const;
+
+const calculateDeliveryProgress = (order: OrderWithFulfillment): { deliveredCount: number; totalItems: number; pendingItems: string[] } => {
+  if (!order.fulfillment) return { deliveredCount: 0, totalItems: 8, pendingItems: [] };
+  
+  const applicableItems = DELIVERY_ITEMS.filter(item => {
+    if (item.key === 'sliding_doors_delivered' && !order.has_sliding_doors) return false;
+    if (item.key === 'screens_delivered_final' && !order.screen_type) return false;
+    return true;
+  });
+
+  const pendingItems: string[] = [];
+  let deliveredCount = 0;
+  
+  applicableItems.forEach(item => {
+    const f = order.fulfillment as any;
+    if (f?.[item.key] === true) {
+      deliveredCount++;
+    } else {
+      pendingItems.push(item.label);
+    }
+  });
+
+  return { 
+    deliveredCount, 
+    totalItems: applicableItems.length, 
+    pendingItems 
+  };
+};
+
 const getNextAction = (order: OrderWithFulfillment): string => {
   // Priority: order components first
   for (const { name, field } of COMPONENT_FIELDS) {
@@ -281,6 +338,7 @@ export function useDashboardData() {
     pendingComponents: 0,
     avgDaysToDelivery: 0,
     readyToShip: 0,
+    pendingDeliveries: 0,
   });
   const [componentSummary, setComponentSummary] = useState<ComponentSummary[]>([]);
   const [manufacturingWorkload, setManufacturingWorkload] = useState<ManufacturingWorkload[]>([]);
@@ -305,7 +363,7 @@ export function useDashboardData() {
 
       // Process orders
       const processedOrders: PriorityOrder[] = (ordersData || [])
-        .filter(order => (order.fulfillment_percentage || 0) < 100)
+        .filter(order => (order.fulfillment_percentage || 0) < 100 && !order.delivery_complete)
         .map(order => {
           const orderWithFulfillment: OrderWithFulfillment = {
             id: order.id,
@@ -317,6 +375,9 @@ export function useDashboardData() {
             windows_count: order.windows_count || 0,
             doors_count: order.doors_count || 0,
             sliding_doors_count: order.sliding_doors_count || 0,
+            has_sliding_doors: order.has_sliding_doors || false,
+            screen_type: order.screen_type,
+            delivery_complete: order.delivery_complete || false,
             reinforcement_status: order.reinforcement_status,
             windows_profile_status: order.windows_profile_status,
             glass_status: order.glass_status,
@@ -330,6 +391,7 @@ export function useDashboardData() {
           const daysUntilDelivery = getDaysUntilDelivery(order.delivery_date);
           const componentReadiness = calculateComponentReadiness(orderWithFulfillment);
           const manufacturingProgress = calculateManufacturingProgress(orderWithFulfillment);
+          const deliveryProgress = calculateDeliveryProgress(orderWithFulfillment);
 
           return {
             ...orderWithFulfillment,
@@ -340,6 +402,7 @@ export function useDashboardData() {
             nextAction: getNextAction(orderWithFulfillment),
             componentReadiness,
             manufacturingProgress,
+            deliveryProgress,
           };
         })
         .sort((a, b) => b.priorityScore - a.priorityScore);
@@ -364,6 +427,11 @@ export function useDashboardData() {
         ? Math.round(processedOrders.reduce((sum, o) => sum + o.daysUntilDelivery, 0) / processedOrders.length)
         : 0;
 
+      // Calculate pending deliveries (orders with 90%+ manufacturing but not all delivered)
+      const pendingDeliveries = processedOrders.filter(o => 
+        o.manufacturingProgress >= 90 && o.deliveryProgress.deliveredCount < o.deliveryProgress.totalItems
+      ).length;
+
       setMetrics({
         totalActive: processedOrders.length,
         criticalCount: critical,
@@ -372,6 +440,7 @@ export function useDashboardData() {
         pendingComponents,
         avgDaysToDelivery: avgDays,
         readyToShip,
+        pendingDeliveries,
       });
 
       // Calculate component summary
