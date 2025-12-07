@@ -132,7 +132,7 @@ export function DeliveryBatchCard({
         .update({ quantity })
         .eq("id", itemId);
       if (error) throw error;
-      onRefresh();
+      // Don't refresh to avoid layout shift
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -158,7 +158,7 @@ export function DeliveryBatchCard({
         .update({ quantity })
         .eq("id", itemId);
       if (error) throw error;
-      onRefresh();
+      // Don't refresh to avoid layout shift
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
