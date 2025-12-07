@@ -93,7 +93,7 @@ interface Order {
 export default function Orders() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isWorker, canUpdateOrdering, canUpdateManufacturing } = useRole();
+  const { isWorker, isSeller, canUpdateOrdering, canUpdateManufacturing } = useRole();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [loading, setLoading] = useState(true);
@@ -438,7 +438,7 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${!isWorker ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => !isWorker && navigate(`/orders/${order.id}`)}>
+            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(canUpdateOrdering || canUpdateManufacturing) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (canUpdateOrdering || canUpdateManufacturing) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
@@ -464,8 +464,8 @@ export default function Orders() {
                               </span>
                             </>}
                         </div>
-                        {/* Ordering stages - hidden for workers */}
-                        {!isWorker && notOrderedComponents.length > 0 && (
+                        {/* Ordering stages - hidden for workers, visible for sellers */}
+                        {canUpdateOrdering && notOrderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                             <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
@@ -489,7 +489,7 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                        {!isWorker && orderedComponents.length > 0 && (
+                        {canUpdateOrdering && orderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium mr-1">Ordered:</span>
@@ -517,61 +517,91 @@ export default function Orders() {
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
                           {manufacturingStages.map((stage) => (
-                            <Popover key={stage.name}>
-                              <PopoverTrigger asChild>
-                                <button 
-                                  onClick={(e) => e.stopPropagation()}
-                                  type="button"
-                                  className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity ${
-                                    stage.status === 'complete' ? 'bg-emerald-500' : 
-                                    stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                  }`}
-                                >
-                                  {stage.name}
-                                  {stage.hasNotes && (
-                                    <AlertCircle className="h-3 w-3" />
-                                  )}
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-36 p-0" align="start">
-                                <StatusPopoverButtons
-                                  currentValue={stage.status}
-                                  options={manufacturingPopoverOptions}
-                                  onChange={(value) => handleStageStatusChange(order.id, stage.field, value)}
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            canUpdateManufacturing ? (
+                              <Popover key={stage.name}>
+                                <PopoverTrigger asChild>
+                                  <button 
+                                    onClick={(e) => e.stopPropagation()}
+                                    type="button"
+                                    className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity ${
+                                      stage.status === 'complete' ? 'bg-emerald-500' : 
+                                      stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                    }`}
+                                  >
+                                    {stage.name}
+                                    {stage.hasNotes && (
+                                      <AlertCircle className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue={stage.status}
+                                    options={manufacturingPopoverOptions}
+                                    onChange={(value) => handleStageStatusChange(order.id, stage.field, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <span 
+                                key={stage.name}
+                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
+                                  stage.status === 'complete' ? 'bg-emerald-500' : 
+                                  stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                }`}
+                              >
+                                {stage.name}
+                                {stage.hasNotes && (
+                                  <AlertCircle className="h-3 w-3" />
+                                )}
+                              </span>
+                            )
                           ))}
                           {/* Custom Manufacturing Steps */}
                           {customManufacturingSteps.map((step) => (
-                            <Popover key={step.id}>
-                              <PopoverTrigger asChild>
-                                <button 
-                                  onClick={(e) => e.stopPropagation()}
-                                  type="button"
-                                  className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity border-2 border-dashed border-white/30 ${
-                                    step.status === 'complete' ? 'bg-emerald-500' : 
-                                    step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                  }`}
-                                >
-                                  {step.name}
-                                  {step.notes && (
-                                    <AlertCircle className="h-3 w-3" />
-                                  )}
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-36 p-0" align="start">
-                                <StatusPopoverButtons
-                                  currentValue={step.status}
-                                  options={manufacturingPopoverOptions}
-                                  onChange={(value) => handleCustomStepStatusChange(step.id, value)}
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            canUpdateManufacturing ? (
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button 
+                                    onClick={(e) => e.stopPropagation()}
+                                    type="button"
+                                    className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity border-2 border-dashed border-white/30 ${
+                                      step.status === 'complete' ? 'bg-emerald-500' : 
+                                      step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                    }`}
+                                  >
+                                    {step.name}
+                                    {step.notes && (
+                                      <AlertCircle className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue={step.status}
+                                    options={manufacturingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <span 
+                                key={step.id}
+                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 border-2 border-dashed border-white/30 ${
+                                  step.status === 'complete' ? 'bg-emerald-500' : 
+                                  step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                }`}
+                              >
+                                {step.name}
+                                {step.notes && (
+                                  <AlertCircle className="h-3 w-3" />
+                                )}
+                              </span>
+                            )
                           ))}
                         </div>
-                        {/* Custom Ordering Steps - Hidden for workers */}
-                        {!isWorker && customOrderingSteps.length > 0 && (
+                        {/* Custom Ordering Steps - visible for those with ordering permission */}
+                        {canUpdateOrdering && customOrderingSteps.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             <span className="text-xs text-muted-foreground font-medium mr-1">Custom:</span>
