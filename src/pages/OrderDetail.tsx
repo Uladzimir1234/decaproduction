@@ -111,6 +111,56 @@ interface Order {
   hardware_order_date: string | null;
 }
 
+// Static helper for calculating fulfillment percentage
+const calculateFulfillmentPercentageStatic = (data: Partial<OrderFulfillment>, orderData: Order | null) => {
+  let totalSteps = 0;
+  let completedSteps = 0;
+
+  const getStatusPoints = (status: string | null | undefined, weight: number) => {
+    if (status === 'complete') return weight;
+    if (status === 'partial') return weight * 0.5;
+    return 0;
+  };
+
+  // Reinforcement cutting (weight: 10%)
+  totalSteps += 10;
+  completedSteps += getStatusPoints(data.reinforcement_cutting, 10);
+
+  // Profile cutting (weight: 10%)
+  totalSteps += 10;
+  completedSteps += getStatusPoints(data.profile_cutting, 10);
+
+  // Welding (weight: 10%)
+  totalSteps += 10;
+  completedSteps += getStatusPoints(data.welding_status, 10);
+
+  // Doors assembled (if applicable) (weight: 10%)
+  if (orderData?.doors_count && orderData.doors_count > 0) {
+    totalSteps += 10;
+    completedSteps += getStatusPoints(data.doors_status, 10);
+  }
+
+  // Sliding doors assembled (if applicable) (weight: 10%)
+  if (orderData?.has_sliding_doors) {
+    totalSteps += 10;
+    completedSteps += getStatusPoints(data.sliding_doors_status, 10);
+  }
+
+  // Frame/sash assembled (weight: 15%)
+  totalSteps += 15;
+  completedSteps += getStatusPoints(data.assembly_status, 15);
+
+  // Glass installed (weight: 25%)
+  totalSteps += 25;
+  completedSteps += getStatusPoints(data.glass_status, 25);
+
+  // Screens (weight: 10%)
+  totalSteps += 10;
+  completedSteps += getStatusPoints(data.screens_cutting, 10);
+
+  return Math.round(completedSteps / totalSteps * 100);
+};
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -317,6 +367,12 @@ export default function OrderDetail() {
         }
       } else {
         setFulfillment(fulfillmentData);
+        // Recalculate and update fulfillment percentage if out of sync
+        const calculatedPercentage = calculateFulfillmentPercentageStatic(fulfillmentData, orderData);
+        if (calculatedPercentage !== orderData.fulfillment_percentage) {
+          await supabase.from("orders").update({ fulfillment_percentage: calculatedPercentage }).eq("id", id);
+          setOrder({ ...orderData, fulfillment_percentage: calculatedPercentage });
+        }
       }
     } catch (error) {
       console.error("Error fetching order:", error);
@@ -330,53 +386,8 @@ export default function OrderDetail() {
     }
   };
 
-  const calculateFulfillmentPercentage = (data: Partial<OrderFulfillment>) => {
-    let totalSteps = 0;
-    let completedSteps = 0;
-
-    const getStatusPoints = (status: string | null | undefined, weight: number) => {
-      if (status === 'complete') return weight;
-      if (status === 'partial') return weight * 0.5;
-      return 0;
-    };
-
-    // Reinforcement cutting (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(data.reinforcement_cutting, 10);
-
-    // Profile cutting (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(data.profile_cutting, 10);
-
-    // Welding (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(data.welding_status, 10);
-
-    // Doors assembled (if applicable) (weight: 10%)
-    if (order?.doors_count && order.doors_count > 0) {
-      totalSteps += 10;
-      completedSteps += getStatusPoints(data.doors_status, 10);
-    }
-
-    // Sliding doors assembled (if applicable) (weight: 10%)
-    if (order?.has_sliding_doors) {
-      totalSteps += 10;
-      completedSteps += getStatusPoints(data.sliding_doors_status, 10);
-    }
-
-    // Frame/sash assembled (weight: 15%)
-    totalSteps += 15;
-    completedSteps += getStatusPoints(data.assembly_status, 15);
-
-    // Glass installed (weight: 25%)
-    totalSteps += 25;
-    completedSteps += getStatusPoints(data.glass_status, 25);
-
-    // Screens (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(data.screens_cutting, 10);
-
-    return Math.round(completedSteps / totalSteps * 100);
+  const calculateFulfillmentPercentage = (data: Partial<OrderFulfillment>, orderData?: Order | null) => {
+    return calculateFulfillmentPercentageStatic(data, orderData || order);
   };
 
   const updateFulfillment = async (key: keyof OrderFulfillment, value: any) => {
