@@ -103,12 +103,11 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canUpdateOrdering, isWorker } = useRole();
+  const { canUpdateOrdering, isWorker, loading: roleLoading } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [roleLoaded, setRoleLoaded] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [newOrderingStepName, setNewOrderingStepName] = useState("");
   const [newManufacturingStepName, setNewManufacturingStepName] = useState("");
@@ -116,11 +115,12 @@ export default function OrderDetail() {
   const [manufacturingDialogOpen, setManufacturingDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    // Wait for role to be loaded before fetching order
+    if (id && !roleLoading) {
       fetchOrder();
       fetchCustomSteps();
     }
-  }, [id, isWorker]);
+  }, [id, roleLoading, isWorker]);
 
   const fetchCustomSteps = async () => {
     if (!id) return;
