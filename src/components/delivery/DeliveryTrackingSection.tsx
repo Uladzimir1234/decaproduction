@@ -28,6 +28,7 @@ interface CustomDeliveryItem {
   id: string;
   order_id: string;
   name: string;
+  quantity: number;
   is_delivered: boolean;
   created_at: string;
 }
@@ -65,6 +66,15 @@ interface DeliveryFulfillment {
   shipping_labels_qty: number;
   shipping_fins_qty: number;
   shipping_brackets_qty: number;
+  // Delivery quantities
+  windows_delivered_qty: number;
+  doors_delivered_qty: number;
+  sliding_doors_delivered_qty: number;
+  glass_delivered_qty: number;
+  screens_delivered_qty: number;
+  handles_delivered_qty: number;
+  nailing_fins_delivered_qty: number;
+  brackets_delivered_qty: number;
 }
 
 interface OrderInfo {
@@ -86,14 +96,14 @@ interface DeliveryTrackingSectionProps {
 }
 
 const DELIVERY_ITEMS = [
-  { key: 'windows_delivered', label: 'Windows', icon: Package },
-  { key: 'doors_delivered', label: 'Doors', icon: Package },
-  { key: 'sliding_doors_delivered', label: 'Sliding Doors', icon: Package },
-  { key: 'glass_delivered_final', label: 'Glass', icon: Package },
-  { key: 'screens_delivered_final', label: 'Screens', icon: Package },
-  { key: 'handles_delivered', label: 'Handles', icon: Package },
-  { key: 'nailing_fins_delivered', label: 'Nailing Fins', icon: Package },
-  { key: 'brackets_delivered', label: 'Installation Brackets', icon: Package },
+  { key: 'windows_delivered', qtyKey: 'windows_delivered_qty', label: 'Windows', icon: Package },
+  { key: 'doors_delivered', qtyKey: 'doors_delivered_qty', label: 'Doors', icon: Package },
+  { key: 'sliding_doors_delivered', qtyKey: 'sliding_doors_delivered_qty', label: 'Sliding Doors', icon: Package },
+  { key: 'glass_delivered_final', qtyKey: 'glass_delivered_qty', label: 'Glass', icon: Package },
+  { key: 'screens_delivered_final', qtyKey: 'screens_delivered_qty', label: 'Screens', icon: Package },
+  { key: 'handles_delivered', qtyKey: 'handles_delivered_qty', label: 'Handles', icon: Package },
+  { key: 'nailing_fins_delivered', qtyKey: 'nailing_fins_delivered_qty', label: 'Nailing Fins', icon: Package },
+  { key: 'brackets_delivered', qtyKey: 'brackets_delivered_qty', label: 'Installation Brackets', icon: Package },
 ] as const;
 
 const SHIPPING_PREP_ITEMS = [
@@ -130,6 +140,7 @@ export function DeliveryTrackingSection({
   const [customDeliveryItems, setCustomDeliveryItems] = useState<CustomDeliveryItem[]>([]);
   const [customDeliveryDialogOpen, setCustomDeliveryDialogOpen] = useState(false);
   const [newCustomDeliveryName, setNewCustomDeliveryName] = useState("");
+  const [newCustomDeliveryQty, setNewCustomDeliveryQty] = useState(1);
 
   useEffect(() => {
     fetchDeliveryLogs();
@@ -269,6 +280,7 @@ export function DeliveryTrackingSection({
         .insert({
           order_id: order.id,
           name: newCustomDeliveryName.trim(),
+          quantity: newCustomDeliveryQty,
           is_delivered: false
         })
         .select()
@@ -278,6 +290,7 @@ export function DeliveryTrackingSection({
 
       setCustomDeliveryItems([...customDeliveryItems, data as CustomDeliveryItem]);
       setNewCustomDeliveryName("");
+      setNewCustomDeliveryQty(1);
       setCustomDeliveryDialogOpen(false);
       
       toast({
@@ -694,6 +707,15 @@ export function DeliveryTrackingSection({
                         maxLength={100}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={newCustomDeliveryQty}
+                        onChange={(e) => setNewCustomDeliveryQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      />
+                    </div>
                     <Button 
                       onClick={addCustomDeliveryItem} 
                       disabled={saving || !newCustomDeliveryName.trim()}
@@ -706,13 +728,14 @@ export function DeliveryTrackingSection({
               </Dialog>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {applicableItems.map(item => {
               const isChecked = fulfillment?.[item.key as keyof DeliveryFulfillment] === true;
+              const quantity = (fulfillment as any)?.[item.qtyKey] || 0;
               return (
                 <div 
                   key={item.key}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                     isChecked 
                       ? 'bg-emerald-500/10 border-emerald-500/30' 
                       : 'bg-card border-border'
@@ -723,13 +746,32 @@ export function DeliveryTrackingSection({
                     checked={isChecked}
                     onCheckedChange={(checked) => handleDeliveryItemChange(item.key, checked as boolean)}
                     disabled={isLocked || !canEdit}
+                    className="mt-0.5"
                   />
-                  <Label 
-                    htmlFor={item.key} 
-                    className={`text-sm cursor-pointer ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
-                  >
-                    {item.label}
-                  </Label>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label 
+                        htmlFor={item.key} 
+                        className={`text-sm font-medium cursor-pointer ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                      >
+                        {item.label}
+                      </Label>
+                      {canEdit && !isLocked ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          value={quantity}
+                          onChange={(e) => onUpdate(item.qtyKey, parseInt(e.target.value) || 0)}
+                          className="w-16 h-6 text-xs text-center p-1"
+                          placeholder="Qty"
+                        />
+                      ) : quantity > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          ×{quantity}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -737,36 +779,45 @@ export function DeliveryTrackingSection({
             {customDeliveryItems.map(item => (
               <div 
                 key={item.id}
-                className={`flex items-center justify-between gap-2 p-3 rounded-lg border border-dashed transition-colors ${
+                className={`flex items-start gap-3 p-3 rounded-lg border border-dashed transition-colors ${
                   item.is_delivered 
                     ? 'bg-emerald-500/10 border-emerald-500/30' 
                     : 'bg-card border-border'
                 } ${isLocked ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id={`delivery-custom-${item.id}`}
-                    checked={item.is_delivered}
-                    onCheckedChange={(checked) => toggleCustomDeliveryItem(item.id, checked as boolean)}
-                    disabled={isLocked || !canEdit}
-                  />
-                  <Label 
-                    htmlFor={`delivery-custom-${item.id}`}
-                    className={`text-sm cursor-pointer ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
-                  >
-                    {item.name}
-                  </Label>
+                <Checkbox
+                  id={`delivery-custom-${item.id}`}
+                  checked={item.is_delivered}
+                  onCheckedChange={(checked) => toggleCustomDeliveryItem(item.id, checked as boolean)}
+                  disabled={isLocked || !canEdit}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label 
+                      htmlFor={`delivery-custom-${item.id}`}
+                      className={`text-sm font-medium cursor-pointer ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                    >
+                      {item.name}
+                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs">
+                        ×{item.quantity}
+                      </Badge>
+                      {canEdit && !isLocked && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteCustomDeliveryItem(item.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Custom item</p>
                 </div>
-                {canEdit && !isLocked && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteCustomDeliveryItem(item.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                )}
               </div>
             ))}
           </div>

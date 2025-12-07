@@ -1540,6 +1540,14 @@ export default function OrderDetail() {
           shipping_labels_qty: (fulfillment as any).shipping_labels_qty || 0,
           shipping_fins_qty: (fulfillment as any).shipping_fins_qty || 0,
           shipping_brackets_qty: (fulfillment as any).shipping_brackets_qty || 0,
+          windows_delivered_qty: (fulfillment as any).windows_delivered_qty || 0,
+          doors_delivered_qty: (fulfillment as any).doors_delivered_qty || 0,
+          sliding_doors_delivered_qty: (fulfillment as any).sliding_doors_delivered_qty || 0,
+          glass_delivered_qty: (fulfillment as any).glass_delivered_qty || 0,
+          screens_delivered_qty: (fulfillment as any).screens_delivered_qty || 0,
+          handles_delivered_qty: (fulfillment as any).handles_delivered_qty || 0,
+          nailing_fins_delivered_qty: (fulfillment as any).nailing_fins_delivered_qty || 0,
+          brackets_delivered_qty: (fulfillment as any).brackets_delivered_qty || 0,
         } : null}
         onUpdate={(key, value) => updateFulfillment(key as keyof OrderFulfillment, value)}
         manufacturingProgress={order.fulfillment_percentage}
