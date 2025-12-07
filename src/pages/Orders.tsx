@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { createAuditLog } from "@/lib/auditLog";
+import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -473,36 +474,12 @@ export default function Orders() {
                                     </Badge>
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-40 p-1" align="start">
-                                  <div className="flex flex-col gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'not_ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded bg-red-100 text-red-700"
-                                    >
-                                      Not Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'available');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Available
-                                    </button>
-                                  </div>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="not_ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             ))}
@@ -521,36 +498,12 @@ export default function Orders() {
                                     </Badge>
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-40 p-1" align="start">
-                                  <div className="flex flex-col gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'not_ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Not Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded bg-amber-100 text-amber-700"
-                                    >
-                                      Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleComponentStatusChange(order.id, component.field, 'available');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Available
-                                    </button>
-                                  </div>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             ))}
@@ -575,36 +528,12 @@ export default function Orders() {
                                   )}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-40 p-1" align="start">
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleStageStatusChange(order.id, stage.field, 'not_started');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'not_started' ? 'bg-red-100 text-red-700' : ''}`}
-                                  >
-                                    Not Started
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleStageStatusChange(order.id, stage.field, 'partial');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'partial' ? 'bg-amber-100 text-amber-700' : ''}`}
-                                  >
-                                    Partial
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleStageStatusChange(order.id, stage.field, 'complete');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${stage.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : ''}`}
-                                  >
-                                    Complete
-                                  </button>
-                                </div>
+                              <PopoverContent className="w-36 p-0" align="start">
+                                <StatusPopoverButtons
+                                  currentValue={stage.status}
+                                  options={manufacturingPopoverOptions}
+                                  onChange={(value) => handleStageStatusChange(order.id, stage.field, value)}
+                                />
                               </PopoverContent>
                             </Popover>
                           ))}
@@ -625,36 +554,12 @@ export default function Orders() {
                                   )}
                                 </button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-40 p-1" align="start">
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleCustomStepStatusChange(step.id, 'not_started');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'not_started' ? 'bg-red-100 text-red-700' : ''}`}
-                                  >
-                                    Not Started
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleCustomStepStatusChange(step.id, 'partial');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'partial' ? 'bg-amber-100 text-amber-700' : ''}`}
-                                  >
-                                    Partial
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleCustomStepStatusChange(step.id, 'complete');
-                                    }}
-                                    className={`text-left px-3 py-1.5 text-sm rounded hover:bg-muted ${step.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : ''}`}
-                                  >
-                                    Complete
-                                  </button>
-                                </div>
+                              <PopoverContent className="w-36 p-0" align="start">
+                                <StatusPopoverButtons
+                                  currentValue={step.status}
+                                  options={manufacturingPopoverOptions}
+                                  onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                />
                               </PopoverContent>
                             </Popover>
                           ))}
@@ -673,36 +578,12 @@ export default function Orders() {
                                     </Badge>
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-40 p-1" align="start">
-                                  <div className="flex flex-col gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'not_ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded bg-red-100 text-red-700"
-                                    >
-                                      Not Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'available');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Available
-                                    </button>
-                                  </div>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="not_ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             ))}
@@ -715,36 +596,12 @@ export default function Orders() {
                                     </Badge>
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-40 p-1" align="start">
-                                  <div className="flex flex-col gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'not_ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Not Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded bg-amber-100 text-amber-700"
-                                    >
-                                      Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'available');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Available
-                                    </button>
-                                  </div>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             ))}
@@ -757,36 +614,12 @@ export default function Orders() {
                                     </Badge>
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-40 p-1" align="start">
-                                  <div className="flex flex-col gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'not_ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Not Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'ordered');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded hover:bg-muted"
-                                    >
-                                      Ordered
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleCustomStepStatusChange(step.id, 'available');
-                                      }}
-                                      className="text-left px-3 py-1.5 text-sm rounded bg-emerald-100 text-emerald-700"
-                                    >
-                                      Available
-                                    </button>
-                                  </div>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="available"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
                                 </PopoverContent>
                               </Popover>
                             ))}
