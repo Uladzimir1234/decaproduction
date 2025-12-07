@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,6 +41,15 @@ interface OrderFulfillment {
   screens_delivered: boolean | null;
   screens_cutting: string | null;
   screens_notes: string | null;
+  // Delivery tracking fields
+  windows_delivered: boolean | null;
+  doors_delivered: boolean | null;
+  sliding_doors_delivered: boolean | null;
+  screens_delivered_final: boolean | null;
+  handles_delivered: boolean | null;
+  glass_delivered_final: boolean | null;
+  nailing_fins_delivered: boolean | null;
+  brackets_delivered: boolean | null;
 }
 
 interface CustomStep {
@@ -394,12 +403,52 @@ export default function Orders() {
       });
     }
   };
+
+  const DELIVERY_ITEMS = [
+    { key: 'windows_delivered', label: 'Windows' },
+    { key: 'doors_delivered', label: 'Doors' },
+    { key: 'sliding_doors_delivered', label: 'Sliding Doors' },
+    { key: 'glass_delivered_final', label: 'Glass' },
+    { key: 'screens_delivered_final', label: 'Screens' },
+    { key: 'handles_delivered', label: 'Handles' },
+    { key: 'nailing_fins_delivered', label: 'Nailing Fins' },
+    { key: 'brackets_delivered', label: 'Brackets' },
+  ] as const;
+
+  const getDeliveryProgress = (order: Order) => {
+    const f = fulfillments[order.id];
+    if (!f) return { delivered: 0, total: 8, pending: [] as string[] };
+    
+    const applicableItems = DELIVERY_ITEMS.filter(item => {
+      if (item.key === 'sliding_doors_delivered' && !order.has_sliding_doors) return false;
+      if (item.key === 'screens_delivered_final' && !order.screen_type) return false;
+      return true;
+    });
+
+    const pending: string[] = [];
+    let delivered = 0;
+    
+    applicableItems.forEach(item => {
+      if ((f as any)[item.key] === true) {
+        delivered++;
+      } else {
+        pending.push(item.label);
+      }
+    });
+
+    return { delivered, total: applicableItems.length, pending };
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === "all") return matchesSearch;
     if (statusFilter === "complete") return matchesSearch && order.fulfillment_percentage >= 90;
     if (statusFilter === "in_progress") return matchesSearch && order.fulfillment_percentage >= 20 && order.fulfillment_percentage < 90;
     if (statusFilter === "not_started") return matchesSearch && order.fulfillment_percentage < 20;
+    if (statusFilter === "pending_delivery") {
+      const progress = getDeliveryProgress(order);
+      return matchesSearch && order.fulfillment_percentage >= 90 && progress.delivered < progress.total;
+    }
     return matchesSearch;
   });
   if (loading) {
@@ -438,6 +487,7 @@ export default function Orders() {
                 <SelectItem value="not_started">Not Started</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="pending_delivery">Pending Delivery</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -457,6 +507,8 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
+            const deliveryProgress = getDeliveryProgress(order);
+            const showDeliveryBadge = order.fulfillment_percentage >= 50;
             return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
@@ -708,6 +760,30 @@ export default function Orders() {
                                 </Badge>
                               )
                             ))}
+                          </div>
+                        )}
+                        {/* Delivery Progress Badge */}
+                        {showDeliveryBadge && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="text-xs text-muted-foreground font-medium mr-1">Delivery:</span>
+                            <Badge 
+                              variant={deliveryProgress.delivered === deliveryProgress.total ? "default" : "outline"}
+                              className={`text-xs py-0 px-1.5 ${
+                                deliveryProgress.delivered === deliveryProgress.total 
+                                  ? 'bg-emerald-500 hover:bg-emerald-500/90' 
+                                  : deliveryProgress.delivered > 0 
+                                    ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                                    : 'border-muted-foreground/30'
+                              }`}
+                            >
+                              {deliveryProgress.delivered}/{deliveryProgress.total} delivered
+                            </Badge>
+                            {deliveryProgress.pending.length > 0 && deliveryProgress.pending.length <= 3 && (
+                              <span className="text-xs text-muted-foreground">
+                                ({deliveryProgress.pending.join(', ')} pending)
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
