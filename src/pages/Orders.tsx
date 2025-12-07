@@ -268,6 +268,25 @@ export default function Orders() {
     return stages;
   };
 
+  const calculateFulfillmentPercentage = (order: Order) => {
+    const stages = getManufacturingStages(order);
+    if (stages.length === 0) return 0;
+    
+    let totalPoints = 0;
+    let earnedPoints = 0;
+    
+    stages.forEach(stage => {
+      totalPoints += 1;
+      if (stage.status === 'complete') {
+        earnedPoints += 1;
+      } else if (stage.status === 'partial') {
+        earnedPoints += 0.5;
+      }
+    });
+    
+    return Math.round((earnedPoints / totalPoints) * 100);
+  };
+
   const handleStageStatusChange = async (orderId: string, field: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -695,7 +714,7 @@ export default function Orders() {
 
                       <div className="flex items-center gap-3">
                         <ProgressCircle
-                          value={order.fulfillment_percentage}
+                          value={calculateFulfillmentPercentage(order)}
                           size="sm"
                           colorVariant="gradient"
                           label="Fulfillment"
