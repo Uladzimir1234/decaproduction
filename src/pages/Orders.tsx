@@ -93,7 +93,7 @@ interface Order {
 export default function Orders() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isWorker, canUpdateOrdering } = useRole();
+  const { isWorker, canUpdateOrdering, canUpdateManufacturing } = useRole();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [loading, setLoading] = useState(true);
@@ -464,63 +464,52 @@ export default function Orders() {
                               </span>
                             </>}
                         </div>
-                        {notOrderedComponents.length > 0 && (
+                        {/* Ordering stages - hidden for workers */}
+                        {!isWorker && notOrderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                             <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
                             {notOrderedComponents.map((component) => (
-                              canUpdateOrdering ? (
-                                <Popover key={component.name}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                        {component.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="not_ordered"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <Badge key={component.name} variant="destructive" className="text-xs py-0 px-1.5">
-                                  {component.name}
-                                </Badge>
-                              )
+                              <Popover key={component.name}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
+                                    <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                      {component.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="not_ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             ))}
                           </div>
                         )}
-                        {orderedComponents.length > 0 && (
+                        {!isWorker && orderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium mr-1">Ordered:</span>
                             {orderedComponents.map((component) => (
-                              canUpdateOrdering ? (
-                                <Popover key={component.name}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
-                                        {component.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="ordered"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
-                                  {component.name}
-                                </Badge>
-                              )
+                              <Popover key={component.name}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
+                                      {component.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             ))}
                           </div>
                         )}
@@ -581,82 +570,64 @@ export default function Orders() {
                             </Popover>
                           ))}
                         </div>
-                        {/* Custom Ordering Steps - Only show for non-workers */}
-                        {customOrderingSteps.length > 0 && (
+                        {/* Custom Ordering Steps - Hidden for workers */}
+                        {!isWorker && customOrderingSteps.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             <span className="text-xs text-muted-foreground font-medium mr-1">Custom:</span>
                             {customOrderingSteps.filter(s => s.status === 'not_ordered').map((step) => (
-                              canUpdateOrdering ? (
-                                <Popover key={step.id}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
-                                        {step.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="not_ordered"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleCustomStepStatusChange(step.id, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <Badge key={step.id} variant="destructive" className="text-xs py-0 px-1.5 border-dashed">
-                                  {step.name}
-                                </Badge>
-                              )
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
+                                    <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="not_ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             ))}
                             {customOrderingSteps.filter(s => s.status === 'ordered').map((step) => (
-                              canUpdateOrdering ? (
-                                <Popover key={step.id}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
-                                        {step.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="ordered"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleCustomStepStatusChange(step.id, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <Badge key={step.id} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 border-dashed">
-                                  {step.name}
-                                </Badge>
-                              )
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="ordered"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             ))}
                             {customOrderingSteps.filter(s => s.status === 'available').map((step) => (
-                              canUpdateOrdering ? (
-                                <Popover key={step.id}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
-                                        {step.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="available"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleCustomStepStatusChange(step.id, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <Badge key={step.id} variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 border-dashed">
-                                  {step.name}
-                                </Badge>
-                              )
+                              <Popover key={step.id}>
+                                <PopoverTrigger asChild>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
+                                    <Badge variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
+                                      {step.name}
+                                    </Badge>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-36 p-0" align="start">
+                                  <StatusPopoverButtons
+                                    currentValue="available"
+                                    options={orderingPopoverOptions}
+                                    onChange={(value) => handleCustomStepStatusChange(step.id, value)}
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             ))}
                           </div>
                         )}
