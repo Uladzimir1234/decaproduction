@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
-import { Truck, Plus, CalendarIcon } from "lucide-react";
+import { Truck, Plus, CalendarIcon, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -106,6 +106,14 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
   const [selectedDeliveryItems, setSelectedDeliveryItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
   const [saving, setSaving] = useState(false);
+  
+  // Custom items for new batch
+  const [newCustomShippingItems, setNewCustomShippingItems] = useState<{ name: string; qty: number }[]>([]);
+  const [newCustomDeliveryItems, setNewCustomDeliveryItems] = useState<{ name: string; qty: number }[]>([]);
+  const [customShippingName, setCustomShippingName] = useState("");
+  const [customShippingQty, setCustomShippingQty] = useState(1);
+  const [customDeliveryName, setCustomDeliveryName] = useState("");
+  const [customDeliveryQty, setCustomDeliveryQty] = useState(1);
 
   const canEdit = canUpdateManufacturing && !isSeller;
 
@@ -156,6 +164,34 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     });
     setSelectedDeliveryItems(deliveryInit);
     setNewBatchDate(new Date());
+    setNewCustomShippingItems([]);
+    setNewCustomDeliveryItems([]);
+    setCustomShippingName("");
+    setCustomShippingQty(1);
+    setCustomDeliveryName("");
+    setCustomDeliveryQty(1);
+  };
+
+  const addCustomShippingToList = () => {
+    if (!customShippingName.trim()) return;
+    setNewCustomShippingItems([...newCustomShippingItems, { name: customShippingName.trim(), qty: customShippingQty }]);
+    setCustomShippingName("");
+    setCustomShippingQty(1);
+  };
+
+  const removeCustomShippingFromList = (index: number) => {
+    setNewCustomShippingItems(newCustomShippingItems.filter((_, i) => i !== index));
+  };
+
+  const addCustomDeliveryToList = () => {
+    if (!customDeliveryName.trim()) return;
+    setNewCustomDeliveryItems([...newCustomDeliveryItems, { name: customDeliveryName.trim(), qty: customDeliveryQty }]);
+    setCustomDeliveryName("");
+    setCustomDeliveryQty(1);
+  };
+
+  const removeCustomDeliveryFromList = (index: number) => {
+    setNewCustomDeliveryItems(newCustomDeliveryItems.filter((_, i) => i !== index));
   };
 
   const createBatch = async () => {
@@ -214,6 +250,34 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           .from("batch_delivery_items")
           .insert(deliveryToInsert);
         if (deliveryError) throw deliveryError;
+      }
+
+      // Insert custom shipping items
+      if (newCustomShippingItems.length > 0) {
+        const customShipToInsert = newCustomShippingItems.map(item => ({
+          batch_id: batchData.id,
+          name: item.name,
+          quantity: item.qty,
+          is_complete: false
+        }));
+        const { error: customShipError } = await supabase
+          .from("batch_custom_shipping_items")
+          .insert(customShipToInsert);
+        if (customShipError) throw customShipError;
+      }
+
+      // Insert custom delivery items
+      if (newCustomDeliveryItems.length > 0) {
+        const customDelToInsert = newCustomDeliveryItems.map(item => ({
+          batch_id: batchData.id,
+          name: item.name,
+          quantity: item.qty,
+          is_delivered: false
+        }));
+        const { error: customDelError } = await supabase
+          .from("batch_custom_delivery_items")
+          .insert(customDelToInsert);
+        if (customDelError) throw customDelError;
       }
 
       toast({ title: "Batch created", description: "New delivery batch created successfully" });
@@ -337,12 +401,42 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                             </div>
                           );
                         })}
+                        {/* Custom shipping items added */}
+                        {newCustomShippingItems.map((item, index) => (
+                          <div key={`custom-ship-${index}`} className="flex items-center gap-3 border-t border-dashed pt-2">
+                            <Badge variant="secondary" className="text-xs">Custom</Badge>
+                            <span className="flex-1 text-sm">{item.name}</span>
+                            <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomShippingFromList(index)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Add custom shipping item */}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Custom item name"
+                          value={customShippingName}
+                          onChange={(e) => setCustomShippingName(e.target.value)}
+                          className="flex-1 h-8 text-sm"
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          value={customShippingQty}
+                          onChange={(e) => setCustomShippingQty(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 h-8 text-xs text-center"
+                        />
+                        <Button variant="outline" size="sm" onClick={addCustomShippingToList} disabled={!customShippingName.trim()}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
 
                     {/* Delivery Items */}
                     <div className="space-y-2">
-                      <Label>Delivery Items (from order totals)</Label>
+                      <Label>Delivery Items</Label>
                       <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
                         {DELIVERY_ITEM_TYPES.map(item => {
                           const val = selectedDeliveryItems[item.key] || { selected: false, qty: 0 };
@@ -364,6 +458,36 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                             </div>
                           );
                         })}
+                        {/* Custom delivery items added */}
+                        {newCustomDeliveryItems.map((item, index) => (
+                          <div key={`custom-del-${index}`} className="flex items-center gap-3 border-t border-dashed pt-2">
+                            <Badge variant="secondary" className="text-xs">Custom</Badge>
+                            <span className="flex-1 text-sm">{item.name}</span>
+                            <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomDeliveryFromList(index)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Add custom delivery item */}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Custom item name"
+                          value={customDeliveryName}
+                          onChange={(e) => setCustomDeliveryName(e.target.value)}
+                          className="flex-1 h-8 text-sm"
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          value={customDeliveryQty}
+                          onChange={(e) => setCustomDeliveryQty(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 h-8 text-xs text-center"
+                        />
+                        <Button variant="outline" size="sm" onClick={addCustomDeliveryToList} disabled={!customDeliveryName.trim()}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
 
