@@ -36,17 +36,15 @@ export function StatusPopoverButtons({
   return (
     <div className="flex flex-col gap-1.5 p-1">
       {options.map((option) => (
-        <PopoverClose key={option.value} asChild>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onChange(option.value);
-            }}
-            className={getButtonStyle(option.value)}
-          >
-            {option.label}
-          </button>
+        <PopoverClose
+          key={option.value}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(option.value);
+          }}
+          className={getButtonStyle(option.value)}
+        >
+          {option.label}
         </PopoverClose>
       ))}
     </div>
