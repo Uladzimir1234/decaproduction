@@ -10,10 +10,19 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
 import { createAuditLog } from "@/lib/auditLog";
-import { Truck, Package, AlertTriangle, CheckCircle2, Plus, Calendar, BoxIcon } from "lucide-react";
+import { Truck, Package, AlertTriangle, CheckCircle2, Plus, Calendar, BoxIcon, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+
+interface CustomShippingItem {
+  id: string;
+  order_id: string;
+  name: string;
+  quantity: number;
+  is_complete: boolean;
+  created_at: string;
+}
 
 interface DeliveryLog {
   id: string;
@@ -41,6 +50,13 @@ interface DeliveryFulfillment {
   shipping_spec_labels: boolean;
   shipping_nailing_fins: boolean;
   shipping_brackets: boolean;
+  // Shipping quantities
+  shipping_handles_qty: number;
+  shipping_hinges_qty: number;
+  shipping_weeping_qty: number;
+  shipping_labels_qty: number;
+  shipping_fins_qty: number;
+  shipping_brackets_qty: number;
 }
 
 interface OrderInfo {
@@ -73,12 +89,12 @@ const DELIVERY_ITEMS = [
 ] as const;
 
 const SHIPPING_PREP_ITEMS = [
-  { key: 'shipping_handles_boxed', label: 'Handles in Box', description: 'Gather window handles in box' },
-  { key: 'shipping_hinges_covers', label: 'Hinges Covers', description: 'Windows hinges covers' },
-  { key: 'shipping_weeping_covers', label: 'Weeping Holes Covers', description: 'Weeping holes covers' },
-  { key: 'shipping_spec_labels', label: 'Spec Labels', description: 'Print & stick glass spec labels' },
-  { key: 'shipping_nailing_fins', label: 'Nailing Fins Packed', description: 'Put nailing fins around windows' },
-  { key: 'shipping_brackets', label: 'Brackets Packed', description: 'Metal installation brackets' },
+  { key: 'shipping_handles_boxed', qtyKey: 'shipping_handles_qty', label: 'Handles in Box', description: 'Gather window handles in box' },
+  { key: 'shipping_hinges_covers', qtyKey: 'shipping_hinges_qty', label: 'Hinges Covers', description: 'Windows hinges covers' },
+  { key: 'shipping_weeping_covers', qtyKey: 'shipping_weeping_qty', label: 'Weeping Holes Covers', description: 'Weeping holes covers' },
+  { key: 'shipping_spec_labels', qtyKey: 'shipping_labels_qty', label: 'Spec Labels', description: 'Print & stick glass spec labels' },
+  { key: 'shipping_nailing_fins', qtyKey: 'shipping_fins_qty', label: 'Nailing Fins Packed', description: 'Put nailing fins around windows' },
+  { key: 'shipping_brackets', qtyKey: 'shipping_brackets_qty', label: 'Brackets Packed', description: 'Metal installation brackets' },
 ] as const;
 
 export function DeliveryTrackingSection({ 
@@ -95,10 +111,119 @@ export function DeliveryTrackingSection({
   const [newDeliveryItems, setNewDeliveryItems] = useState("");
   const [newDeliveryNotes, setNewDeliveryNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  
+  // Custom shipping items state
+  const [customShippingItems, setCustomShippingItems] = useState<CustomShippingItem[]>([]);
+  const [customItemDialogOpen, setCustomItemDialogOpen] = useState(false);
+  const [newCustomItemName, setNewCustomItemName] = useState("");
+  const [newCustomItemQty, setNewCustomItemQty] = useState(1);
 
   useEffect(() => {
     fetchDeliveryLogs();
+    fetchCustomShippingItems();
   }, [order.id]);
+
+  const fetchCustomShippingItems = async () => {
+    const { data, error } = await supabase
+      .from("custom_shipping_items")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      setCustomShippingItems(data as CustomShippingItem[]);
+    }
+  };
+
+  const addCustomShippingItem = async () => {
+    if (!newCustomItemName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an item name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("custom_shipping_items")
+        .insert({
+          order_id: order.id,
+          name: newCustomItemName.trim(),
+          quantity: newCustomItemQty,
+          is_complete: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCustomShippingItems([...customShippingItems, data as CustomShippingItem]);
+      setNewCustomItemName("");
+      setNewCustomItemQty(1);
+      setCustomItemDialogOpen(false);
+      
+      toast({
+        title: "Item added",
+        description: "Custom shipping item added successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add item",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleCustomItem = async (itemId: string, isComplete: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("custom_shipping_items")
+        .update({ is_complete: isComplete })
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      setCustomShippingItems(prev => 
+        prev.map(item => item.id === itemId ? { ...item, is_complete: isComplete } : item)
+      );
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update item",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteCustomItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("custom_shipping_items")
+        .delete()
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      setCustomShippingItems(prev => prev.filter(item => item.id !== itemId));
+      
+      toast({
+        title: "Item deleted",
+        description: "Custom shipping item removed"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete item",
+        variant: "destructive"
+      });
+    }
+  };
 
   const fetchDeliveryLogs = async () => {
     const { data, error } = await supabase
@@ -227,12 +352,14 @@ export function DeliveryTrackingSection({
     fulfillment?.[item.key as keyof DeliveryFulfillment] !== true
   );
 
-  // Calculate shipping prep progress
-  const shippingPrepCount = SHIPPING_PREP_ITEMS.filter(item =>
+  // Calculate shipping prep progress (including custom items)
+  const builtInShippingComplete = SHIPPING_PREP_ITEMS.filter(item =>
     fulfillment?.[item.key as keyof DeliveryFulfillment] === true
   ).length;
-  const totalShippingSteps = SHIPPING_PREP_ITEMS.length;
-  const allShippingComplete = shippingPrepCount === totalShippingSteps;
+  const customItemsComplete = customShippingItems.filter(item => item.is_complete).length;
+  const shippingPrepCount = builtInShippingComplete + customItemsComplete;
+  const totalShippingSteps = SHIPPING_PREP_ITEMS.length + customShippingItems.length;
+  const allShippingComplete = shippingPrepCount === totalShippingSteps && totalShippingSteps > 0;
 
   const isLocked = manufacturingProgress < 90;
   const canEdit = canUpdateManufacturing && !isSeller;
@@ -262,19 +389,64 @@ export function DeliveryTrackingSection({
       <CardContent className="space-y-6">
         {/* Shipping Preparation Checklist */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <BoxIcon className="h-4 w-4 text-blue-500" />
-            <h4 className="text-sm font-medium">Shipping Preparation</h4>
-            {allShippingComplete && (
-              <Badge variant="secondary" className="text-xs gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <CheckCircle2 className="h-3 w-3" />
-                Ready to Ship
-              </Badge>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BoxIcon className="h-4 w-4 text-blue-500" />
+              <h4 className="text-sm font-medium">Shipping Preparation</h4>
+              {allShippingComplete && (
+                <Badge variant="secondary" className="text-xs gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Ready to Ship
+                </Badge>
+              )}
+            </div>
+            {canEdit && (
+              <Dialog open={customItemDialogOpen} onOpenChange={setCustomItemDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Plus className="h-4 w-4" />
+                    Add Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Custom Shipping Item</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Item Name</Label>
+                      <Input
+                        placeholder="e.g., Safety caps, Extra screws"
+                        value={newCustomItemName}
+                        onChange={(e) => setNewCustomItemName(e.target.value)}
+                        maxLength={100}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity Required</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={newCustomItemQty}
+                        onChange={(e) => setNewCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      />
+                    </div>
+                    <Button 
+                      onClick={addCustomShippingItem} 
+                      disabled={saving || !newCustomItemName.trim()}
+                      className="w-full"
+                    >
+                      {saving ? "Adding..." : "Add Item"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {SHIPPING_PREP_ITEMS.map(item => {
               const isChecked = fulfillment?.[item.key as keyof DeliveryFulfillment] === true;
+              const quantity = (fulfillment as any)?.[item.qtyKey] || 0;
               return (
                 <div 
                   key={item.key}
@@ -292,17 +464,78 @@ export function DeliveryTrackingSection({
                     className="mt-0.5"
                   />
                   <div className="flex-1 min-w-0">
-                    <Label 
-                      htmlFor={item.key} 
-                      className={`text-sm font-medium cursor-pointer block ${isChecked ? 'text-blue-600 dark:text-blue-400' : ''}`}
-                    >
-                      {item.label}
-                    </Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label 
+                        htmlFor={item.key} 
+                        className={`text-sm font-medium cursor-pointer ${isChecked ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                      >
+                        {item.label}
+                      </Label>
+                      {canEdit ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          value={quantity}
+                          onChange={(e) => onUpdate(item.qtyKey, parseInt(e.target.value) || 0)}
+                          className="w-16 h-6 text-xs text-center p-1"
+                          placeholder="Qty"
+                        />
+                      ) : quantity > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          ×{quantity}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
                   </div>
                 </div>
               );
             })}
+            {/* Custom shipping items */}
+            {customShippingItems.map(item => (
+              <div 
+                key={item.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border border-dashed transition-colors ${
+                  item.is_complete 
+                    ? 'bg-blue-500/10 border-blue-500/30' 
+                    : 'bg-card border-border'
+                }`}
+              >
+                <Checkbox
+                  id={`custom-${item.id}`}
+                  checked={item.is_complete}
+                  onCheckedChange={(checked) => toggleCustomItem(item.id, checked as boolean)}
+                  disabled={!canEdit}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label 
+                      htmlFor={`custom-${item.id}`}
+                      className={`text-sm font-medium cursor-pointer ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {item.name}
+                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs">
+                        ×{item.quantity}
+                      </Badge>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteCustomItem(item.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Custom item</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
