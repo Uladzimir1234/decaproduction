@@ -103,7 +103,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canUpdateOrdering, canUpdateManufacturing, isWorker, loading: roleLoading } = useRole();
+  const { canUpdateOrdering, canUpdateManufacturing, isWorker, isSeller, loading: roleLoading } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -630,7 +630,7 @@ export default function OrderDetail() {
                 </CardTitle>
                 <CardDescription className="my-[4px] py-[8px] pt-[16px]">Update component availability and order dates</CardDescription>
               </div>
-              {canUpdateOrdering && (
+              {canUpdateOrdering && !isSeller && (
                 <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="gap-1">
@@ -686,7 +686,7 @@ export default function OrderDetail() {
                         reinforcement_order_date: value === 'ordered' ? order.reinforcement_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.reinforcement_status === 'ordered' && (
@@ -696,7 +696,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.reinforcement_order_date || ''}
                         onChange={e => updateOrderComponent({ reinforcement_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -726,7 +726,7 @@ export default function OrderDetail() {
                         windows_profile_order_date: value === 'ordered' ? order.windows_profile_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.windows_profile_status === 'ordered' && (
@@ -736,7 +736,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.windows_profile_order_date || ''}
                         onChange={e => updateOrderComponent({ windows_profile_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -766,7 +766,7 @@ export default function OrderDetail() {
                         glass_order_date: value === 'ordered' ? order.glass_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.glass_status === 'ordered' && (
@@ -776,7 +776,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.glass_order_date || ''}
                         onChange={e => updateOrderComponent({ glass_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -806,7 +806,7 @@ export default function OrderDetail() {
                         screens_order_date: value === 'ordered' ? order.screens_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.screens_status === 'ordered' && (
@@ -816,7 +816,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.screens_order_date || ''}
                         onChange={e => updateOrderComponent({ screens_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -846,7 +846,7 @@ export default function OrderDetail() {
                         plisse_screens_order_date: value === 'ordered' ? order.plisse_screens_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.plisse_screens_status === 'ordered' && (
@@ -856,7 +856,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.plisse_screens_order_date || ''}
                         onChange={e => updateOrderComponent({ plisse_screens_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -886,7 +886,7 @@ export default function OrderDetail() {
                         nail_fins_order_date: value === 'ordered' ? order.nail_fins_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.nail_fins_status === 'ordered' && (
@@ -896,7 +896,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.nail_fins_order_date || ''}
                         onChange={e => updateOrderComponent({ nail_fins_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -926,7 +926,7 @@ export default function OrderDetail() {
                         hardware_order_date: value === 'ordered' ? order.hardware_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering}
+                      disabled={!canUpdateOrdering || isSeller}
                     />
                   </div>
                   {order.hardware_status === 'ordered' && (
@@ -936,7 +936,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.hardware_order_date || ''}
                         onChange={e => updateOrderComponent({ hardware_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                   )}
@@ -967,7 +967,7 @@ export default function OrderDetail() {
                           order_date: value === 'ordered' ? step.order_date || new Date().toISOString().split('T')[0] : null
                         })}
                         options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
                       {step.status === 'ordered' && (
@@ -977,7 +977,7 @@ export default function OrderDetail() {
                           type="date"
                           value={step.order_date || ''}
                           onChange={e => updateCustomStep(step.id, { order_date: e.target.value })}
-                          disabled={!canUpdateOrdering}
+                          disabled={!canUpdateOrdering || isSeller}
                         />
                       </div>
                     )}
@@ -987,10 +987,10 @@ export default function OrderDetail() {
                         placeholder="Add notes..."
                         value={step.notes || ""}
                         onChange={e => updateCustomStep(step.id, { notes: e.target.value })}
-                        disabled={!canUpdateOrdering}
+                        disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
-                    {canUpdateOrdering && (
+                    {canUpdateOrdering && !isSeller && (
                       <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
                         <Trash2 className="h-4 w-4" />
                         Delete Step
