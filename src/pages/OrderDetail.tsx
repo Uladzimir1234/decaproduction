@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createAuditLog } from "@/lib/auditLog";
-import { DeliveryTrackingSection } from "@/components/delivery/DeliveryTrackingSection";
+import { DeliveryBatchSection } from "@/components/delivery/DeliveryBatchSection";
 
 type StageStatus = "not_started" | "partial" | "complete";
 
@@ -1506,8 +1506,8 @@ export default function OrderDetail() {
         </Card>
       </div>
 
-      {/* Delivery Tracking Section */}
-      <DeliveryTrackingSection
+      {/* Delivery Batches Section */}
+      <DeliveryBatchSection
         order={{
           id: order.id,
           order_number: order.order_number,
@@ -1516,40 +1516,7 @@ export default function OrderDetail() {
           sliding_doors_count: order.sliding_doors_count,
           has_sliding_doors: order.has_sliding_doors,
           screen_type: order.screen_type,
-          delivery_complete: order.delivery_complete || false,
         }}
-        fulfillment={fulfillment ? {
-          windows_delivered: fulfillment.windows_delivered || false,
-          doors_delivered: fulfillment.doors_delivered || false,
-          sliding_doors_delivered: fulfillment.sliding_doors_delivered || false,
-          screens_delivered_final: fulfillment.screens_delivered_final || false,
-          handles_delivered: fulfillment.handles_delivered || false,
-          glass_delivered_final: fulfillment.glass_delivered_final || false,
-          nailing_fins_delivered: fulfillment.nailing_fins_delivered || false,
-          brackets_delivered: fulfillment.brackets_delivered || false,
-          delivery_notes: fulfillment.delivery_notes,
-          shipping_handles_boxed: (fulfillment as any).shipping_handles_boxed || false,
-          shipping_hinges_covers: (fulfillment as any).shipping_hinges_covers || false,
-          shipping_weeping_covers: (fulfillment as any).shipping_weeping_covers || false,
-          shipping_spec_labels: (fulfillment as any).shipping_spec_labels || false,
-          shipping_nailing_fins: (fulfillment as any).shipping_nailing_fins || false,
-          shipping_brackets: (fulfillment as any).shipping_brackets || false,
-          shipping_handles_qty: (fulfillment as any).shipping_handles_qty || 0,
-          shipping_hinges_qty: (fulfillment as any).shipping_hinges_qty || 0,
-          shipping_weeping_qty: (fulfillment as any).shipping_weeping_qty || 0,
-          shipping_labels_qty: (fulfillment as any).shipping_labels_qty || 0,
-          shipping_fins_qty: (fulfillment as any).shipping_fins_qty || 0,
-          shipping_brackets_qty: (fulfillment as any).shipping_brackets_qty || 0,
-          windows_delivered_qty: (fulfillment as any).windows_delivered_qty || 0,
-          doors_delivered_qty: (fulfillment as any).doors_delivered_qty || 0,
-          sliding_doors_delivered_qty: (fulfillment as any).sliding_doors_delivered_qty || 0,
-          glass_delivered_qty: (fulfillment as any).glass_delivered_qty || 0,
-          screens_delivered_qty: (fulfillment as any).screens_delivered_qty || 0,
-          handles_delivered_qty: (fulfillment as any).handles_delivered_qty || 0,
-          nailing_fins_delivered_qty: (fulfillment as any).nailing_fins_delivered_qty || 0,
-          brackets_delivered_qty: (fulfillment as any).brackets_delivered_qty || 0,
-        } : null}
-        onUpdate={(key, value) => updateFulfillment(key as keyof OrderFulfillment, value)}
         manufacturingProgress={order.fulfillment_percentage}
       />
     </div>
