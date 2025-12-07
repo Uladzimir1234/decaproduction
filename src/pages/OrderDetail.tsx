@@ -1534,6 +1534,12 @@ export default function OrderDetail() {
           shipping_spec_labels: (fulfillment as any).shipping_spec_labels || false,
           shipping_nailing_fins: (fulfillment as any).shipping_nailing_fins || false,
           shipping_brackets: (fulfillment as any).shipping_brackets || false,
+          shipping_handles_qty: (fulfillment as any).shipping_handles_qty || 0,
+          shipping_hinges_qty: (fulfillment as any).shipping_hinges_qty || 0,
+          shipping_weeping_qty: (fulfillment as any).shipping_weeping_qty || 0,
+          shipping_labels_qty: (fulfillment as any).shipping_labels_qty || 0,
+          shipping_fins_qty: (fulfillment as any).shipping_fins_qty || 0,
+          shipping_brackets_qty: (fulfillment as any).shipping_brackets_qty || 0,
         } : null}
         onUpdate={(key, value) => updateFulfillment(key as keyof OrderFulfillment, value)}
         manufacturingProgress={order.fulfillment_percentage}

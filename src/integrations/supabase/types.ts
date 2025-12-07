@@ -47,6 +47,41 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_shipping_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_complete: boolean
+          name: string
+          order_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          name: string
+          order_id: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          name?: string
+          order_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_shipping_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_steps: {
         Row: {
           created_at: string
@@ -183,11 +218,17 @@ export type Database = {
           screens_made: boolean | null
           screens_notes: string | null
           shipping_brackets: boolean | null
+          shipping_brackets_qty: number | null
+          shipping_fins_qty: number | null
           shipping_handles_boxed: boolean | null
+          shipping_handles_qty: number | null
           shipping_hinges_covers: boolean | null
+          shipping_hinges_qty: number | null
+          shipping_labels_qty: number | null
           shipping_nailing_fins: boolean | null
           shipping_spec_labels: boolean | null
           shipping_weeping_covers: boolean | null
+          shipping_weeping_qty: number | null
           sliding_doors_assembled: boolean | null
           sliding_doors_delivered: boolean | null
           sliding_doors_glass_available: boolean | null
@@ -233,11 +274,17 @@ export type Database = {
           screens_made?: boolean | null
           screens_notes?: string | null
           shipping_brackets?: boolean | null
+          shipping_brackets_qty?: number | null
+          shipping_fins_qty?: number | null
           shipping_handles_boxed?: boolean | null
+          shipping_handles_qty?: number | null
           shipping_hinges_covers?: boolean | null
+          shipping_hinges_qty?: number | null
+          shipping_labels_qty?: number | null
           shipping_nailing_fins?: boolean | null
           shipping_spec_labels?: boolean | null
           shipping_weeping_covers?: boolean | null
+          shipping_weeping_qty?: number | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
           sliding_doors_glass_available?: boolean | null
@@ -283,11 +330,17 @@ export type Database = {
           screens_made?: boolean | null
           screens_notes?: string | null
           shipping_brackets?: boolean | null
+          shipping_brackets_qty?: number | null
+          shipping_fins_qty?: number | null
           shipping_handles_boxed?: boolean | null
+          shipping_handles_qty?: number | null
           shipping_hinges_covers?: boolean | null
+          shipping_hinges_qty?: number | null
+          shipping_labels_qty?: number | null
           shipping_nailing_fins?: boolean | null
           shipping_spec_labels?: boolean | null
           shipping_weeping_covers?: boolean | null
+          shipping_weeping_qty?: number | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
           sliding_doors_glass_available?: boolean | null
