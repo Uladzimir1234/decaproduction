@@ -278,22 +278,55 @@ export default function Orders() {
   };
 
   const calculateFulfillmentPercentage = (order: Order) => {
-    const stages = getManufacturingStages(order);
-    if (stages.length === 0) return 0;
+    const f = fulfillments[order.id];
+    if (!f) return order.fulfillment_percentage || 0;
     
-    let totalPoints = 0;
-    let earnedPoints = 0;
-    
-    stages.forEach(stage => {
-      totalPoints += 1;
-      if (stage.status === 'complete') {
-        earnedPoints += 1;
-      } else if (stage.status === 'partial') {
-        earnedPoints += 0.5;
-      }
-    });
-    
-    return Math.round((earnedPoints / totalPoints) * 100);
+    let totalSteps = 0;
+    let completedSteps = 0;
+
+    const getStatusPoints = (status: string | null | undefined, weight: number) => {
+      if (status === 'complete') return weight;
+      if (status === 'partial') return weight * 0.5;
+      return 0;
+    };
+
+    // Reinforcement cutting (weight: 10%)
+    totalSteps += 10;
+    completedSteps += getStatusPoints(f.reinforcement_cutting, 10);
+
+    // Profile cutting (weight: 10%)
+    totalSteps += 10;
+    completedSteps += getStatusPoints(f.profile_cutting, 10);
+
+    // Welding (weight: 10%)
+    totalSteps += 10;
+    completedSteps += getStatusPoints(f.welding_status, 10);
+
+    // Doors assembled (if applicable) (weight: 10%)
+    if (order.doors_count && order.doors_count > 0) {
+      totalSteps += 10;
+      completedSteps += getStatusPoints(f.doors_status, 10);
+    }
+
+    // Sliding doors assembled (if applicable) (weight: 10%)
+    if (order.has_sliding_doors) {
+      totalSteps += 10;
+      completedSteps += getStatusPoints(f.sliding_doors_status, 10);
+    }
+
+    // Frame/sash assembled (weight: 15%)
+    totalSteps += 15;
+    completedSteps += getStatusPoints(f.assembly_status, 15);
+
+    // Glass installed (weight: 25%)
+    totalSteps += 25;
+    completedSteps += getStatusPoints(f.glass_status, 25);
+
+    // Screens (weight: 10%)
+    totalSteps += 10;
+    completedSteps += getStatusPoints(f.screens_cutting, 10);
+
+    return Math.round(completedSteps / totalSteps * 100);
   };
 
   const handleStageStatusChange = async (orderId: string, field: string, newStatus: string) => {
