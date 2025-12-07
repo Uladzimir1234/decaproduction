@@ -332,9 +332,9 @@ export function DeliveryBatchCard({
                   </Dialog>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {shippingItems.map(item => (
-                  <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 auto-rows-fr">
+                {shippingItems.map((item, index) => (
+                  <div key={item.id} style={{ order: index }} className={`flex items-center gap-2 p-2 rounded-lg border text-sm h-10 ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
                     <Checkbox checked={item.is_complete} onCheckedChange={(c) => updateShippingItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
                     <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>
                       {getItemLabel(item.item_type, SHIPPING_ITEM_TYPES)}
@@ -346,13 +346,13 @@ export function DeliveryBatchCard({
                     )}
                   </div>
                 ))}
-                {customShippingItems.map(item => (
-                  <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => toggleCustomShipping(item.id, c as boolean)} disabled={!canEdit} />
-                    <span className={`flex-1 ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>{item.name}</span>
-                    <Badge variant="secondary" className="text-xs">×{item.quantity}</Badge>
+                {customShippingItems.map((item, index) => (
+                  <div key={item.id} style={{ order: shippingItems.length + index }} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm h-10 ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
+                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => toggleCustomShipping(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
+                    <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>{item.name}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     {canEdit && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => deleteCustomShipping(item.id)}>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomShipping(item.id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     )}
@@ -399,9 +399,9 @@ export function DeliveryBatchCard({
                   </Dialog>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                {deliveryItems.map(item => (
-                  <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 auto-rows-fr">
+                {deliveryItems.map((item, index) => (
+                  <div key={item.id} style={{ order: index }} className={`flex items-center gap-2 p-2 rounded-lg border text-sm h-10 ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
                     <Checkbox checked={item.is_delivered} onCheckedChange={(c) => updateDeliveryItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
                     <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                       {getItemLabel(item.item_type, DELIVERY_ITEM_TYPES)}
@@ -413,13 +413,13 @@ export function DeliveryBatchCard({
                     )}
                   </div>
                 ))}
-                {customDeliveryItems.map(item => (
-                  <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => toggleCustomDelivery(item.id, c as boolean)} disabled={!canEdit} />
-                    <span className={`flex-1 ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{item.name}</span>
-                    <Badge variant="secondary" className="text-xs">×{item.quantity}</Badge>
+                {customDeliveryItems.map((item, index) => (
+                  <div key={item.id} style={{ order: deliveryItems.length + index }} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm h-10 ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
+                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => toggleCustomDelivery(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
+                    <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{item.name}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     {canEdit && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => deleteCustomDelivery(item.id)}>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomDelivery(item.id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     )}
