@@ -47,6 +47,146 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_custom_delivery_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_delivered: boolean
+          name: string
+          quantity: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          name: string
+          quantity?: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          name?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_custom_delivery_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_custom_shipping_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_complete: boolean
+          name: string
+          quantity: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          name: string
+          quantity?: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          name?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_custom_shipping_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_delivery_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_delivered: boolean
+          item_type: string
+          quantity: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          item_type: string
+          quantity?: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          item_type?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_delivery_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_shipping_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          is_complete: boolean
+          item_type: string
+          quantity: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          item_type: string
+          quantity?: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          is_complete?: boolean
+          item_type?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_shipping_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_delivery_items: {
         Row: {
           created_at: string
@@ -187,6 +327,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      delivery_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivery_date: string
+          id: string
+          notes: string | null
+          order_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivery_date: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivery_date?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_delivery_log: {
         Row: {
