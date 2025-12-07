@@ -1528,6 +1528,12 @@ export default function OrderDetail() {
           nailing_fins_delivered: fulfillment.nailing_fins_delivered || false,
           brackets_delivered: fulfillment.brackets_delivered || false,
           delivery_notes: fulfillment.delivery_notes,
+          shipping_handles_boxed: (fulfillment as any).shipping_handles_boxed || false,
+          shipping_hinges_covers: (fulfillment as any).shipping_hinges_covers || false,
+          shipping_weeping_covers: (fulfillment as any).shipping_weeping_covers || false,
+          shipping_spec_labels: (fulfillment as any).shipping_spec_labels || false,
+          shipping_nailing_fins: (fulfillment as any).shipping_nailing_fins || false,
+          shipping_brackets: (fulfillment as any).shipping_brackets || false,
         } : null}
         onUpdate={(key, value) => updateFulfillment(key as keyof OrderFulfillment, value)}
         manufacturingProgress={order.fulfillment_percentage}
