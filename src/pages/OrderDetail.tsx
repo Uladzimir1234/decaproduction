@@ -103,11 +103,12 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canUpdateOrdering } = useRole();
+  const { canUpdateOrdering, isWorker } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [roleLoaded, setRoleLoaded] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [newOrderingStepName, setNewOrderingStepName] = useState("");
   const [newManufacturingStepName, setNewManufacturingStepName] = useState("");
@@ -119,7 +120,7 @@ export default function OrderDetail() {
       fetchOrder();
       fetchCustomSteps();
     }
-  }, [id]);
+  }, [id, isWorker]);
 
   const fetchCustomSteps = async () => {
     if (!id) return;
@@ -266,34 +267,45 @@ export default function OrderDetail() {
       if (fulfillmentError && fulfillmentError.code !== "PGRST116") throw fulfillmentError;
 
       if (!fulfillmentData) {
-        // Create fulfillment record
-        const { data: newFulfillment, error: createError } = await supabase
-          .from("order_fulfillment")
-          .insert({
-            order_id: id,
-            reinforcement_cutting: "not_started",
-            profile_cutting: "not_started",
-            frames_welded: false,
-            doors_assembled: false,
-            doors_glass_available: false,
-            doors_glass_installed: false,
-            sliding_doors_assembled: false,
-            sliding_doors_glass_available: false,
-            sliding_doors_glass_installed: false,
-            frame_sash_assembled: false,
-            glass_delivered: false,
-            glass_installed: false,
-            screens_made: false,
-            screens_delivered: false
-          })
-          .select()
-          .single();
+        // Only non-workers can create fulfillment records
+        if (isWorker) {
+          // Workers can't create - just set empty fulfillment for display
+          toast({
+            title: "Notice",
+            description: "Fulfillment record not yet created for this order.",
+          });
+          setFulfillment(null);
+        } else {
+          // Create fulfillment record
+          const { data: newFulfillment, error: createError } = await supabase
+            .from("order_fulfillment")
+            .insert({
+              order_id: id,
+              reinforcement_cutting: "not_started",
+              profile_cutting: "not_started",
+              frames_welded: false,
+              doors_assembled: false,
+              doors_glass_available: false,
+              doors_glass_installed: false,
+              sliding_doors_assembled: false,
+              sliding_doors_glass_available: false,
+              sliding_doors_glass_installed: false,
+              frame_sash_assembled: false,
+              glass_delivered: false,
+              glass_installed: false,
+              screens_made: false,
+              screens_delivered: false
+            })
+            .select()
+            .single();
 
-        if (createError) throw createError;
-        fulfillmentData = newFulfillment;
+          if (createError) throw createError;
+          fulfillmentData = newFulfillment;
+          setFulfillment(fulfillmentData);
+        }
+      } else {
+        setFulfillment(fulfillmentData);
       }
-
-      setFulfillment(fulfillmentData);
     } catch (error) {
       console.error("Error fetching order:", error);
       toast({
