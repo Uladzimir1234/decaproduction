@@ -468,7 +468,7 @@ export default function Orders() {
                             {notOrderedComponents.map((component) => (
                               <Popover key={component.name}>
                                 <PopoverTrigger asChild>
-                                  <button onClick={(e) => e.preventDefault()}>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
                                     <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
                                       {component.name}
                                     </Badge>
@@ -492,7 +492,7 @@ export default function Orders() {
                             {orderedComponents.map((component) => (
                               <Popover key={component.name}>
                                 <PopoverTrigger asChild>
-                                  <button onClick={(e) => e.preventDefault()}>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
                                     <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
                                       {component.name}
                                     </Badge>
@@ -516,7 +516,8 @@ export default function Orders() {
                             <Popover key={stage.name}>
                               <PopoverTrigger asChild>
                                 <button 
-                                  onClick={(e) => e.preventDefault()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  type="button"
                                   className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity ${
                                     stage.status === 'complete' ? 'bg-emerald-500' : 
                                     stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
@@ -542,7 +543,8 @@ export default function Orders() {
                             <Popover key={step.id}>
                               <PopoverTrigger asChild>
                                 <button 
-                                  onClick={(e) => e.preventDefault()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  type="button"
                                   className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity border-2 border-dashed border-white/30 ${
                                     step.status === 'complete' ? 'bg-emerald-500' : 
                                     step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
@@ -572,7 +574,7 @@ export default function Orders() {
                             {customOrderingSteps.filter(s => s.status === 'not_ordered').map((step) => (
                               <Popover key={step.id}>
                                 <PopoverTrigger asChild>
-                                  <button onClick={(e) => e.preventDefault()}>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
                                     <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
                                       {step.name}
                                     </Badge>
@@ -590,7 +592,7 @@ export default function Orders() {
                             {customOrderingSteps.filter(s => s.status === 'ordered').map((step) => (
                               <Popover key={step.id}>
                                 <PopoverTrigger asChild>
-                                  <button onClick={(e) => e.preventDefault()}>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
                                     <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
                                       {step.name}
                                     </Badge>
@@ -608,7 +610,7 @@ export default function Orders() {
                             {customOrderingSteps.filter(s => s.status === 'available').map((step) => (
                               <Popover key={step.id}>
                                 <PopoverTrigger asChild>
-                                  <button onClick={(e) => e.preventDefault()}>
+                                  <button onClick={(e) => e.stopPropagation()} type="button">
                                     <Badge variant="outline" className="text-xs py-0 px-1.5 border-emerald-500/50 text-emerald-600 dark:text-emerald-400 cursor-pointer hover:opacity-80 transition-opacity border-dashed">
                                       {step.name}
                                     </Badge>
