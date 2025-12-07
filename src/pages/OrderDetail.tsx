@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createAuditLog } from "@/lib/auditLog";
+import { DeliveryTrackingSection } from "@/components/delivery/DeliveryTrackingSection";
 
 type StageStatus = "not_started" | "partial" | "complete";
 
@@ -65,6 +66,16 @@ interface OrderFulfillment {
   screens_delivered: boolean | null;
   screens_cutting: string | null;
   screens_notes: string | null;
+  // Delivery tracking fields
+  windows_delivered: boolean | null;
+  doors_delivered: boolean | null;
+  sliding_doors_delivered: boolean | null;
+  screens_delivered_final: boolean | null;
+  handles_delivered: boolean | null;
+  glass_delivered_final: boolean | null;
+  nailing_fins_delivered: boolean | null;
+  brackets_delivered: boolean | null;
+  delivery_notes: string | null;
 }
 
 interface Order {
@@ -82,6 +93,7 @@ interface Order {
   screen_type: string | null;
   has_plisse_screens: boolean;
   glass_ordered: boolean;
+  delivery_complete: boolean;
   // Component availability status
   reinforcement_status: string | null;
   reinforcement_order_date: string | null;
@@ -1482,6 +1494,33 @@ export default function OrderDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delivery Tracking Section */}
+      <DeliveryTrackingSection
+        order={{
+          id: order.id,
+          order_number: order.order_number,
+          windows_count: order.windows_count,
+          doors_count: order.doors_count,
+          sliding_doors_count: order.sliding_doors_count,
+          has_sliding_doors: order.has_sliding_doors,
+          screen_type: order.screen_type,
+          delivery_complete: order.delivery_complete || false,
+        }}
+        fulfillment={fulfillment ? {
+          windows_delivered: fulfillment.windows_delivered || false,
+          doors_delivered: fulfillment.doors_delivered || false,
+          sliding_doors_delivered: fulfillment.sliding_doors_delivered || false,
+          screens_delivered_final: fulfillment.screens_delivered_final || false,
+          handles_delivered: fulfillment.handles_delivered || false,
+          glass_delivered_final: fulfillment.glass_delivered_final || false,
+          nailing_fins_delivered: fulfillment.nailing_fins_delivered || false,
+          brackets_delivered: fulfillment.brackets_delivered || false,
+          delivery_notes: fulfillment.delivery_notes,
+        } : null}
+        onUpdate={(key, value) => updateFulfillment(key as keyof OrderFulfillment, value)}
+        manufacturingProgress={order.fulfillment_percentage}
+      />
     </div>
   );
 }

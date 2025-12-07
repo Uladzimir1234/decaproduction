@@ -4,12 +4,15 @@ export type AuditAction =
   | 'order_created'
   | 'order_updated'
   | 'order_deleted'
+  | 'order_completed'
   | 'fulfillment_updated'
   | 'custom_step_created'
   | 'custom_step_updated'
   | 'custom_step_deleted'
   | 'customer_created'
-  | 'customer_updated';
+  | 'customer_updated'
+  | 'delivery_logged'
+  | 'delivery_item_updated';
 
 export interface CreateAuditLogParams {
   action: AuditAction;
