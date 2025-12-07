@@ -126,9 +126,11 @@ export function DeliveryTrackingSection({
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newDeliveryDate, setNewDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newDeliveryItems, setNewDeliveryItems] = useState("");
   const [newDeliveryNotes, setNewDeliveryNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  
+  // Delivery log item selections with quantities
+  const [deliveryLogItems, setDeliveryLogItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
   
   // Custom shipping items state
   const [customShippingItems, setCustomShippingItems] = useState<CustomShippingItem[]>([]);
@@ -365,15 +367,62 @@ export function DeliveryTrackingSection({
     }
   };
 
+  // Initialize delivery log items when dialog opens
+  const initDeliveryLogItems = () => {
+    const initialItems: Record<string, { selected: boolean; qty: number }> = {};
+    applicableItems.forEach(item => {
+      initialItems[item.key] = { selected: false, qty: 0 };
+    });
+    customDeliveryItems.forEach(item => {
+      initialItems[`custom_${item.id}`] = { selected: false, qty: 0 };
+    });
+    setDeliveryLogItems(initialItems);
+    setNewDeliveryDate(new Date().toISOString().split('T')[0]);
+    setNewDeliveryNotes("");
+  };
+
+  const toggleDeliveryLogItem = (key: string, selected: boolean) => {
+    setDeliveryLogItems(prev => ({
+      ...prev,
+      [key]: { ...prev[key], selected, qty: selected ? (prev[key]?.qty || 1) : 0 }
+    }));
+  };
+
+  const updateDeliveryLogQty = (key: string, qty: number) => {
+    setDeliveryLogItems(prev => ({
+      ...prev,
+      [key]: { ...prev[key], qty: Math.max(0, qty), selected: qty > 0 }
+    }));
+  };
+
   const addDeliveryLog = async () => {
-    if (!newDeliveryItems.trim()) {
+    // Build items string from selections
+    const selectedItems: string[] = [];
+    
+    applicableItems.forEach(item => {
+      const logItem = deliveryLogItems[item.key];
+      if (logItem?.selected && logItem.qty > 0) {
+        selectedItems.push(`${logItem.qty}× ${item.label}`);
+      }
+    });
+    
+    customDeliveryItems.forEach(item => {
+      const logItem = deliveryLogItems[`custom_${item.id}`];
+      if (logItem?.selected && logItem.qty > 0) {
+        selectedItems.push(`${logItem.qty}× ${item.name}`);
+      }
+    });
+
+    if (selectedItems.length === 0) {
       toast({
         title: "Error",
-        description: "Please specify what was delivered",
+        description: "Please select at least one item with quantity",
         variant: "destructive"
       });
       return;
     }
+
+    const itemsDeliveredStr = selectedItems.join(', ');
 
     setSaving(true);
     try {
@@ -383,7 +432,7 @@ export function DeliveryTrackingSection({
         .insert({
           order_id: order.id,
           delivery_date: newDeliveryDate,
-          items_delivered: newDeliveryItems.trim(),
+          items_delivered: itemsDeliveredStr,
           notes: newDeliveryNotes.trim() || null,
           created_by: userData.user?.id
         })
@@ -396,7 +445,7 @@ export function DeliveryTrackingSection({
       
       await createAuditLog({
         action: 'delivery_logged',
-        description: `Logged delivery for order #${order.order_number}: ${newDeliveryItems.trim()}`,
+        description: `Logged delivery for order #${order.order_number}: ${itemsDeliveredStr}`,
         entityType: 'order',
         entityId: order.id,
       });
@@ -406,9 +455,6 @@ export function DeliveryTrackingSection({
         description: "Delivery record added successfully"
       });
 
-      setNewDeliveryDate(new Date().toISOString().split('T')[0]);
-      setNewDeliveryItems("");
-      setNewDeliveryNotes("");
       setDialogOpen(false);
     } catch (error: any) {
       toast({
@@ -861,14 +907,17 @@ export function DeliveryTrackingSection({
               Delivery History
             </h4>
             {canEdit && !isLocked && (
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (open) initDeliveryLogItems();
+              }}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1">
                     <Plus className="h-4 w-4" />
                     Log Delivery
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Log Delivery</DialogTitle>
                   </DialogHeader>
@@ -883,11 +932,54 @@ export function DeliveryTrackingSection({
                     </div>
                     <div className="space-y-2">
                       <Label>Items Delivered</Label>
-                      <Input
-                        placeholder="e.g., 5 windows, 2 doors, handles"
-                        value={newDeliveryItems}
-                        onChange={(e) => setNewDeliveryItems(e.target.value)}
-                      />
+                      <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3">
+                        {applicableItems.map(item => {
+                          const logItem = deliveryLogItems[item.key] || { selected: false, qty: 0 };
+                          return (
+                            <div key={item.key} className="flex items-center gap-3 py-1">
+                              <Checkbox
+                                id={`log-${item.key}`}
+                                checked={logItem.selected}
+                                onCheckedChange={(checked) => toggleDeliveryLogItem(item.key, checked as boolean)}
+                              />
+                              <Label htmlFor={`log-${item.key}`} className="flex-1 text-sm cursor-pointer">
+                                {item.label}
+                              </Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={logItem.qty}
+                                onChange={(e) => updateDeliveryLogQty(item.key, parseInt(e.target.value) || 0)}
+                                className="w-16 h-7 text-xs text-center"
+                                placeholder="Qty"
+                              />
+                            </div>
+                          );
+                        })}
+                        {customDeliveryItems.map(item => {
+                          const logItem = deliveryLogItems[`custom_${item.id}`] || { selected: false, qty: 0 };
+                          return (
+                            <div key={item.id} className="flex items-center gap-3 py-1 border-t border-dashed pt-2">
+                              <Checkbox
+                                id={`log-custom-${item.id}`}
+                                checked={logItem.selected}
+                                onCheckedChange={(checked) => toggleDeliveryLogItem(`custom_${item.id}`, checked as boolean)}
+                              />
+                              <Label htmlFor={`log-custom-${item.id}`} className="flex-1 text-sm cursor-pointer">
+                                {item.name}
+                              </Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={logItem.qty}
+                                onChange={(e) => updateDeliveryLogQty(`custom_${item.id}`, parseInt(e.target.value) || 0)}
+                                className="w-16 h-7 text-xs text-center"
+                                placeholder="Qty"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Notes (optional)</Label>
@@ -900,7 +992,7 @@ export function DeliveryTrackingSection({
                     </div>
                     <Button 
                       onClick={addDeliveryLog} 
-                      disabled={saving || !newDeliveryItems.trim()}
+                      disabled={saving || Object.values(deliveryLogItems).every(i => !i.selected || i.qty === 0)}
                       className="w-full"
                     >
                       {saving ? "Saving..." : "Log Delivery"}
