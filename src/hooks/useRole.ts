@@ -76,6 +76,7 @@ export function useRole() {
   const canEditOrders = state.isAdmin || state.isManager;
   const canViewAllOrders = state.isAdmin || state.isManager || state.isWorker;
   const canUpdateManufacturing = state.isAdmin || state.isManager || state.isWorker;
+  const canUpdateOrdering = state.isAdmin || state.isManager || state.isSeller;
 
   return {
     ...state,
@@ -84,5 +85,6 @@ export function useRole() {
     canEditOrders,
     canViewAllOrders,
     canUpdateManufacturing,
+    canUpdateOrdering,
   };
 }

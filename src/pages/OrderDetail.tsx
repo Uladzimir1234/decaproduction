@@ -11,6 +11,7 @@ import { ProgressCircle } from "@/components/ui/progress-circle";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
+import { useRole } from "@/hooks/useRole";
 import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -102,6 +103,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canUpdateOrdering } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -616,13 +618,14 @@ export default function OrderDetail() {
                 </CardTitle>
                 <CardDescription className="my-[4px] py-[8px] pt-[16px]">Update component availability and order dates</CardDescription>
               </div>
-              <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Plus className="h-4 w-4" />
-                    Add Step
-                  </Button>
-                </DialogTrigger>
+              {canUpdateOrdering && (
+                <Dialog open={orderingDialogOpen} onOpenChange={setOrderingDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Plus className="h-4 w-4" />
+                      Add Step
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add Custom Ordering Step</DialogTitle>
@@ -643,6 +646,7 @@ export default function OrderDetail() {
                   </div>
                 </DialogContent>
               </Dialog>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -670,6 +674,7 @@ export default function OrderDetail() {
                         reinforcement_order_date: value === 'ordered' ? order.reinforcement_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.reinforcement_status === 'ordered' && (
@@ -679,6 +684,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.reinforcement_order_date || ''}
                         onChange={e => updateOrderComponent({ reinforcement_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -708,6 +714,7 @@ export default function OrderDetail() {
                         windows_profile_order_date: value === 'ordered' ? order.windows_profile_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.windows_profile_status === 'ordered' && (
@@ -717,6 +724,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.windows_profile_order_date || ''}
                         onChange={e => updateOrderComponent({ windows_profile_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -746,6 +754,7 @@ export default function OrderDetail() {
                         glass_order_date: value === 'ordered' ? order.glass_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.glass_status === 'ordered' && (
@@ -755,6 +764,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.glass_order_date || ''}
                         onChange={e => updateOrderComponent({ glass_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -784,6 +794,7 @@ export default function OrderDetail() {
                         screens_order_date: value === 'ordered' ? order.screens_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.screens_status === 'ordered' && (
@@ -793,6 +804,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.screens_order_date || ''}
                         onChange={e => updateOrderComponent({ screens_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -822,6 +834,7 @@ export default function OrderDetail() {
                         plisse_screens_order_date: value === 'ordered' ? order.plisse_screens_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.plisse_screens_status === 'ordered' && (
@@ -831,6 +844,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.plisse_screens_order_date || ''}
                         onChange={e => updateOrderComponent({ plisse_screens_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -860,6 +874,7 @@ export default function OrderDetail() {
                         nail_fins_order_date: value === 'ordered' ? order.nail_fins_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.nail_fins_status === 'ordered' && (
@@ -869,6 +884,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.nail_fins_order_date || ''}
                         onChange={e => updateOrderComponent({ nail_fins_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -898,6 +914,7 @@ export default function OrderDetail() {
                         hardware_order_date: value === 'ordered' ? order.hardware_order_date || new Date().toISOString().split('T')[0] : null
                       })}
                       options={orderingStatusOptions}
+                      disabled={!canUpdateOrdering}
                     />
                   </div>
                   {order.hardware_status === 'ordered' && (
@@ -907,6 +924,7 @@ export default function OrderDetail() {
                         type="date"
                         value={order.hardware_order_date || ''}
                         onChange={e => updateOrderComponent({ hardware_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
                   )}
@@ -937,15 +955,17 @@ export default function OrderDetail() {
                           order_date: value === 'ordered' ? step.order_date || new Date().toISOString().split('T')[0] : null
                         })}
                         options={orderingStatusOptions}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
-                    {step.status === 'ordered' && (
+                      {step.status === 'ordered' && (
                       <div className="space-y-2">
                         <Label>Order Date</Label>
                         <Input
                           type="date"
                           value={step.order_date || ''}
                           onChange={e => updateCustomStep(step.id, { order_date: e.target.value })}
+                          disabled={!canUpdateOrdering}
                         />
                       </div>
                     )}
@@ -955,12 +975,15 @@ export default function OrderDetail() {
                         placeholder="Add notes..."
                         value={step.notes || ""}
                         onChange={e => updateCustomStep(step.id, { notes: e.target.value })}
+                        disabled={!canUpdateOrdering}
                       />
                     </div>
-                    <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
-                      <Trash2 className="h-4 w-4" />
-                      Delete Step
-                    </Button>
+                    {canUpdateOrdering && (
+                      <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
+                        <Trash2 className="h-4 w-4" />
+                        Delete Step
+                      </Button>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               ))}
