@@ -47,6 +47,38 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_delivery_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_delivered: boolean
+          name: string
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          name: string
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          name?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_delivery_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_shipping_items: {
         Row: {
           created_at: string
