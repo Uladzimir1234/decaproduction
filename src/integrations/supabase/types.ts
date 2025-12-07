@@ -182,6 +182,12 @@ export type Database = {
           screens_delivered_final: boolean | null
           screens_made: boolean | null
           screens_notes: string | null
+          shipping_brackets: boolean | null
+          shipping_handles_boxed: boolean | null
+          shipping_hinges_covers: boolean | null
+          shipping_nailing_fins: boolean | null
+          shipping_spec_labels: boolean | null
+          shipping_weeping_covers: boolean | null
           sliding_doors_assembled: boolean | null
           sliding_doors_delivered: boolean | null
           sliding_doors_glass_available: boolean | null
@@ -226,6 +232,12 @@ export type Database = {
           screens_delivered_final?: boolean | null
           screens_made?: boolean | null
           screens_notes?: string | null
+          shipping_brackets?: boolean | null
+          shipping_handles_boxed?: boolean | null
+          shipping_hinges_covers?: boolean | null
+          shipping_nailing_fins?: boolean | null
+          shipping_spec_labels?: boolean | null
+          shipping_weeping_covers?: boolean | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
           sliding_doors_glass_available?: boolean | null
@@ -270,6 +282,12 @@ export type Database = {
           screens_delivered_final?: boolean | null
           screens_made?: boolean | null
           screens_notes?: string | null
+          shipping_brackets?: boolean | null
+          shipping_handles_boxed?: boolean | null
+          shipping_hinges_covers?: boolean | null
+          shipping_nailing_fins?: boolean | null
+          shipping_spec_labels?: boolean | null
+          shipping_weeping_covers?: boolean | null
           sliding_doors_assembled?: boolean | null
           sliding_doors_delivered?: boolean | null
           sliding_doors_glass_available?: boolean | null

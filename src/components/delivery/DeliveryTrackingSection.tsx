@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
 import { createAuditLog } from "@/lib/auditLog";
-import { Truck, Package, AlertTriangle, CheckCircle2, Plus, Calendar } from "lucide-react";
+import { Truck, Package, AlertTriangle, CheckCircle2, Plus, Calendar, BoxIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -34,6 +34,13 @@ interface DeliveryFulfillment {
   nailing_fins_delivered: boolean;
   brackets_delivered: boolean;
   delivery_notes: string | null;
+  // Shipping preparation fields
+  shipping_handles_boxed: boolean;
+  shipping_hinges_covers: boolean;
+  shipping_weeping_covers: boolean;
+  shipping_spec_labels: boolean;
+  shipping_nailing_fins: boolean;
+  shipping_brackets: boolean;
 }
 
 interface OrderInfo {
@@ -63,6 +70,15 @@ const DELIVERY_ITEMS = [
   { key: 'handles_delivered', label: 'Handles', icon: Package },
   { key: 'nailing_fins_delivered', label: 'Nailing Fins', icon: Package },
   { key: 'brackets_delivered', label: 'Installation Brackets', icon: Package },
+] as const;
+
+const SHIPPING_PREP_ITEMS = [
+  { key: 'shipping_handles_boxed', label: 'Handles in Box', description: 'Gather window handles in box' },
+  { key: 'shipping_hinges_covers', label: 'Hinges Covers', description: 'Windows hinges covers' },
+  { key: 'shipping_weeping_covers', label: 'Weeping Holes Covers', description: 'Weeping holes covers' },
+  { key: 'shipping_spec_labels', label: 'Spec Labels', description: 'Print & stick glass spec labels' },
+  { key: 'shipping_nailing_fins', label: 'Nailing Fins Packed', description: 'Put nailing fins around windows' },
+  { key: 'shipping_brackets', label: 'Brackets Packed', description: 'Metal installation brackets' },
 ] as const;
 
 export function DeliveryTrackingSection({ 
@@ -211,62 +227,127 @@ export function DeliveryTrackingSection({
     fulfillment?.[item.key as keyof DeliveryFulfillment] !== true
   );
 
+  // Calculate shipping prep progress
+  const shippingPrepCount = SHIPPING_PREP_ITEMS.filter(item =>
+    fulfillment?.[item.key as keyof DeliveryFulfillment] === true
+  ).length;
+  const totalShippingSteps = SHIPPING_PREP_ITEMS.length;
+  const allShippingComplete = shippingPrepCount === totalShippingSteps;
+
   const isLocked = manufacturingProgress < 90;
   const canEdit = canUpdateManufacturing && !isSeller;
 
   return (
-    <Card className={`${isLocked ? 'opacity-60' : ''} border-primary/20`}>
+    <Card className="border-primary/20">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Delivery Tracking</CardTitle>
+            <CardTitle className="text-lg">Shipping & Delivery</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant={allShippingComplete ? "default" : "outline"} className={allShippingComplete ? "bg-blue-500" : "border-blue-500/50 text-blue-600 dark:text-blue-400"}>
+              <BoxIcon className="h-3 w-3 mr-1" />
+              {shippingPrepCount}/{totalShippingSteps} Packed
+            </Badge>
             <Badge variant={allDelivered ? "default" : "outline"} className={allDelivered ? "bg-emerald-500" : ""}>
               {deliveredCount}/{totalItems} Delivered
             </Badge>
+          </div>
+        </div>
+        <CardDescription>
+          Prepare order for shipping and track deliveries
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Shipping Preparation Checklist */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <BoxIcon className="h-4 w-4 text-blue-500" />
+            <h4 className="text-sm font-medium">Shipping Preparation</h4>
+            {allShippingComplete && (
+              <Badge variant="secondary" className="text-xs gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <CheckCircle2 className="h-3 w-3" />
+                Ready to Ship
+              </Badge>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SHIPPING_PREP_ITEMS.map(item => {
+              const isChecked = fulfillment?.[item.key as keyof DeliveryFulfillment] === true;
+              return (
+                <div 
+                  key={item.key}
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                    isChecked 
+                      ? 'bg-blue-500/10 border-blue-500/30' 
+                      : 'bg-card border-border'
+                  }`}
+                >
+                  <Checkbox
+                    id={item.key}
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleDeliveryItemChange(item.key, checked as boolean)}
+                    disabled={!canEdit}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <Label 
+                      htmlFor={item.key} 
+                      className={`text-sm font-medium cursor-pointer block ${isChecked ? 'text-blue-600 dark:text-blue-400' : ''}`}
+                    >
+                      {item.label}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Delivery Items Checklist */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-emerald-500" />
+            <h4 className="text-sm font-medium">Delivery Tracking</h4>
             {isLocked && (
-              <Badge variant="secondary" className="gap-1">
+              <Badge variant="secondary" className="text-xs gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 Manufacturing {"<"}90%
               </Badge>
             )}
           </div>
-        </div>
-        <CardDescription>
-          Track what has been delivered from this order
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Delivery Items Checklist */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {applicableItems.map(item => {
-            const isChecked = fulfillment?.[item.key as keyof DeliveryFulfillment] === true;
-            return (
-              <div 
-                key={item.key}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                  isChecked 
-                    ? 'bg-emerald-500/10 border-emerald-500/30' 
-                    : 'bg-card border-border'
-                }`}
-              >
-                <Checkbox
-                  id={item.key}
-                  checked={isChecked}
-                  onCheckedChange={(checked) => handleDeliveryItemChange(item.key, checked as boolean)}
-                  disabled={isLocked || !canEdit}
-                />
-                <Label 
-                  htmlFor={item.key} 
-                  className={`text-sm cursor-pointer ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {applicableItems.map(item => {
+              const isChecked = fulfillment?.[item.key as keyof DeliveryFulfillment] === true;
+              return (
+                <div 
+                  key={item.key}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    isChecked 
+                      ? 'bg-emerald-500/10 border-emerald-500/30' 
+                      : 'bg-card border-border'
+                  } ${isLocked ? 'opacity-60' : ''}`}
                 >
-                  {item.label}
-                </Label>
-              </div>
-            );
-          })}
+                  <Checkbox
+                    id={item.key}
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleDeliveryItemChange(item.key, checked as boolean)}
+                    disabled={isLocked || !canEdit}
+                  />
+                  <Label 
+                    htmlFor={item.key} 
+                    className={`text-sm cursor-pointer ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                  >
+                    {item.label}
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Pending Delivery Warning */}

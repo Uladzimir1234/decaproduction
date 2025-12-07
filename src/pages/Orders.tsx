@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +50,13 @@ interface OrderFulfillment {
   glass_delivered_final: boolean | null;
   nailing_fins_delivered: boolean | null;
   brackets_delivered: boolean | null;
+  // Shipping preparation fields
+  shipping_handles_boxed: boolean | null;
+  shipping_hinges_covers: boolean | null;
+  shipping_weeping_covers: boolean | null;
+  shipping_spec_labels: boolean | null;
+  shipping_nailing_fins: boolean | null;
+  shipping_brackets: boolean | null;
 }
 
 interface CustomStep {
@@ -472,6 +479,29 @@ export default function Orders() {
     return { delivered, total: applicableItems.length, pending };
   };
 
+  const SHIPPING_PREP_ITEMS = [
+    { key: 'shipping_handles_boxed', label: 'Handles' },
+    { key: 'shipping_hinges_covers', label: 'Hinges' },
+    { key: 'shipping_weeping_covers', label: 'Weeping' },
+    { key: 'shipping_spec_labels', label: 'Labels' },
+    { key: 'shipping_nailing_fins', label: 'Fins' },
+    { key: 'shipping_brackets', label: 'Brackets' },
+  ] as const;
+
+  const getShippingPrepProgress = (order: Order) => {
+    const f = fulfillments[order.id];
+    if (!f) return { prepared: 0, total: 6 };
+    
+    let prepared = 0;
+    SHIPPING_PREP_ITEMS.forEach(item => {
+      if ((f as any)[item.key] === true) {
+        prepared++;
+      }
+    });
+
+    return { prepared, total: SHIPPING_PREP_ITEMS.length };
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === "all") return matchesSearch;
@@ -541,7 +571,9 @@ export default function Orders() {
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
             const deliveryProgress = getDeliveryProgress(order);
+            const shippingPrepProgress = getShippingPrepProgress(order);
             const showDeliveryBadge = order.fulfillment_percentage >= 50;
+            const showShippingBadge = order.fulfillment_percentage >= 50;
             return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
@@ -795,11 +827,23 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                        {/* Delivery Progress Badge */}
-                        {showDeliveryBadge && (
+                        {/* Shipping & Delivery Progress Badges */}
+                        {showShippingBadge && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
-                            <span className="text-xs text-muted-foreground font-medium mr-1">Delivery:</span>
+                            <BoxIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                            <Badge 
+                              variant={shippingPrepProgress.prepared === shippingPrepProgress.total ? "default" : "outline"}
+                              className={`text-xs py-0 px-1.5 ${
+                                shippingPrepProgress.prepared === shippingPrepProgress.total 
+                                  ? 'bg-blue-500 hover:bg-blue-500/90' 
+                                  : shippingPrepProgress.prepared > 0 
+                                    ? 'border-blue-500/50 text-blue-600 dark:text-blue-400'
+                                    : 'border-muted-foreground/30'
+                              }`}
+                            >
+                              {shippingPrepProgress.prepared}/{shippingPrepProgress.total} packed
+                            </Badge>
+                            <Truck className="h-3.5 w-3.5 text-emerald-500 shrink-0 ml-2" />
                             <Badge 
                               variant={deliveryProgress.delivered === deliveryProgress.total ? "default" : "outline"}
                               className={`text-xs py-0 px-1.5 ${
@@ -812,11 +856,6 @@ export default function Orders() {
                             >
                               {deliveryProgress.delivered}/{deliveryProgress.total} delivered
                             </Badge>
-                            {deliveryProgress.pending.length > 0 && deliveryProgress.pending.length <= 3 && (
-                              <span className="text-xs text-muted-foreground">
-                                ({deliveryProgress.pending.join(', ')} pending)
-                              </span>
-                            )}
                           </div>
                         )}
                       </div>
