@@ -261,7 +261,7 @@ export default function Orders() {
       stages.push({ name: 'Sliding Doors', status: getStatus(f?.sliding_doors_status), hasNotes: !!(f?.sliding_doors_notes), field: 'sliding_doors_status' });
     }
     
-    stages.push({ name: 'Assembly', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes), field: 'assembly_status' });
+    stages.push({ name: 'Windows', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes), field: 'assembly_status' });
     stages.push({ name: 'Glass', status: getStatus(f?.glass_status), hasNotes: !!(f?.glass_notes), field: 'glass_status' });
     stages.push({ name: 'Screens', status: getStatus(f?.screens_cutting), hasNotes: !!(f?.screens_notes), field: 'screens_cutting' });
     
