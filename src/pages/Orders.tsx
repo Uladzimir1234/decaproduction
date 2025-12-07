@@ -438,7 +438,7 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
+            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${!isWorker ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => !isWorker && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
