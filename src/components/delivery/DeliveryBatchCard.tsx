@@ -335,14 +335,14 @@ export function DeliveryBatchCard({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {shippingItems.map(item => (
                   <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => updateShippingItem(item.id, c as boolean)} disabled={!canEdit} />
-                    <span className={`flex-1 ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => updateShippingItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
+                    <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>
                       {getItemLabel(item.item_type, SHIPPING_ITEM_TYPES)}
                     </span>
                     {canEdit ? (
-                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateShippingQty(item.id, parseInt(e.target.value) || 0)} className="w-14 h-6 text-xs text-center p-1" />
+                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateShippingQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
                     ) : item.quantity > 0 && (
-                      <Badge variant="secondary" className="text-xs">×{item.quantity}</Badge>
+                      <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     )}
                   </div>
                 ))}
@@ -402,14 +402,14 @@ export function DeliveryBatchCard({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 {deliveryItems.map(item => (
                   <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => updateDeliveryItem(item.id, c as boolean)} disabled={!canEdit} />
-                    <span className={`flex-1 ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => updateDeliveryItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
+                    <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                       {getItemLabel(item.item_type, DELIVERY_ITEM_TYPES)}
                     </span>
                     {canEdit ? (
-                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateDeliveryQty(item.id, parseInt(e.target.value) || 0)} className="w-14 h-6 text-xs text-center p-1" />
+                      <Input type="number" min={0} value={item.quantity} onChange={(e) => updateDeliveryQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
                     ) : item.quantity > 0 && (
-                      <Badge variant="secondary" className="text-xs">×{item.quantity}</Badge>
+                      <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
                     )}
                   </div>
                 ))}
