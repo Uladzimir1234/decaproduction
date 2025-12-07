@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
+import { X, Loader2, Image as ImageIcon } from "lucide-react";
 
 interface ImageUploadProps {
   value?: string | null;
@@ -11,10 +11,70 @@ interface ImageUploadProps {
   disabled?: boolean;
 }
 
+// Helper to extract file path from stored URL or path
+const extractFilePath = (value: string): string | null => {
+  if (!value) return null;
+  
+  // If it's already just a path (not a full URL), return it
+  if (!value.startsWith('http')) {
+    return value;
+  }
+  
+  try {
+    const url = new URL(value);
+    const pathParts = url.pathname.split("/fulfillment-images/");
+    if (pathParts.length > 1) {
+      return decodeURIComponent(pathParts[1]);
+    }
+  } catch (error) {
+    console.error("Error extracting file path:", error);
+  }
+  return null;
+};
+
 export function ImageUpload({ value, onChange, folder, disabled }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Fetch signed URL when value changes
+  useEffect(() => {
+    const fetchSignedUrl = async () => {
+      if (!value) {
+        setSignedUrl(null);
+        return;
+      }
+
+      const filePath = extractFilePath(value);
+      if (!filePath) {
+        setSignedUrl(null);
+        return;
+      }
+
+      setLoadingUrl(true);
+      try {
+        const { data, error } = await supabase.storage
+          .from("fulfillment-images")
+          .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+        if (error) {
+          console.error("Error creating signed URL:", error);
+          setSignedUrl(null);
+        } else {
+          setSignedUrl(data.signedUrl);
+        }
+      } catch (error) {
+        console.error("Error fetching signed URL:", error);
+        setSignedUrl(null);
+      } finally {
+        setLoadingUrl(false);
+      }
+    };
+
+    fetchSignedUrl();
+  }, [value]);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -51,11 +111,8 @@ export function ImageUpload({ value, onChange, folder, disabled }: ImageUploadPr
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("fulfillment-images")
-        .getPublicUrl(fileName);
-
-      onChange(publicUrl);
+      // Store the file path (not the public URL) for later signed URL generation
+      onChange(fileName);
       toast({
         title: "Image uploaded",
         description: "Image uploaded successfully",
@@ -79,11 +136,8 @@ export function ImageUpload({ value, onChange, folder, disabled }: ImageUploadPr
     if (!value) return;
     
     try {
-      // Extract the file path from the URL
-      const url = new URL(value);
-      const pathParts = url.pathname.split("/fulfillment-images/");
-      if (pathParts.length > 1) {
-        const filePath = pathParts[1];
+      const filePath = extractFilePath(value);
+      if (filePath) {
         await supabase.storage.from("fulfillment-images").remove([filePath]);
       }
     } catch (error) {
@@ -106,11 +160,21 @@ export function ImageUpload({ value, onChange, folder, disabled }: ImageUploadPr
 
       {value ? (
         <div className="relative group">
-          <img
-            src={value}
-            alt="Uploaded"
-            className="w-full max-w-xs rounded-lg border border-border object-cover aspect-video"
-          />
+          {loadingUrl ? (
+            <div className="w-full max-w-xs rounded-lg border border-border aspect-video flex items-center justify-center bg-muted">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : signedUrl ? (
+            <img
+              src={signedUrl}
+              alt="Uploaded"
+              className="w-full max-w-xs rounded-lg border border-border object-cover aspect-video"
+            />
+          ) : (
+            <div className="w-full max-w-xs rounded-lg border border-border aspect-video flex items-center justify-center bg-muted">
+              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
           <Button
             type="button"
             variant="destructive"
