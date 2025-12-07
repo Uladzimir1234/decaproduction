@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { PopoverClose } from "@/components/ui/popover";
 
 interface StatusOption {
   value: string;
@@ -15,7 +16,7 @@ interface StatusPopoverButtonsProps {
 export function StatusPopoverButtons({ 
   currentValue, 
   options, 
-  onChange 
+  onChange
 }: StatusPopoverButtonsProps) {
   const getButtonStyle = (optionValue: string) => {
     const isComplete = optionValue === 'complete' || optionValue === 'available';
@@ -35,17 +36,18 @@ export function StatusPopoverButtons({
   return (
     <div className="flex flex-col gap-1.5 p-1">
       {options.map((option) => (
-        <button
-          key={option.value}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onChange(option.value);
-          }}
-          className={getButtonStyle(option.value)}
-        >
-          {option.label}
-        </button>
+        <PopoverClose key={option.value} asChild>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(option.value);
+            }}
+            className={getButtonStyle(option.value)}
+          >
+            {option.label}
+          </button>
+        </PopoverClose>
       ))}
     </div>
   );
