@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,7 @@ interface Order {
 }
 export default function Orders() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [loading, setLoading] = useState(true);
@@ -435,9 +436,9 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+            return <div key={order.id} className="block p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      <Link to={`/orders/${order.id}`} className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
                             #{order.order_number}
@@ -627,7 +628,7 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                      </Link>
+                      </div>
 
                       <div className="flex items-center gap-3">
                         <ProgressCircle
