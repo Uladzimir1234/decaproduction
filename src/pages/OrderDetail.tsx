@@ -103,7 +103,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canUpdateOrdering, isWorker, loading: roleLoading } = useRole();
+  const { canUpdateOrdering, canUpdateManufacturing, isWorker, loading: roleLoading } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1014,33 +1014,35 @@ export default function OrderDetail() {
                 </CardTitle>
                 <CardDescription>Track progress through each manufacturing step</CardDescription>
               </div>
-              <Dialog open={manufacturingDialogOpen} onOpenChange={setManufacturingDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Plus className="h-4 w-4" />
-                    Add Step
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Custom Manufacturing Step</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div className="space-y-2">
-                      <Label>Step Name</Label>
-                      <Input
-                        placeholder="e.g., Quality Check, Packaging..."
-                        value={newManufacturingStepName}
-                        onChange={e => setNewManufacturingStepName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && addCustomStep('manufacturing', newManufacturingStepName)}
-                      />
-                    </div>
-                    <Button onClick={() => addCustomStep('manufacturing', newManufacturingStepName)} disabled={!newManufacturingStepName.trim()} className="w-full">
+              {canUpdateManufacturing && (
+                <Dialog open={manufacturingDialogOpen} onOpenChange={setManufacturingDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Plus className="h-4 w-4" />
                       Add Step
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Custom Manufacturing Step</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label>Step Name</Label>
+                        <Input
+                          placeholder="e.g., Quality Check, Packaging..."
+                          value={newManufacturingStepName}
+                          onChange={e => setNewManufacturingStepName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && addCustomStep('manufacturing', newManufacturingStepName)}
+                        />
+                      </div>
+                      <Button onClick={() => addCustomStep('manufacturing', newManufacturingStepName)} disabled={!newManufacturingStepName.trim()} className="w-full">
+                        Add Step
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -1067,6 +1069,7 @@ export default function OrderDetail() {
                       value={fulfillment.reinforcement_cutting || "not_started"}
                       onChange={value => updateFulfillment("reinforcement_cutting", value)}
                       options={manufacturingStatusOptions}
+                      disabled={!canUpdateManufacturing}
                     />
                   )}
                 </AccordionContent>
@@ -1094,6 +1097,7 @@ export default function OrderDetail() {
                       value={fulfillment.profile_cutting || "not_started"}
                       onChange={value => updateFulfillment("profile_cutting", value)}
                       options={manufacturingStatusOptions}
+                      disabled={!canUpdateManufacturing}
                     />
                   )}
                 </AccordionContent>
@@ -1124,6 +1128,7 @@ export default function OrderDetail() {
                           value={fulfillment.welding_status || "not_started"}
                           onChange={value => updateFulfillment("welding_status", value)}
                           options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
                         />
                       </div>
                       {fulfillment.welding_status === 'partial' && (
@@ -1133,6 +1138,7 @@ export default function OrderDetail() {
                             placeholder="Add notes about welding progress..."
                             value={fulfillment.welding_notes || ""}
                             onChange={e => updateFulfillment("welding_notes", e.target.value)}
+                            disabled={!canUpdateManufacturing}
                           />
                         </div>
                       )}
@@ -1167,6 +1173,7 @@ export default function OrderDetail() {
                             value={fulfillment.doors_status || "not_started"}
                             onChange={value => updateFulfillment("doors_status", value)}
                             options={manufacturingStatusOptions}
+                            disabled={!canUpdateManufacturing}
                           />
                         </div>
                         {fulfillment.doors_status === 'partial' && (
@@ -1176,6 +1183,7 @@ export default function OrderDetail() {
                               placeholder="Add notes about door assembly..."
                               value={fulfillment.doors_notes || ""}
                               onChange={e => updateFulfillment("doors_notes", e.target.value)}
+                              disabled={!canUpdateManufacturing}
                             />
                           </div>
                         )}
@@ -1196,7 +1204,8 @@ export default function OrderDetail() {
                           ) : (
                             <Switch 
                               checked={fulfillment.doors_glass_installed || false} 
-                              onCheckedChange={checked => updateFulfillment("doors_glass_installed", checked)} 
+                              onCheckedChange={checked => updateFulfillment("doors_glass_installed", checked)}
+                              disabled={!canUpdateManufacturing}
                             />
                           )}
                         </div>
@@ -1207,7 +1216,7 @@ export default function OrderDetail() {
                             value={fulfillment.doors_image_url}
                             onChange={url => updateFulfillment("doors_image_url", url)}
                             folder={`doors/${order.id}`}
-                            disabled={saving}
+                            disabled={saving || !canUpdateManufacturing}
                           />
                         </div>
                       </>
@@ -1242,6 +1251,7 @@ export default function OrderDetail() {
                             value={fulfillment.sliding_doors_status || "not_started"}
                             onChange={value => updateFulfillment("sliding_doors_status", value)}
                             options={manufacturingStatusOptions}
+                            disabled={!canUpdateManufacturing}
                           />
                         </div>
                         {fulfillment.sliding_doors_status === 'partial' && (
@@ -1251,6 +1261,7 @@ export default function OrderDetail() {
                               placeholder="Add notes about sliding door assembly..."
                               value={fulfillment.sliding_doors_notes || ""}
                               onChange={e => updateFulfillment("sliding_doors_notes", e.target.value)}
+                              disabled={!canUpdateManufacturing}
                             />
                           </div>
                         )}
@@ -1271,7 +1282,8 @@ export default function OrderDetail() {
                           ) : (
                             <Switch 
                               checked={fulfillment.sliding_doors_glass_installed || false} 
-                              onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)} 
+                              onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)}
+                              disabled={!canUpdateManufacturing}
                             />
                           )}
                         </div>
@@ -1282,7 +1294,7 @@ export default function OrderDetail() {
                             value={fulfillment.sliding_doors_image_url}
                             onChange={url => updateFulfillment("sliding_doors_image_url", url)}
                             folder={`sliding-doors/${order.id}`}
-                            disabled={saving}
+                            disabled={saving || !canUpdateManufacturing}
                           />
                         </div>
                       </>
@@ -1316,6 +1328,7 @@ export default function OrderDetail() {
                           value={fulfillment.assembly_status || "not_started"}
                           onChange={value => updateFulfillment("assembly_status", value)}
                           options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
                         />
                       </div>
                       {fulfillment.assembly_status === 'partial' && (
@@ -1325,6 +1338,7 @@ export default function OrderDetail() {
                             placeholder="Add notes about assembly progress..."
                             value={fulfillment.assembly_notes || ""}
                             onChange={e => updateFulfillment("assembly_notes", e.target.value)}
+                            disabled={!canUpdateManufacturing}
                           />
                         </div>
                       )}
@@ -1366,6 +1380,7 @@ export default function OrderDetail() {
                           value={fulfillment.glass_status || "not_started"}
                           onChange={value => updateFulfillment("glass_status", value)}
                           options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
                         />
                       </div>
                       {fulfillment.glass_status === 'partial' && (
@@ -1375,6 +1390,7 @@ export default function OrderDetail() {
                             placeholder="Add notes about glass installation..."
                             value={fulfillment.glass_notes || ""}
                             onChange={e => updateFulfillment("glass_notes", e.target.value)}
+                            disabled={!canUpdateManufacturing}
                           />
                         </div>
                       )}
@@ -1408,6 +1424,7 @@ export default function OrderDetail() {
                           value={fulfillment.screens_cutting || "not_started"}
                           onChange={value => updateFulfillment("screens_cutting", value)}
                           options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1416,6 +1433,7 @@ export default function OrderDetail() {
                           placeholder="Add notes about screens..."
                           value={fulfillment.screens_notes || ""}
                           onChange={e => updateFulfillment("screens_notes", e.target.value)}
+                          disabled={!canUpdateManufacturing}
                         />
                       </div>
                     </>
@@ -1439,6 +1457,7 @@ export default function OrderDetail() {
                         value={step.status}
                         onChange={value => updateCustomStep(step.id, { status: value })}
                         options={manufacturingStatusOptions}
+                        disabled={!canUpdateManufacturing}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1447,12 +1466,15 @@ export default function OrderDetail() {
                         placeholder="Add notes..."
                         value={step.notes || ""}
                         onChange={e => updateCustomStep(step.id, { notes: e.target.value })}
+                        disabled={!canUpdateManufacturing}
                       />
                     </div>
-                    <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
-                      <Trash2 className="h-4 w-4" />
-                      Delete Step
-                    </Button>
+                    {canUpdateManufacturing && (
+                      <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
+                        <Trash2 className="h-4 w-4" />
+                        Delete Step
+                      </Button>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               ))}
