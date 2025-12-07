@@ -93,7 +93,7 @@ interface Order {
 export default function Orders() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isWorker, isSeller, canUpdateOrdering, canUpdateManufacturing } = useRole();
+  const { isWorker, isSeller, isAdmin, isManager, canUpdateOrdering, canUpdateManufacturing } = useRole();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [loading, setLoading] = useState(true);
@@ -438,7 +438,7 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(canUpdateOrdering || canUpdateManufacturing) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (canUpdateOrdering || canUpdateManufacturing) && navigate(`/orders/${order.id}`)}>
+            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
