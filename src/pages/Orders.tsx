@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,6 +69,13 @@ interface CustomStep {
   notes: string | null;
 }
 
+interface DeliveryBatch {
+  id: string;
+  order_id: string;
+  delivery_date: string;
+  status: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -121,11 +128,13 @@ export default function Orders() {
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
+  const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
 
   useEffect(() => {
     fetchOrders();
     fetchFulfillments();
     fetchCustomSteps();
+    fetchDeliveryBatches();
   }, []);
 
   const fetchCustomSteps = async () => {
@@ -136,6 +145,23 @@ export default function Orders() {
     } catch (error) {
       console.error("Error fetching custom steps:", error);
     }
+  };
+
+  const fetchDeliveryBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("delivery_batches")
+        .select("id, order_id, delivery_date, status")
+        .order("delivery_date", { ascending: true });
+      if (error) throw error;
+      setDeliveryBatches((data || []) as DeliveryBatch[]);
+    } catch (error) {
+      console.error("Error fetching delivery batches:", error);
+    }
+  };
+
+  const getOrderDeliveryBatches = (orderId: string) => {
+    return deliveryBatches.filter(b => b.order_id === orderId);
   };
 
   const handleCustomStepStatusChange = async (stepId: string, newStatus: string) => {
@@ -572,6 +598,9 @@ export default function Orders() {
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
             const deliveryProgress = getDeliveryProgress(order);
             const shippingPrepProgress = getShippingPrepProgress(order);
+            const orderBatches = getOrderDeliveryBatches(order.id);
+            const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
+            const preparingBatches = orderBatches.filter(b => b.status === 'preparing').length;
             const showDeliveryBadge = order.fulfillment_percentage >= 50;
             const showShippingBadge = order.fulfillment_percentage >= 50;
             return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
@@ -856,6 +885,23 @@ export default function Orders() {
                             >
                               {deliveryProgress.delivered}/{deliveryProgress.total} delivered
                             </Badge>
+                          </div>
+                        )}
+                        {/* Delivery Batches Status */}
+                        {orderBatches.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Truck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground font-medium mr-1">Batches:</span>
+                            {shippedBatches > 0 && (
+                              <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-white text-xs py-0 px-1.5">
+                                {shippedBatches} shipped
+                              </Badge>
+                            )}
+                            {preparingBatches > 0 && (
+                              <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                {preparingBatches} preparing
+                              </Badge>
+                            )}
                           </div>
                         )}
                       </div>
