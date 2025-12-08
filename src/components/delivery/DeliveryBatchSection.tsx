@@ -102,6 +102,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [batchCustomDelivery, setBatchCustomDelivery] = useState<Record<string, BatchCustomDeliveryItem[]>>({});
   
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
   const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
   const [selectedDeliveryItems, setSelectedDeliveryItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
@@ -152,6 +153,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   }, [fetchBatches]);
 
   const initNewBatch = () => {
+    setEditingBatchId(null);
     const shippingInit: Record<string, { selected: boolean; qty: number }> = {};
     SHIPPING_ITEM_TYPES.forEach(item => {
       shippingInit[item.key] = { selected: true, qty: 0 };
@@ -170,6 +172,46 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setCustomShippingQty(1);
     setCustomDeliveryName("");
     setCustomDeliveryQty(1);
+  };
+
+  const initEditBatch = (batchId: string) => {
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) return;
+    
+    setEditingBatchId(batchId);
+    setNewBatchDate(new Date(batch.delivery_date));
+    
+    // Initialize shipping items from existing batch data
+    const shippingItems = batchShippingItems[batchId] || [];
+    const shippingInit: Record<string, { selected: boolean; qty: number }> = {};
+    SHIPPING_ITEM_TYPES.forEach(item => {
+      const existing = shippingItems.find(si => si.item_type === item.key);
+      shippingInit[item.key] = { selected: !!existing, qty: existing?.quantity || 0 };
+    });
+    setSelectedShippingItems(shippingInit);
+    
+    // Initialize delivery items from existing batch data
+    const deliveryItems = batchDeliveryItems[batchId] || [];
+    const deliveryInit: Record<string, { selected: boolean; qty: number }> = {};
+    DELIVERY_ITEM_TYPES.forEach(item => {
+      const existing = deliveryItems.find(di => di.item_type === item.key);
+      deliveryInit[item.key] = { selected: !!existing && existing.quantity > 0, qty: existing?.quantity || 0 };
+    });
+    setSelectedDeliveryItems(deliveryInit);
+    
+    // Initialize custom items
+    const customShipping = batchCustomShipping[batchId] || [];
+    setNewCustomShippingItems(customShipping.map(cs => ({ name: cs.name, qty: cs.quantity })));
+    
+    const customDelivery = batchCustomDelivery[batchId] || [];
+    setNewCustomDeliveryItems(customDelivery.map(cd => ({ name: cd.name, qty: cd.quantity })));
+    
+    setCustomShippingName("");
+    setCustomShippingQty(1);
+    setCustomDeliveryName("");
+    setCustomDeliveryQty(1);
+    
+    setDialogOpen(true);
   };
 
   const addCustomShippingToList = () => {
@@ -194,7 +236,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setNewCustomDeliveryItems(newCustomDeliveryItems.filter((_, i) => i !== index));
   };
 
-  const createBatch = async () => {
+  const saveBatch = async () => {
     if (!newBatchDate) {
       toast({ title: "Error", description: "Please select a delivery date", variant: "destructive" });
       return;
@@ -204,25 +246,46 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      // Create the batch
-      const { data: batchData, error: batchError } = await supabase
-        .from("delivery_batches")
-        .insert({
-          order_id: order.id,
-          delivery_date: format(newBatchDate, "yyyy-MM-dd"),
-          status: 'preparing',
-          created_by: userData.user?.id
-        })
-        .select()
-        .single();
+      let batchId: string;
+      
+      if (editingBatchId) {
+        // Update existing batch
+        const { error: batchError } = await supabase
+          .from("delivery_batches")
+          .update({
+            delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+          })
+          .eq("id", editingBatchId);
+        if (batchError) throw batchError;
+        batchId = editingBatchId;
+        
+        // Delete existing items and re-insert
+        await supabase.from("batch_shipping_items").delete().eq("batch_id", batchId);
+        await supabase.from("batch_delivery_items").delete().eq("batch_id", batchId);
+        await supabase.from("batch_custom_shipping_items").delete().eq("batch_id", batchId);
+        await supabase.from("batch_custom_delivery_items").delete().eq("batch_id", batchId);
+      } else {
+        // Create the batch
+        const { data: batchData, error: batchError } = await supabase
+          .from("delivery_batches")
+          .insert({
+            order_id: order.id,
+            delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+            status: 'preparing',
+            created_by: userData.user?.id
+          })
+          .select()
+          .single();
 
-      if (batchError) throw batchError;
+        if (batchError) throw batchError;
+        batchId = batchData.id;
+      }
 
       // Insert shipping items
       const shippingToInsert = Object.entries(selectedShippingItems)
         .filter(([_, val]) => val.selected)
         .map(([key, val]) => ({
-          batch_id: batchData.id,
+          batch_id: batchId,
           item_type: key,
           quantity: val.qty,
           is_complete: false
@@ -239,7 +302,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       const deliveryToInsert = Object.entries(selectedDeliveryItems)
         .filter(([_, val]) => val.selected && val.qty > 0)
         .map(([key, val]) => ({
-          batch_id: batchData.id,
+          batch_id: batchId,
           item_type: key,
           quantity: val.qty,
           is_delivered: false
@@ -255,7 +318,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       // Insert custom shipping items
       if (newCustomShippingItems.length > 0) {
         const customShipToInsert = newCustomShippingItems.map(item => ({
-          batch_id: batchData.id,
+          batch_id: batchId,
           name: item.name,
           quantity: item.qty,
           is_complete: false
@@ -269,7 +332,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       // Insert custom delivery items
       if (newCustomDeliveryItems.length > 0) {
         const customDelToInsert = newCustomDeliveryItems.map(item => ({
-          batch_id: batchData.id,
+          batch_id: batchId,
           name: item.name,
           quantity: item.qty,
           is_delivered: false
@@ -280,8 +343,12 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (customDelError) throw customDelError;
       }
 
-      toast({ title: "Batch created", description: "New delivery batch created successfully" });
+      toast({ 
+        title: editingBatchId ? "Batch updated" : "Batch created", 
+        description: editingBatchId ? "Delivery batch updated successfully" : "New delivery batch created successfully" 
+      });
       setDialogOpen(false);
+      setEditingBatchId(null);
       fetchBatches();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -336,7 +403,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
             {canEdit && (
               <Dialog open={dialogOpen} onOpenChange={(open) => {
                 setDialogOpen(open);
-                if (open) initNewBatch();
+                if (open && !editingBatchId) initNewBatch();
+                if (!open) setEditingBatchId(null);
               }}>
                 <DialogTrigger asChild>
                   <Button variant="default" size="sm" className="gap-1">
@@ -346,7 +414,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                 </DialogTrigger>
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Create Delivery Batch</DialogTitle>
+                    <DialogTitle>{editingBatchId ? "Edit Delivery Batch" : "Create Delivery Batch"}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
                     {/* Date Picker */}
@@ -491,8 +559,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                       </div>
                     </div>
 
-                    <Button onClick={createBatch} disabled={saving} className="w-full">
-                      {saving ? "Creating..." : "Create Delivery Batch"}
+                    <Button onClick={saveBatch} disabled={saving} className="w-full">
+                      {saving ? (editingBatchId ? "Updating..." : "Creating...") : (editingBatchId ? "Update Delivery Batch" : "Create Delivery Batch")}
                     </Button>
                   </div>
                 </DialogContent>
@@ -523,6 +591,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
               customDeliveryItems={batchCustomDelivery[batch.id] || []}
               canEdit={canEdit}
               onRefresh={fetchBatches}
+              onEdit={() => initEditBatch(batch.id)}
             />
           ))
         )}
