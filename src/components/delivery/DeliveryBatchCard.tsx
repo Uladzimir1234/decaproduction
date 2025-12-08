@@ -7,14 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Truck, Package, BoxIcon, Plus, Trash2, ChevronDown, ChevronUp, CalendarIcon, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface DeliveryBatch {
@@ -66,6 +62,7 @@ interface DeliveryBatchCardProps {
   customDeliveryItems: BatchCustomDeliveryItem[];
   canEdit: boolean;
   onRefresh: () => void;
+  onEdit: () => void;
   batchNumber: number;
 }
 
@@ -97,6 +94,7 @@ export function DeliveryBatchCard({
   customDeliveryItems,
   canEdit,
   onRefresh,
+  onEdit,
   batchNumber
 }: DeliveryBatchCardProps) {
   const { toast } = useToast();
@@ -105,12 +103,6 @@ export function DeliveryBatchCard({
   const [customDeliveryDialogOpen, setCustomDeliveryDialogOpen] = useState(false);
   const [newCustomName, setNewCustomName] = useState("");
   const [newCustomQty, setNewCustomQty] = useState(1);
-  
-  // Edit batch state
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editDate, setEditDate] = useState<Date>(new Date(batch.delivery_date));
-  const [editNotes, setEditNotes] = useState(batch.notes || "");
-  const [editSaving, setEditSaving] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Local state for quantities to prevent layout shift during edits
@@ -275,27 +267,6 @@ export function DeliveryBatchCard({
     }
   };
 
-  const updateBatch = async () => {
-    setEditSaving(true);
-    try {
-      const { error } = await supabase
-        .from("delivery_batches")
-        .update({
-          delivery_date: format(editDate, "yyyy-MM-dd"),
-          notes: editNotes.trim() || null
-        })
-        .eq("id", batch.id);
-      if (error) throw error;
-      onRefresh();
-      setEditDialogOpen(false);
-      toast({ title: "Batch updated", description: "Delivery batch updated successfully" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
-      setEditSaving(false);
-    }
-  };
-
   const getItemLabel = (itemType: string, types: { key: string; label: string }[]) => {
     return types.find(t => t.key === itemType)?.label || itemType;
   };
@@ -323,64 +294,9 @@ export function DeliveryBatchCard({
               </Badge>
               {canEdit && (
                 <>
-                  <Dialog open={editDialogOpen} onOpenChange={(open) => {
-                    setEditDialogOpen(open);
-                    if (open) {
-                      setEditDate(new Date(batch.delivery_date));
-                      setEditNotes(batch.notes || "");
-                    }
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Edit Delivery Batch #{batchNumber}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <Label>Delivery Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !editDate && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {editDate ? format(editDate, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={editDate}
-                                onSelect={(date) => date && setEditDate(date)}
-                                initialFocus
-                                className={cn("p-3 pointer-events-auto")}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Notes</Label>
-                          <Textarea
-                            value={editNotes}
-                            onChange={(e) => setEditNotes(e.target.value)}
-                            placeholder="Optional notes for this delivery batch..."
-                            rows={3}
-                          />
-                        </div>
-                        <Button onClick={updateBatch} disabled={editSaving} className="w-full">
-                          {editSaving ? "Saving..." : "Save Changes"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={deleteBatch}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
