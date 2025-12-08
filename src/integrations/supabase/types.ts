@@ -608,6 +608,7 @@ export type Database = {
           delivery_date: string
           doors_count: number | null
           fulfillment_percentage: number | null
+          glass_delivery_date: string | null
           glass_order_date: string | null
           glass_ordered: boolean | null
           glass_status: string | null
@@ -653,6 +654,7 @@ export type Database = {
           delivery_date: string
           doors_count?: number | null
           fulfillment_percentage?: number | null
+          glass_delivery_date?: string | null
           glass_order_date?: string | null
           glass_ordered?: boolean | null
           glass_status?: string | null
@@ -698,6 +700,7 @@ export type Database = {
           delivery_date?: string
           doors_count?: number | null
           fulfillment_percentage?: number | null
+          glass_delivery_date?: string | null
           glass_order_date?: string | null
           glass_ordered?: boolean | null
           glass_status?: string | null

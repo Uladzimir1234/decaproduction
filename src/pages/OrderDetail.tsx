@@ -101,6 +101,7 @@ interface Order {
   windows_profile_order_date: string | null;
   glass_status: string | null;
   glass_order_date: string | null;
+  glass_delivery_date: string | null;
   screens_status: string | null;
   screens_order_date: string | null;
   plisse_screens_status: string | null;
@@ -799,6 +800,17 @@ export default function OrderDetail() {
                         type="date"
                         value={order.glass_order_date || ''}
                         onChange={e => updateOrderComponent({ glass_order_date: e.target.value })}
+                        disabled={!canUpdateOrdering || isSeller}
+                      />
+                    </div>
+                  )}
+                  {(order.glass_status === 'ordered' || order.glass_status === 'available') && (
+                    <div className="space-y-2">
+                      <Label>Delivery Date</Label>
+                      <Input
+                        type="date"
+                        value={order.glass_delivery_date || ''}
+                        onChange={e => updateOrderComponent({ glass_delivery_date: e.target.value })}
                         disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
