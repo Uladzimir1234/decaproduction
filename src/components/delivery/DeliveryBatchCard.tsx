@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Package, BoxIcon, Plus, Trash2, ChevronDown, ChevronUp, CalendarIcon, Pencil } from "lucide-react";
+import { Truck, Package, BoxIcon, Plus, Trash2, ChevronDown, ChevronUp, CalendarIcon, Pencil, CheckCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -104,6 +104,7 @@ export function DeliveryBatchCard({
   const [newCustomName, setNewCustomName] = useState("");
   const [newCustomQty, setNewCustomQty] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [markingShipped, setMarkingShipped] = useState(false);
 
   // Local state for quantities to prevent layout shift during edits
   const [localShippingQty, setLocalShippingQty] = useState<Record<string, number>>({});
@@ -117,6 +118,8 @@ export function DeliveryBatchCard({
   const totalDelivery = deliveryItems.length + customDeliveryItems.length;
   const completedDelivery = deliveryItems.filter(i => i.is_delivered).length + 
     customDeliveryItems.filter(i => i.is_delivered).length;
+
+  const isShipped = batch.status === 'shipped';
 
   const updateShippingItem = async (itemId: string, isComplete: boolean) => {
     try {
@@ -267,20 +270,44 @@ export function DeliveryBatchCard({
     }
   };
 
+  const markAsShipped = async () => {
+    setMarkingShipped(true);
+    try {
+      const { error } = await supabase
+        .from("delivery_batches")
+        .update({ status: 'shipped' })
+        .eq("id", batch.id);
+      if (error) throw error;
+      onRefresh();
+      toast({ title: "Batch shipped", description: "Delivery batch marked as shipped" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setMarkingShipped(false);
+    }
+  };
+
   const getItemLabel = (itemType: string, types: { key: string; label: string }[]) => {
     return types.find(t => t.key === itemType)?.label || itemType;
   };
 
   return (
-    <Card className="border-primary/20">
+    <Card className={`border-primary/20 ${isShipped ? 'bg-emerald-500/5 border-emerald-500/30' : ''}`}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80">
-              <CalendarIcon className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">
+              {isShipped ? (
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <CalendarIcon className="h-4 w-4 text-primary" />
+              )}
+              <CardTitle className={`text-base ${isShipped ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                 Delivery #{batchNumber} - {format(new Date(batch.delivery_date), "MMM dd, yyyy")}
               </CardTitle>
+              {isShipped && (
+                <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-white text-xs">Shipped</Badge>
+              )}
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </CollapsibleTrigger>
             <div className="flex items-center gap-2">
@@ -438,6 +465,20 @@ export function DeliveryBatchCard({
                 ))}
               </div>
             </div>
+
+            {/* Mark as Shipped Button */}
+            {canEdit && !isShipped && (
+              <div className="pt-4 border-t border-border">
+                <Button 
+                  onClick={markAsShipped} 
+                  disabled={markingShipped}
+                  className="w-full gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+                >
+                  <Truck className="h-4 w-4" />
+                  {markingShipped ? "Marking as Shipped..." : "Mark as Shipped"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
