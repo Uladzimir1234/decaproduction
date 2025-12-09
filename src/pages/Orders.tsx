@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -183,8 +184,27 @@ export default function Orders() {
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
   
+  // Toggle states with localStorage persistence
+  const [showOrderMap, setShowOrderMap] = useState(() => {
+    const saved = localStorage.getItem('orders_showOrderMap');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [showAvailableComponents, setShowAvailableComponents] = useState(() => {
+    const saved = localStorage.getItem('orders_showAvailableComponents');
+    return saved !== null ? saved === 'true' : true;
+  });
+  
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
+
+  // Persist toggle states to localStorage
+  useEffect(() => {
+    localStorage.setItem('orders_showOrderMap', String(showOrderMap));
+  }, [showOrderMap]);
+
+  useEffect(() => {
+    localStorage.setItem('orders_showAvailableComponents', String(showAvailableComponents));
+  }, [showAvailableComponents]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -1322,6 +1342,45 @@ export default function Orders() {
                 </SelectContent>
               </Select>
             )}
+            
+            {/* Toggle switches for visibility */}
+            <div className="flex items-center gap-4 ml-auto">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5">
+                      <Switch 
+                        checked={showOrderMap} 
+                        onCheckedChange={setShowOrderMap}
+                        id="toggle-order-map"
+                      />
+                      <label htmlFor="toggle-order-map" className="cursor-pointer">
+                        <Grid3X3 className="h-4 w-4 text-muted-foreground" />
+                      </label>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Show/Hide Order Map</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5">
+                      <Switch 
+                        checked={showAvailableComponents} 
+                        onCheckedChange={setShowAvailableComponents}
+                        id="toggle-available"
+                      />
+                      <label htmlFor="toggle-available" className="cursor-pointer">
+                        <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                      </label>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Show/Hide Available Components</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1548,7 +1607,7 @@ export default function Orders() {
                           </div>
                         )}
                         {/* Available components - only show for file-extracted orders */}
-                        {!isWorker && availableComponents.length > 0 && (
+                        {showAvailableComponents && !isWorker && availableComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
                             <span className="text-xs text-success font-medium mr-1">Available:</span>
@@ -1909,8 +1968,8 @@ export default function Orders() {
                       </div>
                     </div>
 
-                    {/* Inline Order Map - Always visible */}
-                    {ordersWithConstructions.has(order.id) && (
+                    {/* Inline Order Map - Controlled by toggle */}
+                    {showOrderMap && ordersWithConstructions.has(order.id) && (
                       <div className="mt-3 pt-3 border-t border-border">
                         <OrderMapInline
                           orderId={order.id}
