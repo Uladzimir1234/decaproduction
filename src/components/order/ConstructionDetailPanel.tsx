@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { X, Square, DoorOpen, PanelLeftOpen, Plus, MessageSquare, Truck, Check } from "lucide-react";
+import { X, Square, DoorOpen, PanelLeftOpen, Plus, MessageSquare, Truck, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StatusButtonGroup, manufacturingStatusOptions } from "@/components/ui/status-button-group";
+import { StatusButtonGroup, manufacturingStatusOptions, orderingStatusOptions } from "@/components/ui/status-button-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
@@ -33,6 +33,17 @@ interface ConstructionDelivery {
   id: string;
   is_prepared: boolean;
   is_delivered: boolean;
+}
+
+interface ConstructionComponent {
+  id: string;
+  component_type: string;
+  component_name: string | null;
+  quantity: number;
+  status: string;
+  order_date: string | null;
+  notes: string | null;
+  updated_by_email: string | null;
 }
 
 interface Construction {
@@ -73,6 +84,18 @@ const MANUFACTURING_STAGES = [
   { key: 'glass_installation', label: 'Glass Installation' },
 ];
 
+const COMPONENT_TYPE_LABELS: Record<string, string> = {
+  glass: 'Glass',
+  blinds: 'Blinds',
+  screen: 'Screen',
+  flex_screen: 'Flex Screen',
+  deca_screen: 'Deca Screen',
+  coupling_profile: 'Coupling Profile',
+  reinforcement: 'Reinforcement',
+  hardware: 'Hardware',
+  nailing_fins: 'Nailing Fins',
+};
+
 export function ConstructionDetailPanel({
   construction,
   onClose,
@@ -84,6 +107,7 @@ export function ConstructionDetailPanel({
   const [manufacturing, setManufacturing] = useState<ConstructionManufacturing[]>([]);
   const [notes, setNotes] = useState<ConstructionNote[]>([]);
   const [delivery, setDelivery] = useState<ConstructionDelivery | null>(null);
+  const [components, setComponents] = useState<ConstructionComponent[]>([]);
   const [newNoteText, setNewNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
 
@@ -166,6 +190,40 @@ export function ConstructionDetailPanel({
         .single();
       
       if (newDelivery) setDelivery(newDelivery);
+    }
+
+    // Fetch construction components (ordering stages)
+    const { data: componentsData } = await supabase
+      .from('construction_components')
+      .select('*')
+      .eq('construction_id', construction.id)
+      .order('component_type');
+    
+    if (componentsData) setComponents(componentsData);
+  };
+
+  const handleComponentStatusUpdate = async (componentId: string, status: string) => {
+    const canEditOrdering = isAdmin || isManager;
+    if (!canEditOrdering) {
+      toast({
+        title: "Permission denied",
+        description: "Only admins and managers can update ordering status",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('construction_components')
+      .update({ status })
+      .eq('id', componentId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setComponents(prev => 
+        prev.map(c => c.id === componentId ? { ...c, status } : c)
+      );
     }
   };
 
@@ -349,6 +407,52 @@ export function ConstructionDetailPanel({
               </div>
             )}
           </div>
+
+          {/* Ordering Stages (Components) */}
+          {components.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Ordering Stages ({components.length})
+                </h3>
+                <div className="space-y-3">
+                  {components.map((component) => {
+                    const label = COMPONENT_TYPE_LABELS[component.component_type] || component.component_type;
+                    const displayName = component.component_name 
+                      ? `${label}: ${component.component_name}` 
+                      : label;
+                    
+                    return (
+                      <div key={component.id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">
+                            {displayName}
+                            {component.quantity > 1 && (
+                              <span className="text-muted-foreground ml-1">(×{component.quantity})</span>
+                            )}
+                          </span>
+                          {component.updated_by_email && (
+                            <span className="text-xs text-muted-foreground">
+                              {component.updated_by_email?.split('@')[0]}
+                            </span>
+                          )}
+                        </div>
+                        <StatusButtonGroup
+                          value={component.status}
+                          onChange={(val) => handleComponentStatusUpdate(component.id, val)}
+                          options={orderingStatusOptions}
+                          disabled={!isAdmin && !isManager}
+                          size="sm"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 

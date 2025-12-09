@@ -5,6 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface ConstructionComponent {
+  component_type: string;
+  component_name: string | null;
+  quantity: number;
+}
+
 interface Construction {
   construction_number: string;
   construction_type: 'window' | 'door' | 'sliding_door';
@@ -27,6 +33,7 @@ interface Construction {
   comments: string | null;
   quantity: number;
   position_index: number;
+  components: ConstructionComponent[];
 }
 
 interface ParsedOrder {
@@ -67,6 +74,16 @@ These CSV files have a specific structure:
 - Multiple "Construction ?" sections, each representing a window or door
 - Each construction has: dimensions in inches and mm, room/location, model, system type, opening type, colors, glass specs, handle type, screen type, blinds info, and quantity
 
+IMPORTANT: For each construction, also extract all COMPONENTS that need to be ordered separately:
+- "blinds" - if the construction has blinds/shades
+- "screen" or "flex_screen" or "deca_screen" - if screens are specified
+- "coupling_profile" - if coupling profiles or mullions are mentioned
+- "reinforcement" - if reinforcement is mentioned
+- "hardware" - if special hardware is mentioned
+- "glass" - always include glass as a component
+- "nailing_fins" - if nailing fins or installation flanges are mentioned
+- Any other custom components mentioned in the order
+
 Extract all construction items and return structured JSON.
 For dimensions like "35.98x47.99 inch (914x1219 mm)", extract both inch and mm values.
 Determine construction_type from the "System" field: "Window" = window, "Entrance" or "Door" = door, "Sliding" or "PSK" or "Lift" = sliding_door.
@@ -74,7 +91,7 @@ Look for quantity in "Number of constructions pcs:" or assume 1 if not specified
         },
         {
           role: 'user',
-          content: `Extract all window and door constructions from this IT Okna CSV export. Return structured JSON with quote_number, customer_name, order_date, and an array of constructions.\n\nCSV Content:\n${csvContent}`
+          content: `Extract all window and door constructions from this IT Okna CSV export. Return structured JSON with quote_number, customer_name, order_date, and an array of constructions. For each construction, include a "components" array listing all components that need ordering.\n\nCSV Content:\n${csvContent}`
         }
       ],
       tools: [
@@ -113,7 +130,26 @@ Look for quantity in "Number of constructions pcs:" or assume 1 if not specified
                       blinds_color: { type: 'string', nullable: true },
                       center_seal: { type: 'boolean' },
                       comments: { type: 'string', nullable: true },
-                      quantity: { type: 'number' }
+                      quantity: { type: 'number' },
+                      components: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            component_type: { 
+                              type: 'string',
+                              description: 'Type of component: glass, blinds, screen, coupling_profile, reinforcement, hardware, nailing_fins, or custom type'
+                            },
+                            component_name: { 
+                              type: 'string', 
+                              nullable: true,
+                              description: 'Specific name/model of the component if available'
+                            },
+                            quantity: { type: 'number' }
+                          },
+                          required: ['component_type', 'quantity']
+                        }
+                      }
                     },
                     required: ['construction_number', 'construction_type', 'quantity']
                   }
@@ -152,13 +188,14 @@ Look for quantity in "Number of constructions pcs:" or assume 1 if not specified
   const extracted = JSON.parse(toolCall.function.arguments);
   console.log('Extracted data:', JSON.stringify(extracted, null, 2));
   
-  // Add position_index to constructions
+  // Add position_index to constructions and ensure components array exists
   const constructions = (extracted.constructions || []).map((c: any, index: number) => ({
     ...c,
     position_index: index,
     has_blinds: c.has_blinds || false,
     center_seal: c.center_seal || false,
     quantity: c.quantity || 1,
+    components: c.components || [],
   }));
 
   // Calculate counts
@@ -219,14 +256,24 @@ For each construction, identify:
 - blinds_color
 - center_seal (boolean)
 - comments
-- quantity (how many of this exact configuration)`
+- quantity (how many of this exact configuration)
+
+IMPORTANT: For each construction, also extract all COMPONENTS that need to be ordered separately:
+- "blinds" - if the construction has blinds/shades
+- "screen" or "flex_screen" or "deca_screen" - if screens are specified
+- "coupling_profile" - if coupling profiles or mullions are mentioned
+- "reinforcement" - if reinforcement is mentioned
+- "hardware" - if special hardware is mentioned
+- "glass" - always include glass as a component with specs
+- "nailing_fins" - if nailing fins or installation flanges are mentioned
+- Any other custom components mentioned (e.g., "extension profile", "sill", etc.)`
         },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: 'Extract all window and door constructions from this order document. Return a JSON object with: quote_number, customer_name, order_date, and an array of constructions with all specifications.'
+              text: 'Extract all window and door constructions from this order document. Return a JSON object with: quote_number, customer_name, order_date, and an array of constructions with all specifications. For each construction, include a "components" array listing all components that need ordering with their types, names, and quantities.'
             },
             {
               type: 'image_url',
@@ -273,7 +320,26 @@ For each construction, identify:
                       blinds_color: { type: 'string', nullable: true },
                       center_seal: { type: 'boolean' },
                       comments: { type: 'string', nullable: true },
-                      quantity: { type: 'number' }
+                      quantity: { type: 'number' },
+                      components: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            component_type: { 
+                              type: 'string',
+                              description: 'Type of component: glass, blinds, screen, coupling_profile, reinforcement, hardware, nailing_fins, or custom type'
+                            },
+                            component_name: { 
+                              type: 'string', 
+                              nullable: true,
+                              description: 'Specific name/model of the component if available'
+                            },
+                            quantity: { type: 'number' }
+                          },
+                          required: ['component_type', 'quantity']
+                        }
+                      }
                     },
                     required: ['construction_number', 'construction_type', 'quantity']
                   }
@@ -303,13 +369,14 @@ For each construction, identify:
 
   const extracted = JSON.parse(toolCall.function.arguments);
   
-  // Add position_index to constructions
+  // Add position_index to constructions and ensure components array exists
   const constructions = (extracted.constructions || []).map((c: any, index: number) => ({
     ...c,
     position_index: index,
     has_blinds: c.has_blinds || false,
     center_seal: c.center_seal || false,
     quantity: c.quantity || 1,
+    components: c.components || [],
   }));
 
   // Calculate counts
