@@ -188,6 +188,12 @@ export default function OrderCreate() {
     setScreenType(confirmedData.screenType);
     setHasPlisseScreens(confirmedData.hasPlisseScreens);
     setHasNailingFlanges(confirmedData.hasNailingFlanges);
+    
+    // Apply profile type if detected
+    if (confirmedData.profileType) {
+      setWindowsProfileType(confirmedData.profileType);
+    }
+    
     setParsedOrderData(confirmedData.parsedOrderData);
     
     setShowConfirmationDialog(false);

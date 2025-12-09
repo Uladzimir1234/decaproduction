@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, X, FileText, AlertCircle } from "lucide-react";
+import { Check, X, FileText, AlertCircle, Sparkles } from "lucide-react";
 import { ParsedOrderData } from "./FileUploadZone";
 
 interface SlidingDoorEntry {
@@ -41,8 +41,19 @@ export interface ConfirmedExtractionData {
   screenType: string;
   hasPlisseScreens: boolean;
   hasNailingFlanges: boolean;
+  hasBlinds: boolean;
+  blindsColor: string;
+  profileType: string;
+  colorExterior: string;
+  colorInterior: string;
   parsedOrderData: ParsedOrderData;
 }
+
+const PROFILE_TYPES = [
+  { value: "S8000", label: "S8000" },
+  { value: "Linear", label: "Linear" },
+  { value: "Deca 70", label: "Deca 70" },
+];
 
 const SLIDING_DOOR_TYPES = [
   { value: "multi_slide", label: "Multi Slide" },
@@ -74,7 +85,15 @@ export function ExtractionConfirmationDialog({
   const [screenType, setScreenType] = useState("");
   const [hasPlisseScreens, setHasPlisseScreens] = useState(false);
   const [hasNailingFlanges, setHasNailingFlanges] = useState(false);
+  const [hasBlinds, setHasBlinds] = useState(false);
+  const [blindsColor, setBlindsColor] = useState("");
+  const [profileType, setProfileType] = useState("");
+  const [colorExterior, setColorExterior] = useState("");
+  const [colorInterior, setColorInterior] = useState("");
   const [initialized, setInitialized] = useState(false);
+  
+  // Track what was detected from file
+  const [detectedFields, setDetectedFields] = useState<Set<string>>(new Set());
 
   // Initialize form when parsedData changes
   if (parsedData && !initialized) {
@@ -88,7 +107,13 @@ export function ExtractionConfirmationDialog({
     let detectedScreenType = "";
     let detectedHasPlisse = false;
     let detectedHasNailingFins = false;
+    let detectedHasBlinds = false;
+    let detectedBlindsColor = "";
+    let detectedProfileType = "";
+    let detectedColorExterior = "";
+    let detectedColorInterior = "";
     const detectedSlidingDoors: Record<string, number> = {};
+    const detected = new Set<string>();
 
     for (const construction of parsedData.constructions) {
       // Detect sliding door types
@@ -107,11 +132,11 @@ export function ExtractionConfirmationDialog({
         } else if (combined.includes("psk")) {
           doorType = "psk";
         } else {
-          // Default to multi_slide if type not detected
           doorType = "multi_slide";
         }
 
         detectedSlidingDoors[doorType] = (detectedSlidingDoors[doorType] || 0) + construction.quantity;
+        detected.add("slidingDoors");
       }
 
       // Detect screens
@@ -119,12 +144,50 @@ export function ExtractionConfirmationDialog({
         const screenLower = construction.screen_type.toLowerCase();
         if (screenLower.includes("flex")) {
           detectedScreenType = "flex";
+          detected.add("screenType");
         } else if (screenLower.includes("deca") || screenLower.includes("aluminum")) {
           detectedScreenType = "deca";
+          detected.add("screenType");
         }
         if (screenLower.includes("plisse") || screenLower.includes("retractable")) {
           detectedHasPlisse = true;
+          detected.add("plisseScreens");
         }
+      }
+
+      // Detect blinds
+      if (construction.has_blinds) {
+        detectedHasBlinds = true;
+        detected.add("blinds");
+        if (construction.blinds_color) {
+          detectedBlindsColor = construction.blinds_color;
+          detected.add("blindsColor");
+        }
+      }
+
+      // Detect profile type from model
+      if (construction.model && !detectedProfileType) {
+        const modelLower = construction.model.toLowerCase();
+        if (modelLower.includes("s8000") || modelLower.includes("s-8000")) {
+          detectedProfileType = "S8000";
+          detected.add("profileType");
+        } else if (modelLower.includes("linear")) {
+          detectedProfileType = "Linear";
+          detected.add("profileType");
+        } else if (modelLower.includes("deca") || modelLower.includes("70")) {
+          detectedProfileType = "Deca 70";
+          detected.add("profileType");
+        }
+      }
+
+      // Detect colors
+      if (construction.color_exterior && !detectedColorExterior) {
+        detectedColorExterior = construction.color_exterior;
+        detected.add("colorExterior");
+      }
+      if (construction.color_interior && !detectedColorInterior) {
+        detectedColorInterior = construction.color_interior;
+        detected.add("colorInterior");
       }
 
       // Check components array
@@ -136,16 +199,20 @@ export function ExtractionConfirmationDialog({
           if (typeLower.includes("screen") || nameLower.includes("screen")) {
             if (typeLower.includes("flex") || nameLower.includes("flex")) {
               detectedScreenType = "flex";
+              detected.add("screenType");
             } else if (typeLower.includes("deca") || nameLower.includes("deca") || nameLower.includes("aluminum")) {
               detectedScreenType = "deca";
+              detected.add("screenType");
             }
             if (typeLower.includes("plisse") || nameLower.includes("plisse") || nameLower.includes("retractable")) {
               detectedHasPlisse = true;
+              detected.add("plisseScreens");
             }
           }
 
           if (typeLower.includes("nailing") || typeLower.includes("fin") || nameLower.includes("nailing") || nameLower.includes("flange")) {
             detectedHasNailingFins = true;
+            detected.add("nailingFlanges");
           }
         }
       }
@@ -165,6 +232,12 @@ export function ExtractionConfirmationDialog({
     setScreenType(detectedScreenType);
     setHasPlisseScreens(detectedHasPlisse);
     setHasNailingFlanges(detectedHasNailingFins);
+    setHasBlinds(detectedHasBlinds);
+    setBlindsColor(detectedBlindsColor);
+    setProfileType(detectedProfileType);
+    setColorExterior(detectedColorExterior);
+    setColorInterior(detectedColorInterior);
+    setDetectedFields(detected);
     setInitialized(true);
   }
 
@@ -190,8 +263,24 @@ export function ExtractionConfirmationDialog({
       screenType,
       hasPlisseScreens,
       hasNailingFlanges,
+      hasBlinds,
+      blindsColor,
+      profileType,
+      colorExterior,
+      colorInterior,
       parsedOrderData: parsedData,
     });
+  };
+  
+  // Helper to show "Detected from file" badge
+  const DetectedBadge = ({ field }: { field: string }) => {
+    if (!detectedFields.has(field)) return null;
+    return (
+      <Badge variant="secondary" className="ml-2 text-xs gap-1">
+        <Sparkles className="h-3 w-3" />
+        Detected
+      </Badge>
+    );
   };
 
   const handleCancel = () => {
@@ -362,12 +451,96 @@ export function ExtractionConfirmationDialog({
               )}
             </div>
 
-            {/* Components */}
+            {/* Profile & Colors */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-sm border-b pb-2">Components</h3>
+              <h3 className="font-semibold text-sm border-b pb-2">Profile & Colors</h3>
 
               <div className="space-y-2">
-                <Label>Screen Type</Label>
+                <div className="flex items-center">
+                  <Label>Profile Type</Label>
+                  <DetectedBadge field="profileType" />
+                </div>
+                <Select 
+                  value={profileType || "none"} 
+                  onValueChange={(v) => setProfileType(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select profile type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {PROFILE_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label>Exterior Color</Label>
+                    <DetectedBadge field="colorExterior" />
+                  </div>
+                  <Input
+                    value={colorExterior}
+                    onChange={(e) => setColorExterior(e.target.value)}
+                    placeholder="e.g., White, RAL 7016"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label>Interior Color</Label>
+                    <DetectedBadge field="colorInterior" />
+                  </div>
+                  <Input
+                    value={colorInterior}
+                    onChange={(e) => setColorInterior(e.target.value)}
+                    placeholder="e.g., White, Oak"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Blinds */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Blinds</h3>
+              
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={hasBlinds}
+                  onCheckedChange={setHasBlinds}
+                />
+                <Label>Has Blinds</Label>
+                <DetectedBadge field="blinds" />
+              </div>
+
+              {hasBlinds && (
+                <div className="space-y-2 pl-4 border-l-2 border-primary/20">
+                  <div className="flex items-center">
+                    <Label>Blinds Color</Label>
+                    <DetectedBadge field="blindsColor" />
+                  </div>
+                  <Input
+                    value={blindsColor}
+                    onChange={(e) => setBlindsColor(e.target.value)}
+                    placeholder="e.g., White, Gray"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Screens & Components */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm border-b pb-2">Screens & Components</h3>
+
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <Label>Screen Type</Label>
+                  <DetectedBadge field="screenType" />
+                </div>
                 <Select 
                   value={screenType || "none"} 
                   onValueChange={(v) => setScreenType(v === "none" ? "" : v)}
@@ -392,6 +565,7 @@ export function ExtractionConfirmationDialog({
                   onCheckedChange={setHasPlisseScreens}
                 />
                 <Label>Has Plisse Screens</Label>
+                <DetectedBadge field="plisseScreens" />
               </div>
 
               <div className="flex items-center gap-3">
@@ -400,6 +574,7 @@ export function ExtractionConfirmationDialog({
                   onCheckedChange={setHasNailingFlanges}
                 />
                 <Label>Has Nailing Flanges</Label>
+                <DetectedBadge field="nailingFlanges" />
               </div>
             </div>
           </div>
