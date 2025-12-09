@@ -154,6 +154,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sellerFilter, setSellerFilter] = useState<string>("all");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -822,6 +823,9 @@ export default function Orders() {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSeller = sellerFilter === "all" || order.user_id === sellerFilter;
+    
+    if (!matchesSeller) return false;
     if (statusFilter === "all") return matchesSearch;
     if (statusFilter === "on_hold") return matchesSearch && order.production_status === 'hold';
     if (statusFilter === "production_ready") return matchesSearch && order.production_status === 'production_ready';
@@ -875,6 +879,21 @@ export default function Orders() {
                 <SelectItem value="pending_delivery">Pending Delivery</SelectItem>
               </SelectContent>
             </Select>
+            {(isAdmin || isManager || isWorker) && Object.keys(sellers).length > 0 && (
+              <Select value={sellerFilter} onValueChange={setSellerFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Filter by seller" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sellers</SelectItem>
+                  {Object.entries(sellers).map(([id, seller]) => (
+                    <SelectItem key={id} value={id}>
+                      {seller.full_name || seller.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardHeader>
         <CardContent>
