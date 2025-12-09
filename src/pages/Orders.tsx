@@ -18,8 +18,6 @@ import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp } from "lucide-react";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -181,7 +179,6 @@ export default function Orders() {
   const [deleting, setDeleting] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
-  const [expandedOrderMapId, setExpandedOrderMapId] = useState<string | null>(null);
   const [ordersWithConstructions, setOrdersWithConstructions] = useState<Set<string>>(new Set());
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
@@ -512,12 +509,6 @@ export default function Orders() {
     } catch (error) {
       console.error("Error fetching construction manufacturing:", error);
     }
-  };
-
-  const handleToggleOrderMap = (e: React.MouseEvent, orderId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setExpandedOrderMapId(prev => prev === orderId ? null : orderId);
   };
 
   const getOrderDeliveryBatches = (orderId: string) => {
