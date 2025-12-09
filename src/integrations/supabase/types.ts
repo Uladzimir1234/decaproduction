@@ -619,6 +619,7 @@ export type Database = {
           has_plisse_screens: boolean | null
           has_sliding_doors: boolean | null
           hidden_hinges_count: number | null
+          hold_started_at: string | null
           id: string
           nail_fins_order_date: string | null
           nail_fins_status: string | null
@@ -666,6 +667,7 @@ export type Database = {
           has_plisse_screens?: boolean | null
           has_sliding_doors?: boolean | null
           hidden_hinges_count?: number | null
+          hold_started_at?: string | null
           id?: string
           nail_fins_order_date?: string | null
           nail_fins_status?: string | null
@@ -713,6 +715,7 @@ export type Database = {
           has_plisse_screens?: boolean | null
           has_sliding_doors?: boolean | null
           hidden_hinges_count?: number | null
+          hold_started_at?: string | null
           id?: string
           nail_fins_order_date?: string | null
           nail_fins_status?: string | null

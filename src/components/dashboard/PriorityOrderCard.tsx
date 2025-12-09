@@ -44,6 +44,15 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
     });
   };
 
+  const getDaysOnHold = (): number => {
+    if (!order.hold_started_at) return 0;
+    const holdDate = new Date(order.hold_started_at);
+    const now = new Date();
+    return Math.floor((now.getTime() - holdDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const daysOnHold = getDaysOnHold();
+
   // Component status dots
   const componentStatuses = [
     order.reinforcement_status,
@@ -70,7 +79,7 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
               {order.production_status === 'hold' ? (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
                   <Pause className="h-2.5 w-2.5" />
-                  Hold
+                  Hold {daysOnHold > 0 && `(${daysOnHold}d)`}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 border-success/50 text-success">

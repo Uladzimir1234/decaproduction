@@ -113,6 +113,7 @@ interface Order {
   hardware_status: string | null;
   hardware_order_date: string | null;
   production_status: string;
+  hold_started_at: string | null;
 }
 export default function Orders() {
   const { toast } = useToast();
@@ -453,16 +454,21 @@ export default function Orders() {
   const handleProductionStatusChange = async (orderId: string, newStatus: string) => {
     try {
       const order = orders.find(o => o.id === orderId);
+      const updateData: { production_status: string; hold_started_at: string | null } = {
+        production_status: newStatus,
+        hold_started_at: newStatus === 'hold' ? new Date().toISOString() : null,
+      };
+      
       const { error } = await supabase
         .from("orders")
-        .update({ production_status: newStatus })
+        .update(updateData)
         .eq("id", orderId);
       
       if (error) throw error;
       
       // Update local state
       setOrders(prev => prev.map(o => 
-        o.id === orderId ? { ...o, production_status: newStatus } : o
+        o.id === orderId ? { ...o, ...updateData } : o
       ));
       
       await createAuditLog({
@@ -483,6 +489,13 @@ export default function Orders() {
         variant: "destructive",
       });
     }
+  };
+
+  const getDaysOnHold = (holdStartedAt: string | null): number => {
+    if (!holdStartedAt) return 0;
+    const holdDate = new Date(holdStartedAt);
+    const now = new Date();
+    return Math.floor((now.getTime() - holdDate.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   const handleComponentStatusChange = async (orderId: string, field: string, newStatus: string) => {
@@ -676,7 +689,7 @@ export default function Orders() {
                               {order.production_status === 'hold' ? (
                                 <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer transition-colors">
                                   <Pause className="h-3 w-3" />
-                                  On Hold
+                                  On Hold {getDaysOnHold(order.hold_started_at) > 0 && `(${getDaysOnHold(order.hold_started_at)}d)`}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success hover:bg-success/10 cursor-pointer transition-colors">
@@ -689,7 +702,7 @@ export default function Orders() {
                             order.production_status === 'hold' ? (
                               <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 shrink-0">
                                 <Pause className="h-3 w-3" />
-                                On Hold
+                                On Hold {getDaysOnHold(order.hold_started_at) > 0 && `(${getDaysOnHold(order.hold_started_at)}d)`}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">

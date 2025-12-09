@@ -15,6 +15,7 @@ export interface OrderWithFulfillment {
   screen_type: string | null;
   delivery_complete: boolean;
   production_status: string;
+  hold_started_at: string | null;
   // Component status
   reinforcement_status: string | null;
   windows_profile_status: string | null;
@@ -384,6 +385,7 @@ export function useDashboardData() {
             screen_type: order.screen_type,
             delivery_complete: order.delivery_complete || false,
             production_status: order.production_status || 'hold',
+            hold_started_at: order.hold_started_at,
             reinforcement_status: order.reinforcement_status,
             windows_profile_status: order.windows_profile_status,
             glass_status: order.glass_status,
