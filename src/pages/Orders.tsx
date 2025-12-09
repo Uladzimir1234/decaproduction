@@ -684,7 +684,28 @@ export default function Orders() {
       return { isLocked: true, lockReason: `${componentName} ${statusText}` };
     };
     
-    if (mfgData && mfgData.length > 0) {
+    // Check if construction_manufacturing data has any progress (complete or partial)
+    const mfgHasProgress = mfgData && mfgData.length > 0 && 
+      mfgData.some(item => item.status === 'complete' || item.status === 'partial');
+    
+    // Also check if order_fulfillment has any progress
+    const f = fulfillments[order.id];
+    const fulfillmentHasProgress = f && (
+      f.reinforcement_cutting === 'complete' || f.reinforcement_cutting === 'partial' ||
+      f.profile_cutting === 'complete' || f.profile_cutting === 'partial' ||
+      f.welding_status === 'complete' || f.welding_status === 'partial' ||
+      f.assembly_status === 'complete' || f.assembly_status === 'partial' ||
+      f.glass_status === 'complete' || f.glass_status === 'partial' ||
+      f.doors_status === 'complete' || f.doors_status === 'partial' ||
+      f.sliding_doors_status === 'complete' || f.sliding_doors_status === 'partial' ||
+      f.screens_cutting === 'complete' || f.screens_cutting === 'partial'
+    );
+    
+    // Prefer order_fulfillment if it has progress and construction_manufacturing doesn't
+    // This handles cases where user updates legacy workflow even on file-extracted orders
+    const useConstructionMfg = mfgData && mfgData.length > 0 && (mfgHasProgress || !fulfillmentHasProgress);
+    
+    if (useConstructionMfg) {
       // Aggregate construction manufacturing stages
       const stageAggregation = new Map<string, { complete: number; partial: number; not_started: number; total: number }>();
       
@@ -743,7 +764,7 @@ export default function Orders() {
     }
     
     // Fall back to legacy order_fulfillment data with lock dependencies (matching OrderDetail page)
-    const f = fulfillments[order.id];
+    // f is already defined above
     const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string; lock?: LockInfo }[] = [];
     
     const getStatus = (value: string | null | undefined): StageStatus => {
