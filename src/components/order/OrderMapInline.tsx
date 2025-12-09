@@ -198,7 +198,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
   }
 
   return (
-    <div className="pt-3">
+    <div>
       {/* Legend */}
       <div className="flex items-center gap-4 mb-2 text-[10px]">
         <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-red-500" /> Not started</div>
@@ -207,8 +207,8 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
         <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-blue-500" /> Glass installed</div>
       </div>
       
-      {/* Construction grid */}
-      <div className="flex flex-wrap gap-1">
+      {/* Construction grid - full width spread */}
+      <div className="flex flex-wrap gap-2 justify-start w-full">
         {constructions.map(construction => (
           <ConstructionCard
             key={construction.id}
