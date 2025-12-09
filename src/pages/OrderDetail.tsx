@@ -12,7 +12,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
-import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2, Pause, PlayCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2, Pause, PlayCircle, Grid3X3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createAuditLog } from "@/lib/auditLog";
 import { DeliveryBatchSection } from "@/components/delivery/DeliveryBatchSection";
+import { OrderMap } from "@/components/order/OrderMap";
 
 type StageStatus = "not_started" | "partial" | "complete";
 
@@ -178,14 +179,26 @@ export default function OrderDetail() {
   const [newManufacturingStepName, setNewManufacturingStepName] = useState("");
   const [orderingDialogOpen, setOrderingDialogOpen] = useState(false);
   const [manufacturingDialogOpen, setManufacturingDialogOpen] = useState(false);
+  const [orderMapOpen, setOrderMapOpen] = useState(false);
+  const [hasConstructions, setHasConstructions] = useState(false);
 
   useEffect(() => {
     // Wait for role to be loaded before fetching order
     if (id && !roleLoading) {
       fetchOrder();
       fetchCustomSteps();
+      checkConstructions();
     }
   }, [id, roleLoading, isWorker]);
+
+  const checkConstructions = async () => {
+    if (!id) return;
+    const { count } = await supabase
+      .from('order_constructions')
+      .select('id', { count: 'exact', head: true })
+      .eq('order_id', id);
+    setHasConstructions((count || 0) > 0);
+  };
 
   // Real-time subscription for order changes
   useEffect(() => {
@@ -633,8 +646,26 @@ export default function OrderDetail() {
           </div>
           <p className="text-muted-foreground">{order.customer_name}</p>
         </div>
-        {saving && <span className="text-sm text-muted-foreground">Saving...</span>}
+        <div className="flex items-center gap-2">
+          {hasConstructions && (
+            <Button variant="outline" size="sm" onClick={() => setOrderMapOpen(true)} className="gap-2">
+              <Grid3X3 className="h-4 w-4" />
+              Order Map
+            </Button>
+          )}
+          {saving && <span className="text-sm text-muted-foreground">Saving...</span>}
+        </div>
       </div>
+
+      {/* Order Map Overlay */}
+      {orderMapOpen && (
+        <OrderMap
+          orderId={order.id}
+          orderNumber={order.order_number}
+          isProductionReady={order.production_status === 'production_ready'}
+          onClose={() => setOrderMapOpen(false)}
+        />
+      )}
 
       {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-4">
