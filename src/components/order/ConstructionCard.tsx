@@ -131,26 +131,26 @@ export function ConstructionCard({ construction, onClick, isSelected, orderFulfi
           <button
             onClick={onClick}
             className={`
-              relative w-10 h-10 rounded flex items-center justify-center
-              font-mono text-[10px] font-bold cursor-pointer
-              transition-all hover:scale-110 hover:shadow-lg
+              relative w-3.5 h-3.5 rounded-sm flex items-center justify-center
+              text-[7px] font-black cursor-pointer drop-shadow-sm
+              transition-all hover:scale-125 hover:shadow-md
               ${statusColor.bg} ${statusColor.text}
-              ${isSelected ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}
+              ${isSelected ? 'ring-1 ring-offset-1 ring-primary scale-125' : ''}
               ${construction.is_delivered ? 'opacity-50' : ''}
             `}
           >
-            {typePrefix}{construction.construction_number}
+            {construction.construction_number}
             
             {/* Issue indicator */}
             {hasOpenIssues && (
-              <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-3 w-3 flex items-center justify-center">
-                <AlertTriangle className="h-2 w-2 text-white" />
+              <div className="absolute -top-0.5 -right-0.5 bg-amber-500 rounded-full h-1.5 w-1.5 flex items-center justify-center">
+                <AlertTriangle className="h-1 w-1 text-white" />
               </div>
             )}
             
             {/* Quantity indicator */}
             {construction.quantity > 1 && (
-              <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-3.5 w-3.5 flex items-center justify-center text-[8px] font-bold border">
+              <div className="absolute -bottom-0.5 -right-0.5 bg-background text-foreground rounded-full h-2 w-2 flex items-center justify-center text-[5px] font-black border">
                 {construction.quantity}
               </div>
             )}
