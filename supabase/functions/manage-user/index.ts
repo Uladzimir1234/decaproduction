@@ -57,13 +57,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Prevent admin from modifying their own account via this function
-    if (userId === callerUser.id) {
-      return new Response(
-        JSON.stringify({ error: 'Cannot modify your own account' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Admins can now modify their own account (for password/email changes)
 
     if (action === 'update_email') {
       if (!email) {
