@@ -294,17 +294,59 @@ export default function OrderCreate() {
         fulfillment_percentage: 0
       }).select().single();
       if (error) throw error;
+
+      // Save constructions if file was uploaded
+      if (parsedOrderData && parsedOrderData.constructions.length > 0) {
+        const constructionsToInsert = parsedOrderData.constructions.map((c, index) => ({
+          order_id: data.id,
+          construction_number: c.construction_number,
+          construction_type: c.construction_type,
+          width_inches: c.width_inches,
+          height_inches: c.height_inches,
+          width_mm: c.width_mm,
+          height_mm: c.height_mm,
+          rough_opening: c.rough_opening,
+          location: c.location,
+          model: c.model,
+          opening_type: c.opening_type,
+          color_exterior: c.color_exterior,
+          color_interior: c.color_interior,
+          glass_type: c.glass_type,
+          screen_type: c.screen_type,
+          handle_type: c.handle_type,
+          has_blinds: c.has_blinds,
+          blinds_color: c.blinds_color,
+          center_seal: c.center_seal,
+          comments: c.comments,
+          quantity: c.quantity,
+          position_index: index,
+        }));
+
+        const { error: constructionsError } = await supabase
+          .from('order_constructions')
+          .insert(constructionsToInsert);
+
+        if (constructionsError) {
+          console.error('Error saving constructions:', constructionsError);
+          // Don't fail the order creation, just warn
+          toast({
+            title: "Warning",
+            description: "Order created but some constructions failed to save",
+            variant: "destructive"
+          });
+        }
+      }
       
       await createAuditLog({
         action: 'order_created',
-        description: `Created order #${orderNumber} for ${finalCustomerName}`,
+        description: `Created order #${orderNumber} for ${finalCustomerName}${parsedOrderData ? ` with ${parsedOrderData.constructions.length} constructions` : ''}`,
         entityType: 'order',
         entityId: data.id,
       });
       
       toast({
         title: "Order created",
-        description: `Order #${orderNumber} has been created successfully.`
+        description: `Order #${orderNumber} has been created successfully.${parsedOrderData ? ` (${parsedOrderData.constructions.length} constructions)` : ''}`
       });
       navigate(`/orders/${data.id}`);
     } catch (error: any) {
@@ -338,6 +380,19 @@ export default function OrderCreate() {
             <CardDescription>Customer and order details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* File Upload Zone */}
+            <div className="space-y-2">
+              <Label>Upload Order File (Optional)</Label>
+              <FileUploadZone
+                onDataParsed={handleFileParsed}
+                onClear={handleClearFile}
+                parsedData={parsedOrderData}
+              />
+              {parsedOrderData && (
+                <ConstructionsPreview constructions={parsedOrderData.constructions} />
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label>Customer *</Label>
               <Select value={isNewCustomer ? "new" : customerId} onValueChange={handleCustomerChange}>
