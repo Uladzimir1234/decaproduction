@@ -9,7 +9,8 @@ import {
   Truck, 
   Package,
   TrendingUp,
-  LayoutGrid
+  LayoutGrid,
+  Pause
 } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { MetricsStrip } from "@/components/dashboard/MetricsStrip";
@@ -34,7 +35,9 @@ export default function Dashboard() {
   const criticalOrders = orders.filter(o => o.healthStatus === 'critical');
   const atRiskOrders = orders.filter(o => o.healthStatus === 'at-risk');
   const readyToShip = orders.filter(o => o.manufacturingProgress >= 90 && o.healthStatus !== 'critical');
-  const topPriorityOrders = orders.slice(0, 6);
+  const onHoldOrders = orders.filter(o => o.production_status === 'hold');
+  const productionReadyOrders = orders.filter(o => o.production_status === 'production_ready');
+  const topPriorityOrders = productionReadyOrders.slice(0, 6); // Only show production-ready in priority queue
   
   // Pending deliveries - orders with 90%+ manufacturing but items still to deliver
   const pendingDeliveryOrders: PendingDeliveryOrder[] = orders
@@ -104,38 +107,73 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* Orders On Hold Section */}
+      {onHoldOrders.length > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Pause className="h-5 w-5 text-amber-500" />
+                <CardTitle className="text-lg">Orders On Hold</CardTitle>
+              </div>
+              <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                {onHoldOrders.length}
+              </Badge>
+            </div>
+            <CardDescription>
+              Waiting for component preparation before production
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {onHoldOrders.slice(0, 6).map((order) => (
+                <PriorityOrderCard key={order.id} order={order} showDetails={false} />
+              ))}
+            </div>
+            {onHoldOrders.length > 6 && (
+              <Link to="/orders?status=on_hold" className="block text-center py-2 text-sm text-primary hover:underline mt-3">
+                View all {onHoldOrders.length} on hold orders
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Dashboard Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Column */}
         <div className="space-y-6">
-          {/* Top Priority Orders */}
+          {/* Top Priority Orders (Production Ready Only) */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Priority Queue</CardTitle>
+                  <CardTitle className="text-lg">Production Queue</CardTitle>
                 </div>
-                <Badge variant="outline">{orders.length} orders</Badge>
+                <Badge variant="outline">{productionReadyOrders.length} ready</Badge>
               </div>
               <CardDescription>
-                Orders ranked by priority score (time, progress, complexity)
+                Production-ready orders ranked by priority
               </CardDescription>
             </CardHeader>
             <CardContent>
               {topPriorityOrders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active orders</p>
+                  <p className="text-sm">No production-ready orders</p>
+                  {onHoldOrders.length > 0 && (
+                    <p className="text-xs mt-1">{onHoldOrders.length} order(s) on hold</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                   {topPriorityOrders.map((order) => (
                     <PriorityOrderCard key={order.id} order={order} />
                   ))}
-                  {orders.length > 6 && (
-                    <Link to="/orders" className="block text-center py-2 text-sm text-primary hover:underline">
-                      View all {orders.length} orders
+                  {productionReadyOrders.length > 6 && (
+                    <Link to="/orders?status=production_ready" className="block text-center py-2 text-sm text-primary hover:underline">
+                      View all {productionReadyOrders.length} production-ready orders
                     </Link>
                   )}
                 </div>

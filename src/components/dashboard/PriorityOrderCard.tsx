@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { ProgressCircle } from '@/components/ui/progress-circle';
-import { AlertTriangle, Clock, CheckCircle2, Ban, ArrowRight, Calendar } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle2, Ban, ArrowRight, Calendar, Pause, PlayCircle } from 'lucide-react';
 import type { PriorityOrder } from '@/hooks/useDashboardData';
 
 interface PriorityOrderCardProps {
@@ -67,12 +67,20 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-sm font-semibold">#{order.order_number}</span>
+              {order.production_status === 'hold' ? (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                  <Pause className="h-2.5 w-2.5" />
+                  Hold
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 border-success/50 text-success">
+                  <PlayCircle className="h-2.5 w-2.5" />
+                  Ready
+                </Badge>
+              )}
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${health.color}`}>
                 <HealthIcon className="h-3 w-3 mr-1" />
                 {health.label}
-              </Badge>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                P{order.priorityScore}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground truncate mt-1">{order.customer_name}</p>

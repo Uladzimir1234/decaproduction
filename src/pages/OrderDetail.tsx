@@ -12,7 +12,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
-import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Wrench, Lock, CheckCircle2, Clock, AlertCircle, ShoppingCart, Plus, Trash2, Pause, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
@@ -111,6 +111,7 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
+  production_status: string;
 }
 
 // Static helper for calculating fulfillment percentage
@@ -522,7 +523,20 @@ export default function OrderDetail() {
             <ArrowLeft className="h-4 w-4" />
             Back to Orders
           </Button>
-          <h1 className="text-2xl font-bold">Order #{order.order_number}</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold">Order #{order.order_number}</h1>
+            {order.production_status === 'hold' ? (
+              <Badge variant="outline" className="gap-1 text-sm border-amber-500/50 text-amber-600 dark:text-amber-400">
+                <Pause className="h-3.5 w-3.5" />
+                On Hold
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1 text-sm border-success/50 text-success">
+                <PlayCircle className="h-3.5 w-3.5" />
+                Production Ready
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">{order.customer_name}</p>
         </div>
         {saving && <span className="text-sm text-muted-foreground">Saving...</span>}

@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Package, Truck, AlertCircle, Calendar } from 'lucide-react';
+import { AlertTriangle, Clock, Package, Truck, AlertCircle, Calendar, Pause, PlayCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { DashboardMetrics } from '@/hooks/useDashboardData';
 
@@ -14,6 +14,21 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: Package,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
+    },
+    {
+      label: 'On Hold',
+      value: metrics.onHoldCount,
+      icon: Pause,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+      highlight: metrics.onHoldCount > 0,
+    },
+    {
+      label: 'Production Ready',
+      value: metrics.productionReadyCount,
+      icon: PlayCircle,
+      color: 'text-success',
+      bgColor: 'bg-success/10',
     },
     {
       label: 'Critical',
@@ -32,21 +47,6 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       highlight: metrics.atRiskCount > 0,
     },
     {
-      label: 'Blocked',
-      value: metrics.blockedCount,
-      icon: Clock,
-      color: 'text-muted-foreground',
-      bgColor: 'bg-muted',
-      highlight: metrics.blockedCount > 0,
-    },
-    {
-      label: 'Pending Components',
-      value: metrics.pendingComponents,
-      icon: Package,
-      color: 'text-amber-500',
-      bgColor: 'bg-amber-500/10',
-    },
-    {
       label: 'Ready to Ship',
       value: metrics.readyToShip,
       icon: Truck,
@@ -54,7 +54,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       bgColor: 'bg-success/10',
     },
     {
-      label: 'Avg Days to Delivery',
+      label: 'Avg Days',
       value: metrics.avgDaysToDelivery,
       icon: Calendar,
       color: 'text-info',
