@@ -687,9 +687,9 @@ export default function Orders() {
                               className="shrink-0"
                             >
                               {order.production_status === 'hold' ? (
-                                <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer transition-colors">
+                              <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer transition-colors">
                                   <Pause className="h-3 w-3" />
-                                  On Hold {getDaysOnHold(order.hold_started_at) > 0 && `(${getDaysOnHold(order.hold_started_at)}d)`}
+                                  On Hold ({getDaysOnHold(order.hold_started_at)}d)
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success hover:bg-success/10 cursor-pointer transition-colors">
@@ -700,9 +700,9 @@ export default function Orders() {
                             </button>
                           ) : (
                             order.production_status === 'hold' ? (
-                              <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 shrink-0">
+                            <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 shrink-0">
                                 <Pause className="h-3 w-3" />
-                                On Hold {getDaysOnHold(order.hold_started_at) > 0 && `(${getDaysOnHold(order.hold_started_at)}d)`}
+                                On Hold ({getDaysOnHold(order.hold_started_at)}d)
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
