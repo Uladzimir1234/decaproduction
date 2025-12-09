@@ -5,8 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Use fastest model for all file processing
-const AI_MODEL = 'google/gemini-2.5-flash-lite';
+// Use the most accurate model for document extraction
+const AI_MODEL = 'google/gemini-2.5-pro';
 
 interface ConstructionComponent {
   component_type: string;
@@ -47,6 +47,18 @@ interface ParsedOrder {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
+  // NEW: Aggregated components for ordering
+  aggregated_components: {
+    component_type: string;
+    component_name: string;
+    total_quantity: number;
+  }[];
+  // NEW: Profile info
+  profile_info: {
+    model: string | null;
+    color_exterior: string | null;
+    color_interior: string | null;
+  } | null;
 }
 
 // Shared tool definition for extraction
@@ -54,46 +66,55 @@ const extractionTool = {
   type: 'function',
   function: {
     name: 'extract_order_data',
-    description: 'Extract structured order data',
+    description: 'Extract structured order data from window/door manufacturing documents',
     parameters: {
       type: 'object',
       properties: {
-        quote_number: { type: 'string', nullable: true },
-        customer_name: { type: 'string', nullable: true },
-        order_date: { type: 'string', nullable: true },
+        quote_number: { type: 'string', nullable: true, description: 'Quote or order number from the document' },
+        customer_name: { type: 'string', nullable: true, description: 'Customer or client name' },
+        order_date: { type: 'string', nullable: true, description: 'Order date in YYYY-MM-DD format' },
         constructions: {
           type: 'array',
           items: {
             type: 'object',
             properties: {
-              construction_number: { type: 'string' },
+              construction_number: { type: 'string', description: 'Unique ID like "1", "2", "W-01"' },
               construction_type: { type: 'string', enum: ['window', 'door', 'sliding_door'] },
               width_inches: { type: 'number', nullable: true },
               height_inches: { type: 'number', nullable: true },
               width_mm: { type: 'number', nullable: true },
               height_mm: { type: 'number', nullable: true },
-              rough_opening: { type: 'string', nullable: true },
-              location: { type: 'string', nullable: true },
-              model: { type: 'string', nullable: true },
-              opening_type: { type: 'string', nullable: true },
-              color_exterior: { type: 'string', nullable: true },
-              color_interior: { type: 'string', nullable: true },
-              glass_type: { type: 'string', nullable: true },
-              screen_type: { type: 'string', nullable: true },
-              handle_type: { type: 'string', nullable: true },
-              has_blinds: { type: 'boolean' },
-              blinds_color: { type: 'string', nullable: true },
-              center_seal: { type: 'boolean' },
-              comments: { type: 'string', nullable: true },
-              quantity: { type: 'number' },
+              rough_opening: { type: 'string', nullable: true, description: 'Rough opening dimensions if specified' },
+              location: { type: 'string', nullable: true, description: 'Installation location/room' },
+              model: { type: 'string', nullable: true, description: 'Profile model/system name (e.g., DECA GEALAN LINEAR, S8000)' },
+              opening_type: { type: 'string', nullable: true, description: 'How it opens (tilt-turn, casement, fixed, etc.)' },
+              color_exterior: { type: 'string', nullable: true, description: 'Exact exterior color as shown' },
+              color_interior: { type: 'string', nullable: true, description: 'Exact interior color as shown' },
+              glass_type: { type: 'string', nullable: true, description: 'EXACT glass specification as shown (e.g., "3M Triple Pane Low-E Argon 366/180")' },
+              screen_type: { type: 'string', nullable: true, description: 'Screen type - use EXACT value: "Flex screen FlexView" OR "DECA aluminum screen"' },
+              handle_type: { type: 'string', nullable: true, description: 'Handle specification with color (e.g., "Std. handle black", "Premium handle white")' },
+              has_blinds: { type: 'boolean', description: 'Whether blinds are included' },
+              blinds_color: { type: 'string', nullable: true, description: 'EXACT blinds color (e.g., "Cream", "White", "Gray") - REQUIRED if has_blinds=true' },
+              center_seal: { type: 'boolean', description: 'Whether center seal is present' },
+              comments: { type: 'string', nullable: true, description: 'Any additional notes or comments' },
+              quantity: { type: 'number', description: 'Number of this exact construction' },
               components: {
                 type: 'array',
+                description: 'Components that need ordering for this construction',
                 items: {
                   type: 'object',
                   properties: {
-                    component_type: { type: 'string' },
-                    component_name: { type: 'string', nullable: true },
-                    quantity: { type: 'number' }
+                    component_type: { 
+                      type: 'string', 
+                      enum: ['glass', 'blinds', 'screens', 'hardware', 'nailing_fins', 'coupling_profile', 'profile'],
+                      description: 'Type of component'
+                    },
+                    component_name: { 
+                      type: 'string', 
+                      nullable: true, 
+                      description: 'EXACT name/specification of component. For screens use "Flex screen FlexView" or "DECA aluminum screen". For blinds include color.' 
+                    },
+                    quantity: { type: 'number', description: 'Quantity matching construction quantity' }
                   },
                   required: ['component_type', 'quantity']
                 }
@@ -108,27 +129,76 @@ const extractionTool = {
   }
 };
 
-// Enhanced system prompt for complete component extraction
-const SYSTEM_PROMPT = `You are extracting window/door order data from IT Okna software exports.
+// Enhanced system prompt for accurate and consistent extraction
+const SYSTEM_PROMPT = `You are a specialized AI for extracting window and door order data from IT Okna software exports and manufacturing documents.
 
-CRITICAL INSTRUCTIONS:
-1. Each "Construction" = one window or door with specs (dimensions, colors, glass, hardware)
-2. Types mapping: "Window" = window, "Entrance/Door" = door, "Sliding/PSK/Lift" = sliding_door
-3. Extract glass_type exactly as shown in file (e.g. "3M Triple Pane Low-E Argon")
-4. Extract blinds_color if blinds are mentioned (e.g. "Cream", "White", "Gray")
-5. Extract screen_type: look for "flex screen" or "DECA aluminum" or "deca screen"
-6. Extract handle_type with color (e.g. "Std. black", "Premium white")
-7. Extract color_exterior and color_interior exactly as shown
+## CRITICAL ACCURACY REQUIREMENTS
 
-FOR EACH CONSTRUCTION, you MUST populate the "components" array with items that need ordering:
-- If glass_type is set: add component {component_type: "glass", component_name: "<glass_type value>", quantity: 1}
-- If has_blinds is true: add component {component_type: "blinds", component_name: "<blinds_color value>", quantity: 1}
-- If screen_type is set: add component {component_type: "screens", component_name: "<exact screen type>", quantity: 1}
-- If handle_type is set: add component {component_type: "hardware", component_name: "<handle_type value>", quantity: 1}
-- If nailing fins/flanges mentioned: add component {component_type: "nailing_fins", component_name: null, quantity: 1}
-- If coupling profile mentioned: add component {component_type: "coupling_profile", component_name: null, quantity: 1}
+### 1. CONSTRUCTION TYPES
+- "Window" / "Fenster" = window
+- "Entrance" / "Door" / "Tür" = door  
+- "Sliding" / "PSK" / "Lift" / "Multi-slide" / "Smart-slide" = sliding_door
 
-This components array is CRITICAL for tracking what materials need to be ordered for manufacturing.`;
+### 2. EXACT VALUE EXTRACTION (DO NOT PARAPHRASE)
+Extract these fields EXACTLY as they appear in the document:
+- **glass_type**: Copy the COMPLETE glass specification (e.g., "3M Triple Pane Low-E Argon 366/180", "T3 Triple Tempered Low-E")
+- **handle_type**: Include type AND color (e.g., "Std. handle black", "Premium handle white", "Hoppe Atlanta black")
+- **blinds_color**: Extract EXACT color name (e.g., "Cream", "White", "Gray", "Anthracite") - NEVER leave null if has_blinds=true
+- **model**: Full profile system name (e.g., "DECA GEALAN LINEAR", "GEALAN S8000", "DECA 70")
+- **color_exterior**: Exact color (e.g., "Black", "Anthracite Gray 7016", "White")
+- **color_interior**: Exact color (e.g., "Black", "White", "Natural wood")
+
+### 3. SCREEN TYPE STANDARDIZATION
+Use ONLY these exact values for screen_type:
+- "Flex screen FlexView" - for any flex/flexview screen
+- "DECA aluminum screen" - for any deca/aluminum screen
+- null - if no screen
+
+### 4. COMPONENTS ARRAY (CRITICAL FOR ORDERING)
+For EACH construction, populate the components array:
+
+| If this field has value | Add component_type | component_name should be |
+|------------------------|-------------------|--------------------------|
+| glass_type | "glass" | EXACT glass_type value |
+| has_blinds = true | "blinds" | EXACT blinds_color (e.g., "Cream") |
+| screen_type | "screens" | EXACT screen_type value |
+| handle_type | "hardware" | EXACT handle_type value |
+| nailing fins mentioned | "nailing_fins" | null |
+| model (profile system) | "profile" | Format: "MODEL - exterior/interior" |
+
+### 5. PROFILE COMPONENT (NEW - IMPORTANT)
+Always add a "profile" component with:
+- component_type: "profile"
+- component_name: Format as "MODEL (exterior_color / interior_color)"
+- Example: "DECA GEALAN LINEAR (Black / Black)"
+- Example: "GEALAN S8000 (Anthracite Gray / White)"
+
+### 6. QUANTITY MATCHING
+- Each component's quantity MUST match its construction's quantity
+- If construction.quantity = 2, then each component in that construction has quantity = 2
+
+## EXAMPLE OUTPUT
+For a construction with:
+- glass: "3M Triple Pane Low-E Argon"
+- blinds: Cream color
+- screen: flex type
+- handle: standard black
+- profile: DECA LINEAR, black/black
+
+Components array should be:
+[
+  {"component_type": "glass", "component_name": "3M Triple Pane Low-E Argon", "quantity": 1},
+  {"component_type": "blinds", "component_name": "Cream", "quantity": 1},
+  {"component_type": "screens", "component_name": "Flex screen FlexView", "quantity": 1},
+  {"component_type": "hardware", "component_name": "Std. handle black", "quantity": 1},
+  {"component_type": "profile", "component_name": "DECA GEALAN LINEAR (Black / Black)", "quantity": 1}
+]
+
+## CONSISTENCY RULES
+1. Same component type + same specification = IDENTICAL component_name across ALL constructions
+2. Never abbreviate or modify specifications
+3. Never leave blinds_color null when has_blinds = true
+4. Always include profile component for every construction`;
 
 function processExtractedData(extracted: any): ParsedOrder {
   const constructions = (extracted.constructions || []).map((c: any, index: number) => ({
@@ -150,6 +220,107 @@ function processExtractedData(extracted: any): ParsedOrder {
     .filter((c: Construction) => c.construction_type === 'sliding_door')
     .reduce((sum: number, c: Construction) => sum + c.quantity, 0);
 
+  // NEW: Aggregate components across all constructions
+  const componentMap = new Map<string, { type: string; name: string; qty: number }>();
+  
+  for (const construction of constructions) {
+    for (const component of construction.components) {
+      const key = `${component.component_type}::${component.component_name || 'unnamed'}`;
+      const existing = componentMap.get(key);
+      if (existing) {
+        existing.qty += (component.quantity || construction.quantity);
+      } else {
+        componentMap.set(key, {
+          type: component.component_type,
+          name: component.component_name || 'unnamed',
+          qty: component.quantity || construction.quantity,
+        });
+      }
+    }
+    
+    // Fallback: if no components but has data, create them
+    if (construction.components.length === 0) {
+      if (construction.glass_type) {
+        const key = `glass::${construction.glass_type}`;
+        const existing = componentMap.get(key);
+        if (existing) {
+          existing.qty += construction.quantity;
+        } else {
+          componentMap.set(key, { type: 'glass', name: construction.glass_type, qty: construction.quantity });
+        }
+      }
+      
+      if (construction.has_blinds && construction.blinds_color) {
+        const key = `blinds::${construction.blinds_color}`;
+        const existing = componentMap.get(key);
+        if (existing) {
+          existing.qty += construction.quantity;
+        } else {
+          componentMap.set(key, { type: 'blinds', name: construction.blinds_color, qty: construction.quantity });
+        }
+      }
+      
+      if (construction.screen_type) {
+        const screenName = construction.screen_type.toLowerCase().includes('flex') 
+          ? 'Flex screen FlexView' 
+          : 'DECA aluminum screen';
+        const key = `screens::${screenName}`;
+        const existing = componentMap.get(key);
+        if (existing) {
+          existing.qty += construction.quantity;
+        } else {
+          componentMap.set(key, { type: 'screens', name: screenName, qty: construction.quantity });
+        }
+      }
+      
+      if (construction.handle_type) {
+        const key = `hardware::${construction.handle_type}`;
+        const existing = componentMap.get(key);
+        if (existing) {
+          existing.qty += construction.quantity;
+        } else {
+          componentMap.set(key, { type: 'hardware', name: construction.handle_type, qty: construction.quantity });
+        }
+      }
+      
+      // Add profile from model + colors
+      if (construction.model) {
+        const profileName = `${construction.model} (${construction.color_exterior || 'N/A'} / ${construction.color_interior || 'N/A'})`;
+        const key = `profile::${profileName}`;
+        const existing = componentMap.get(key);
+        if (existing) {
+          existing.qty += construction.quantity;
+        } else {
+          componentMap.set(key, { type: 'profile', name: profileName, qty: construction.quantity });
+        }
+      }
+    }
+  }
+
+  const aggregated_components = Array.from(componentMap.values()).map(c => ({
+    component_type: c.type,
+    component_name: c.name,
+    total_quantity: c.qty,
+  }));
+
+  // NEW: Extract profile info from first construction with data
+  let profile_info = null;
+  for (const c of constructions) {
+    if (c.model || c.color_exterior || c.color_interior) {
+      profile_info = {
+        model: c.model,
+        color_exterior: c.color_exterior,
+        color_interior: c.color_interior,
+      };
+      break;
+    }
+  }
+
+  console.log(`Aggregated ${aggregated_components.length} unique component types from ${constructions.length} constructions`);
+  for (const comp of aggregated_components) {
+    console.log(`  - ${comp.component_type}: ${comp.component_name} x${comp.total_quantity}`);
+  }
+
   return {
     quote_number: extracted.quote_number || null,
     customer_name: extracted.customer_name || null,
@@ -158,6 +329,8 @@ function processExtractedData(extracted: any): ParsedOrder {
     windows_count,
     doors_count,
     sliding_doors_count,
+    aggregated_components,
+    profile_info,
   };
 }
 
@@ -167,7 +340,7 @@ async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  console.log('Parsing CSV with AI...');
+  console.log('Parsing CSV with AI (gemini-2.5-pro)...');
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -179,7 +352,7 @@ async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
       model: AI_MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Extract constructions from this order:\n\n${csvContent}` }
+        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${csvContent}` }
       ],
       tools: [extractionTool],
       tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
@@ -201,7 +374,10 @@ async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
     throw new Error('Failed to extract data from CSV');
   }
 
-  return processExtractedData(JSON.parse(toolCall.function.arguments));
+  const extracted = JSON.parse(toolCall.function.arguments);
+  console.log('Raw extraction result:', JSON.stringify(extracted, null, 2).substring(0, 2000));
+  
+  return processExtractedData(extracted);
 }
 
 async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
@@ -210,7 +386,7 @@ async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  console.log('Processing PDF with AI...');
+  console.log('Processing PDF with AI (gemini-2.5-pro)...');
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -225,7 +401,7 @@ async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
         {
           role: 'user',
           content: [
-            { type: 'text', text: 'Extract all constructions from this order document.' },
+            { type: 'text', text: 'Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.' },
             { type: 'image_url', image_url: { url: `data:application/pdf;base64,${base64Content}` } }
           ]
         }
@@ -301,7 +477,7 @@ async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
       model: AI_MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Extract constructions from this order:\n\n${textContent}` }
+        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}` }
       ],
       tools: [extractionTool],
       tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
@@ -346,7 +522,7 @@ serve(async (req) => {
       throw new Error(`Unsupported file type: ${file_type}`);
     }
 
-    console.log(`Extracted ${result.constructions.length} constructions`);
+    console.log(`Extracted ${result.constructions.length} constructions, ${result.aggregated_components.length} unique components`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

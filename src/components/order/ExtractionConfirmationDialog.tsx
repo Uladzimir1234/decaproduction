@@ -373,89 +373,117 @@ export function ExtractionConfirmationDialog({
       if (constructionsError) throw constructionsError;
       
       if (insertedConstructions) {
-        const componentsToInsert: {
-          construction_id: string;
-          component_type: string;
-          component_name: string | null;
-          quantity: number;
-          status: string;
-        }[] = [];
-        
-        const deliveryEntriesToInsert: {
-          construction_id: string;
-          is_prepared: boolean;
-          is_delivered: boolean;
-        }[] = [];
-        
-        for (const construction of parsedData.constructions) {
-          const insertedConstruction = insertedConstructions.find(
-            ic => ic.construction_number === construction.construction_number
-          );
-          
-          if (!insertedConstruction) continue;
-          
-          deliveryEntriesToInsert.push({
-            construction_id: insertedConstruction.id,
-            is_prepared: false,
-            is_delivered: false,
-          });
-          
-          if (construction.components && construction.components.length > 0) {
-            for (const component of construction.components) {
-              componentsToInsert.push({
-                construction_id: insertedConstruction.id,
-                component_type: component.component_type,
-                component_name: component.component_name,
-                quantity: component.quantity || construction.quantity,
-                status: 'not_ordered',
-              });
-            }
-          } else {
-            if (construction.glass_type) {
-              componentsToInsert.push({
-                construction_id: insertedConstruction.id,
-                component_type: 'glass',
-                component_name: construction.glass_type,
-                quantity: construction.quantity,
-                status: 'not_ordered',
-              });
-            }
-            if (construction.has_blinds || hasBlinds) {
-              componentsToInsert.push({
-                construction_id: insertedConstruction.id,
-                component_type: 'blinds',
-                component_name: blindsColor || construction.blinds_color || null,
-                quantity: construction.quantity,
-                status: 'not_ordered',
-              });
-            }
-            if (construction.screen_type || screenType) {
-              componentsToInsert.push({
-                construction_id: insertedConstruction.id,
-                component_type: 'screens',
-                component_name: construction.screen_type || screenType,
-                quantity: construction.quantity,
-                status: 'not_ordered',
-              });
-            }
-            if (construction.handle_type) {
-              componentsToInsert.push({
-                construction_id: insertedConstruction.id,
-                component_type: 'hardware',
-                component_name: construction.handle_type,
-                quantity: construction.quantity,
-                status: 'not_ordered',
-              });
-            }
-          }
-        }
-        
-        if (componentsToInsert.length > 0) {
-          await supabase.from('construction_components').insert(componentsToInsert);
-        }
+        // Create delivery entries for each construction
+        const deliveryEntriesToInsert = insertedConstructions.map(ic => ({
+          construction_id: ic.id,
+          is_prepared: false,
+          is_delivered: false,
+        }));
         
         if (deliveryEntriesToInsert.length > 0) {
           await supabase.from('construction_delivery').insert(deliveryEntriesToInsert);
+        }
+        
+        // Use the first construction for order-level aggregated components
+        const firstConstructionId = insertedConstructions[0]?.id;
+        
+        if (firstConstructionId) {
+          // Use pre-aggregated components from backend if available
+          if (parsedData.aggregated_components && parsedData.aggregated_components.length > 0) {
+            const aggregatedComponentsToInsert = parsedData.aggregated_components.map(comp => ({
+              construction_id: firstConstructionId,
+              component_type: comp.component_type,
+              component_name: comp.component_name || null,
+              quantity: comp.total_quantity,
+              status: 'not_ordered',
+            }));
+            
+            await supabase.from('construction_components').insert(aggregatedComponentsToInsert);
+          } else {
+            // Fallback: Aggregate components manually from constructions
+            const componentMap = new Map<string, { type: string; name: string | null; qty: number }>();
+            
+            for (const construction of parsedData.constructions) {
+              if (construction.components && construction.components.length > 0) {
+                for (const comp of construction.components) {
+                  const key = `${comp.component_type}::${comp.component_name || ''}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += comp.quantity || construction.quantity;
+                  } else {
+                    componentMap.set(key, {
+                      type: comp.component_type,
+                      name: comp.component_name,
+                      qty: comp.quantity || construction.quantity,
+                    });
+                  }
+                }
+              } else {
+                // Auto-detect from construction fields
+                if (construction.glass_type) {
+                  const key = `glass::${construction.glass_type}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += construction.quantity;
+                  } else {
+                    componentMap.set(key, { type: 'glass', name: construction.glass_type, qty: construction.quantity });
+                  }
+                }
+                if (construction.has_blinds || hasBlinds) {
+                  const blindsName = blindsColor || construction.blinds_color || null;
+                  const key = `blinds::${blindsName || ''}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += construction.quantity;
+                  } else {
+                    componentMap.set(key, { type: 'blinds', name: blindsName, qty: construction.quantity });
+                  }
+                }
+                if (construction.screen_type || screenType) {
+                  const screenName = construction.screen_type || screenType;
+                  const key = `screens::${screenName}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += construction.quantity;
+                  } else {
+                    componentMap.set(key, { type: 'screens', name: screenName, qty: construction.quantity });
+                  }
+                }
+                if (construction.handle_type) {
+                  const key = `hardware::${construction.handle_type}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += construction.quantity;
+                  } else {
+                    componentMap.set(key, { type: 'hardware', name: construction.handle_type, qty: construction.quantity });
+                  }
+                }
+                // Add profile if available
+                if (construction.model) {
+                  const profileName = `${construction.model} (${colorExterior || construction.color_exterior || 'N/A'} / ${colorInterior || construction.color_interior || 'N/A'})`;
+                  const key = `profile::${profileName}`;
+                  const existing = componentMap.get(key);
+                  if (existing) {
+                    existing.qty += construction.quantity;
+                  } else {
+                    componentMap.set(key, { type: 'profile', name: profileName, qty: construction.quantity });
+                  }
+                }
+              }
+            }
+            
+            const aggregatedComponents = Array.from(componentMap.values()).map(c => ({
+              construction_id: firstConstructionId,
+              component_type: c.type,
+              component_name: c.name,
+              quantity: c.qty,
+              status: 'not_ordered',
+            }));
+            
+            if (aggregatedComponents.length > 0) {
+              await supabase.from('construction_components').insert(aggregatedComponents);
+            }
+          }
         }
       }
       
@@ -821,90 +849,39 @@ export function ExtractionConfirmationDialog({
               </div>
             </div>
 
-            {/* Detected Components Summary */}
-            {parsedData && parsedData.constructions.length > 0 && (() => {
-              // Aggregate components that will be created for ordering stages
-              const componentSummary: Record<string, { name: string | null; count: number }> = {};
-              
-              for (const construction of parsedData.constructions) {
-                // Check AI-provided components
-                if (construction.components && construction.components.length > 0) {
-                  for (const comp of construction.components) {
-                    const key = `${comp.component_type}::${comp.component_name || ''}`;
-                    if (!componentSummary[key]) {
-                      componentSummary[key] = { name: comp.component_name, count: 0 };
-                    }
-                    componentSummary[key].count += comp.quantity || construction.quantity;
-                  }
-                } else {
-                  // Auto-detect from construction fields
-                  if (construction.glass_type) {
-                    const key = `glass::${construction.glass_type}`;
-                    if (!componentSummary[key]) {
-                      componentSummary[key] = { name: construction.glass_type, count: 0 };
-                    }
-                    componentSummary[key].count += construction.quantity;
-                  }
-                  if (construction.has_blinds) {
-                    const key = `blinds::${construction.blinds_color || ''}`;
-                    if (!componentSummary[key]) {
-                      componentSummary[key] = { name: construction.blinds_color, count: 0 };
-                    }
-                    componentSummary[key].count += construction.quantity;
-                  }
-                  if (construction.screen_type) {
-                    const key = `screens::${construction.screen_type}`;
-                    if (!componentSummary[key]) {
-                      componentSummary[key] = { name: construction.screen_type, count: 0 };
-                    }
-                    componentSummary[key].count += construction.quantity;
-                  }
-                  if (construction.handle_type) {
-                    const key = `hardware::${construction.handle_type}`;
-                    if (!componentSummary[key]) {
-                      componentSummary[key] = { name: construction.handle_type, count: 0 };
-                    }
-                    componentSummary[key].count += construction.quantity;
-                  }
-                }
-              }
-
-              const entries = Object.entries(componentSummary);
-              if (entries.length === 0) return null;
-
-              return (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-sm border-b pb-2 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Ordering Components (Auto-Detected)
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    These components will be created for tracking in Ordering Stages:
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {entries.map(([key, { name, count }]) => {
-                      const [type] = key.split('::');
-                      const typeLabel = type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
-                      return (
-                        <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
-                          <Badge variant="outline" className="text-xs">
-                            x{count}
-                          </Badge>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{typeLabel}</span>
-                            {name && (
-                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                {name}
-                              </span>
-                            )}
-                          </div>
+            {/* Detected Components Summary - Use aggregated_components from backend */}
+            {parsedData && (parsedData.aggregated_components?.length || 0) > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm border-b pb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Ordering Components (Aggregated from File)
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  These {parsedData.aggregated_components!.length} unique component types will be created for tracking:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {parsedData.aggregated_components!.map((comp, index) => {
+                    const typeLabel = comp.component_type.charAt(0).toUpperCase() + 
+                      comp.component_type.slice(1).replace('_', ' ');
+                    return (
+                      <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          x{comp.total_quantity}
+                        </Badge>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-medium">{typeLabel}</span>
+                          {comp.component_name && (
+                            <span className="text-xs text-muted-foreground truncate" title={comp.component_name}>
+                              {comp.component_name}
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })()}
+              </div>
+            )}
           </div>
         </ScrollArea>
 

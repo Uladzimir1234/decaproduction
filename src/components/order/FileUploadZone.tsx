@@ -35,6 +35,20 @@ export interface ParsedConstruction {
   components?: ParsedComponent[];
 }
 
+// NEW: Aggregated component for order-level tracking
+export interface AggregatedComponent {
+  component_type: string;
+  component_name: string;
+  total_quantity: number;
+}
+
+// NEW: Profile info extracted from file
+export interface ProfileInfo {
+  model: string | null;
+  color_exterior: string | null;
+  color_interior: string | null;
+}
+
 export interface ParsedOrderData {
   quote_number: string | null;
   customer_name: string | null;
@@ -43,6 +57,10 @@ export interface ParsedOrderData {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
+  // NEW: Pre-aggregated components from backend
+  aggregated_components?: AggregatedComponent[];
+  // NEW: Profile info
+  profile_info?: ProfileInfo | null;
 }
 
 interface FileUploadZoneProps {
@@ -114,9 +132,10 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
       onDataParsed(data);
       
+      const componentCount = data.aggregated_components?.length || 0;
       toast({
         title: "File processed",
-        description: `Extracted ${data.constructions?.length || 0} constructions`,
+        description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
       });
     } catch (error: any) {
       console.error('Error processing file:', error);
@@ -164,6 +183,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   }, [onClear]);
 
   if (parsedData) {
+    const componentCount = parsedData.aggregated_components?.length || 0;
     return (
       <div className="border border-primary/30 bg-primary/5 rounded-lg p-4">
         <div className="flex items-center justify-between">
@@ -176,6 +196,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
                 {parsedData.windows_count} windows • 
                 {parsedData.doors_count} doors • 
                 {parsedData.sliding_doors_count} sliding doors
+                {componentCount > 0 && ` • ${componentCount} component types`}
               </p>
             </div>
           </div>
@@ -211,14 +232,14 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <p className="text-sm font-medium">Processing {fileName}...</p>
-            <p className="text-xs text-muted-foreground">This may take a moment</p>
+            <p className="text-xs text-muted-foreground">Using AI for accurate extraction...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
             <Upload className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm font-medium">Upload Order File</p>
             <p className="text-xs text-muted-foreground">
-              PDF <span className="text-primary">(fastest)</span>, CSV, or Excel
+              PDF, CSV, or Excel
             </p>
           </div>
         )}
