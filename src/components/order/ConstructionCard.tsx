@@ -131,29 +131,42 @@ export function ConstructionCard({ construction, onClick, isSelected, orderFulfi
           <button
             onClick={onClick}
             className={`
-              relative w-3.5 h-3.5 rounded-sm flex items-center justify-center
-              text-[7px] font-black cursor-pointer drop-shadow-sm
-              transition-all hover:scale-125 hover:shadow-md
-              ${statusColor.bg} ${statusColor.text}
-              ${isSelected ? 'ring-1 ring-offset-1 ring-primary scale-125' : ''}
-              ${construction.is_delivered ? 'opacity-50' : ''}
+              relative flex flex-col items-center gap-0.5 cursor-pointer
+              transition-all hover:scale-110
+              ${isSelected ? 'scale-110' : ''}
             `}
           >
-            {construction.construction_number}
+            {/* Badge square */}
+            <div
+              className={`
+                relative w-7 h-7 rounded-sm flex items-center justify-center
+                text-[10px] font-black drop-shadow-sm
+                ${statusColor.bg} ${statusColor.text}
+                ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
+                ${construction.is_delivered ? 'opacity-50' : ''}
+              `}
+            >
+              {construction.construction_number}
+              
+              {/* Issue indicator */}
+              {hasOpenIssues && (
+                <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2 w-2 flex items-center justify-center">
+                  <AlertTriangle className="h-1.5 w-1.5 text-white" />
+                </div>
+              )}
+              
+              {/* Quantity indicator */}
+              {construction.quantity > 1 && (
+                <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-2.5 w-2.5 flex items-center justify-center text-[6px] font-black border">
+                  {construction.quantity}
+                </div>
+              )}
+            </div>
             
-            {/* Issue indicator */}
-            {hasOpenIssues && (
-              <div className="absolute -top-0.5 -right-0.5 bg-amber-500 rounded-full h-1.5 w-1.5 flex items-center justify-center">
-                <AlertTriangle className="h-1 w-1 text-white" />
-              </div>
-            )}
-            
-            {/* Quantity indicator */}
-            {construction.quantity > 1 && (
-              <div className="absolute -bottom-0.5 -right-0.5 bg-background text-foreground rounded-full h-2 w-2 flex items-center justify-center text-[5px] font-black border">
-                {construction.quantity}
-              </div>
-            )}
+            {/* Type letter below */}
+            <span className="text-[8px] font-medium text-muted-foreground">
+              {typePrefix}
+            </span>
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
