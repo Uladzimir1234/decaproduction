@@ -577,6 +577,91 @@ export function ExtractionConfirmationDialog({
                 <DetectedBadge field="nailingFlanges" />
               </div>
             </div>
+
+            {/* Detected Components Summary */}
+            {parsedData && parsedData.constructions.length > 0 && (() => {
+              // Aggregate components that will be created for ordering stages
+              const componentSummary: Record<string, { name: string | null; count: number }> = {};
+              
+              for (const construction of parsedData.constructions) {
+                // Check AI-provided components
+                if (construction.components && construction.components.length > 0) {
+                  for (const comp of construction.components) {
+                    const key = `${comp.component_type}::${comp.component_name || ''}`;
+                    if (!componentSummary[key]) {
+                      componentSummary[key] = { name: comp.component_name, count: 0 };
+                    }
+                    componentSummary[key].count += comp.quantity || construction.quantity;
+                  }
+                } else {
+                  // Auto-detect from construction fields
+                  if (construction.glass_type) {
+                    const key = `glass::${construction.glass_type}`;
+                    if (!componentSummary[key]) {
+                      componentSummary[key] = { name: construction.glass_type, count: 0 };
+                    }
+                    componentSummary[key].count += construction.quantity;
+                  }
+                  if (construction.has_blinds) {
+                    const key = `blinds::${construction.blinds_color || ''}`;
+                    if (!componentSummary[key]) {
+                      componentSummary[key] = { name: construction.blinds_color, count: 0 };
+                    }
+                    componentSummary[key].count += construction.quantity;
+                  }
+                  if (construction.screen_type) {
+                    const key = `screens::${construction.screen_type}`;
+                    if (!componentSummary[key]) {
+                      componentSummary[key] = { name: construction.screen_type, count: 0 };
+                    }
+                    componentSummary[key].count += construction.quantity;
+                  }
+                  if (construction.handle_type) {
+                    const key = `hardware::${construction.handle_type}`;
+                    if (!componentSummary[key]) {
+                      componentSummary[key] = { name: construction.handle_type, count: 0 };
+                    }
+                    componentSummary[key].count += construction.quantity;
+                  }
+                }
+              }
+
+              const entries = Object.entries(componentSummary);
+              if (entries.length === 0) return null;
+
+              return (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm border-b pb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Ordering Components (Auto-Detected)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    These components will be created for tracking in Ordering Stages:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {entries.map(([key, { name, count }]) => {
+                      const [type] = key.split('::');
+                      const typeLabel = type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
+                      return (
+                        <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
+                          <Badge variant="outline" className="text-xs">
+                            x{count}
+                          </Badge>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{typeLabel}</span>
+                            {name && (
+                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                {name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </ScrollArea>
 

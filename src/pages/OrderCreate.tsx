@@ -367,7 +367,7 @@ export default function OrderCreate() {
             variant: "destructive"
           });
         } else if (insertedConstructions) {
-          // Save construction components
+          // Auto-generate components from construction fields if AI didn't provide them
           const componentsToInsert: {
             construction_id: string;
             component_type: string;
@@ -376,23 +376,87 @@ export default function OrderCreate() {
             status: string;
           }[] = [];
 
+          // Also create construction_delivery entries for delivery tracking
+          const deliveryEntriesToInsert: {
+            construction_id: string;
+            is_prepared: boolean;
+            is_delivered: boolean;
+          }[] = [];
+
           for (const construction of parsedOrderData.constructions) {
             const insertedConstruction = insertedConstructions.find(
               ic => ic.construction_number === construction.construction_number
             );
-            if (insertedConstruction && construction.components && construction.components.length > 0) {
+            
+            if (!insertedConstruction) continue;
+
+            // Create delivery entry for this construction
+            deliveryEntriesToInsert.push({
+              construction_id: insertedConstruction.id,
+              is_prepared: false,
+              is_delivered: false,
+            });
+
+            // If AI provided components, use them
+            if (construction.components && construction.components.length > 0) {
               for (const component of construction.components) {
                 componentsToInsert.push({
                   construction_id: insertedConstruction.id,
                   component_type: component.component_type,
                   component_name: component.component_name,
-                  quantity: component.quantity,
+                  quantity: component.quantity || construction.quantity,
+                  status: 'not_ordered',
+                });
+              }
+            } else {
+              // Auto-generate components from construction fields
+              // Glass component
+              if (construction.glass_type) {
+                componentsToInsert.push({
+                  construction_id: insertedConstruction.id,
+                  component_type: 'glass',
+                  component_name: construction.glass_type,
+                  quantity: construction.quantity,
+                  status: 'not_ordered',
+                });
+              }
+
+              // Blinds component
+              if (construction.has_blinds) {
+                componentsToInsert.push({
+                  construction_id: insertedConstruction.id,
+                  component_type: 'blinds',
+                  component_name: construction.blinds_color || null,
+                  quantity: construction.quantity,
+                  status: 'not_ordered',
+                });
+              }
+
+              // Screens component
+              if (construction.screen_type) {
+                componentsToInsert.push({
+                  construction_id: insertedConstruction.id,
+                  component_type: 'screens',
+                  component_name: construction.screen_type,
+                  quantity: construction.quantity,
+                  status: 'not_ordered',
+                });
+              }
+
+              // Hardware component
+              if (construction.handle_type) {
+                componentsToInsert.push({
+                  construction_id: insertedConstruction.id,
+                  component_type: 'hardware',
+                  component_name: construction.handle_type,
+                  quantity: construction.quantity,
                   status: 'not_ordered',
                 });
               }
             }
           }
 
+          // Insert components
           if (componentsToInsert.length > 0) {
             const { error: componentsError } = await supabase
               .from('construction_components')
@@ -400,6 +464,21 @@ export default function OrderCreate() {
 
             if (componentsError) {
               console.error('Error saving construction components:', componentsError);
+            } else {
+              console.log(`Created ${componentsToInsert.length} construction components`);
+            }
+          }
+
+          // Insert delivery entries
+          if (deliveryEntriesToInsert.length > 0) {
+            const { error: deliveryError } = await supabase
+              .from('construction_delivery')
+              .insert(deliveryEntriesToInsert);
+
+            if (deliveryError) {
+              console.error('Error saving construction delivery:', deliveryError);
+            } else {
+              console.log(`Created ${deliveryEntriesToInsert.length} delivery entries`);
             }
           }
         }
