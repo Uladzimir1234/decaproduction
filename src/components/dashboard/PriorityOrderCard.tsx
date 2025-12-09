@@ -53,15 +53,15 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
 
   const daysOnHold = getDaysOnHold();
 
-  // Component status dots
+  // Component status dots - only show components that were actually sold
   const componentStatuses = [
-    order.reinforcement_status,
-    order.windows_profile_status,
-    order.glass_status,
-    order.screens_status,
-    order.plisse_screens_status,
-    order.nail_fins_status,
-    order.hardware_status,
+    { name: 'Reinforcement', status: order.reinforcement_status },
+    { name: 'Profile', status: order.windows_profile_status },
+    { name: 'Glass', status: order.glass_status },
+    ...(order.screen_type ? [{ name: 'Screens', status: order.screens_status }] : []),
+    ...(order.has_plisse_screens ? [{ name: 'Plisse', status: order.plisse_screens_status }] : []),
+    ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: order.nail_fins_status }] : []),
+    { name: 'Hardware', status: order.hardware_status },
   ];
 
   return (
@@ -108,15 +108,15 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
         {/* Component Status Dots */}
         <div className="flex items-center gap-1 mb-3">
           <span className="text-[10px] text-muted-foreground mr-1">Components:</span>
-          {componentStatuses.map((status, i) => (
+          {componentStatuses.map((component, i) => (
             <div
               key={i}
               className={`h-2 w-2 rounded-full ${
-                status === 'available' ? 'bg-success' :
-                status === 'ordered' ? 'bg-warning' :
+                component.status === 'available' ? 'bg-success' :
+                component.status === 'ordered' ? 'bg-warning' :
                 'bg-destructive'
               }`}
-              title={['Reinforcement', 'Profile', 'Glass', 'Screens', 'Plisse', 'Nail Fins', 'Hardware'][i]}
+              title={component.name}
             />
           ))}
           <span className="text-[10px] text-muted-foreground ml-1">
