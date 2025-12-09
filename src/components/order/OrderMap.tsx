@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { X, Grid3X3, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Grid3X3, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConstructionCard } from "./ConstructionCard";
 import { ConstructionDetailPanel } from "./ConstructionDetailPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,7 +53,6 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
   useEffect(() => {
     fetchConstructions();
     
-    // Subscribe to realtime updates
     const channel = supabase
       .channel(`order-constructions-${orderId}`)
       .on(
@@ -85,7 +84,6 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
   const fetchConstructions = async () => {
     setLoading(true);
     
-    // Fetch constructions
     const { data: constructionsData, error } = await supabase
       .from('order_constructions')
       .select('*')
@@ -106,25 +104,21 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
 
     const constructionIds = constructionsData.map(c => c.id);
 
-    // Fetch manufacturing stages
     const { data: mfgData } = await supabase
       .from('construction_manufacturing')
       .select('construction_id, stage, status')
       .in('construction_id', constructionIds);
 
-    // Fetch notes count
     const { data: notesData } = await supabase
       .from('construction_notes')
       .select('construction_id')
       .in('construction_id', constructionIds);
 
-    // Fetch delivery status
     const { data: deliveryData } = await supabase
       .from('construction_delivery')
       .select('construction_id, is_delivered')
       .in('construction_id', constructionIds);
 
-    // Combine data
     const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
       const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
       const notes_count = notesData?.filter(n => n.construction_id === c.id).length || 0;
@@ -153,74 +147,67 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
     .reduce((sum, c) => sum + c.quantity, 0);
 
   return (
-    <div className="fixed inset-0 bg-background/95 z-40 flex flex-col animate-in fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background">
-        <div className="flex items-center gap-3">
-          <Grid3X3 className="h-5 w-5" />
-          <div>
-            <h2 className="font-bold">Order #{orderNumber} - Order Map</h2>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{constructions.length} constructions</span>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0 gap-0">
+        <DialogHeader className="p-3 pb-2 border-b">
+          <div className="flex items-center gap-2">
+            <Grid3X3 className="h-4 w-4" />
+            <DialogTitle className="text-sm font-bold">
+              #{orderNumber} Order Map
+            </DialogTitle>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
+              <span>{constructions.length} items</span>
               <span>•</span>
-              <span>{windowsCount} windows</span>
+              <span>{windowsCount}W</span>
               <span>•</span>
-              <span>{doorsCount} doors</span>
+              <span>{doorsCount}D</span>
               {slidingDoorsCount > 0 && (
                 <>
                   <span>•</span>
-                  <span>{slidingDoorsCount} sliding doors</span>
+                  <span>{slidingDoorsCount}S</span>
                 </>
               )}
             </div>
           </div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
+        </DialogHeader>
 
-      {/* Content */}
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : constructions.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Grid3X3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium">No Constructions</h3>
-            <p className="text-sm text-muted-foreground">
-              Upload an order file to add constructions
-            </p>
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        </div>
-      ) : (
-        <ScrollArea className="flex-1">
-          <div className="p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {constructions.map(construction => (
-                <ConstructionCard
-                  key={construction.id}
-                  construction={construction}
-                  onClick={() => setSelectedConstruction(construction)}
-                  isSelected={selectedConstruction?.id === construction.id}
-                />
-              ))}
+        ) : constructions.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Grid3X3 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No constructions</p>
             </div>
           </div>
-        </ScrollArea>
-      )}
+        ) : (
+          <ScrollArea className="h-[calc(85vh-60px)]">
+            <div className="p-3">
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+                {constructions.map(construction => (
+                  <ConstructionCard
+                    key={construction.id}
+                    construction={construction}
+                    onClick={() => setSelectedConstruction(construction)}
+                    isSelected={selectedConstruction?.id === construction.id}
+                  />
+                ))}
+              </div>
+            </div>
+          </ScrollArea>
+        )}
 
-      {/* Detail Panel */}
-      {selectedConstruction && (
-        <ConstructionDetailPanel
-          construction={selectedConstruction}
-          onClose={() => setSelectedConstruction(null)}
-          orderId={orderId}
-          isProductionReady={isProductionReady}
-        />
-      )}
-    </div>
+        {selectedConstruction && (
+          <ConstructionDetailPanel
+            construction={selectedConstruction}
+            onClose={() => setSelectedConstruction(null)}
+            orderId={orderId}
+            isProductionReady={isProductionReady}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Square, DoorOpen, PanelLeftOpen, MessageSquare, Check } from "lucide-react";
+import { Square, DoorOpen, PanelLeftOpen, Check } from "lucide-react";
 
 interface ConstructionManufacturing {
   stage: string;
@@ -39,12 +38,6 @@ export function ConstructionCard({ construction, onClick, isSelected }: Construc
   };
   
   const Icon = typeIcons[construction.construction_type] || Square;
-  
-  const typeLabels = {
-    window: 'Window',
-    door: 'Door',
-    sliding_door: 'Sliding Door',
-  };
 
   // Calculate manufacturing progress
   const manufacturingMap = new Map(
@@ -66,67 +59,53 @@ export function ConstructionCard({ construction, onClick, isSelected }: Construc
     <Card
       onClick={onClick}
       className={`
-        p-3 cursor-pointer transition-all hover:shadow-md
+        p-2 cursor-pointer transition-all hover:shadow-md
         ${isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}
         ${construction.is_delivered ? 'opacity-60' : ''}
       `}
     >
-      <div className="space-y-2">
-        {/* Header */}
+      <div className="space-y-1">
+        {/* Header with number and quantity */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold text-sm">
-              C-{construction.construction_number.padStart(3, '0')}
-            </span>
-            {construction.is_delivered && (
-              <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                <Check className="h-3 w-3 mr-0.5" />
-                Delivered
-              </Badge>
-            )}
-          </div>
+          <span className="font-mono font-bold text-xs">
+            C-{construction.construction_number.padStart(3, '0')}
+          </span>
           {construction.quantity > 1 && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
               ×{construction.quantity}
             </Badge>
           )}
         </div>
 
-        {/* Type and icon */}
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">
-            {typeLabels[construction.construction_type]}
+        {/* Type icon and label */}
+        <div className="flex items-center gap-1">
+          <Icon className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">
+            {construction.construction_type === 'window' ? 'Window' : 
+             construction.construction_type === 'door' ? 'Door' : 'Sliding'}
           </span>
         </div>
 
         {/* Dimensions */}
-        <div className="text-sm font-medium">{dimensions}</div>
+        <div className="text-xs font-medium">{dimensions}</div>
 
-        {/* Location */}
+        {/* Location - truncated */}
         {construction.location && (
-          <div className="text-xs text-muted-foreground truncate">
+          <div className="text-[10px] text-muted-foreground truncate">
             {construction.location}
           </div>
         )}
 
-        {/* Progress dots */}
-        <div className="flex items-center gap-1">
+        {/* Progress dots and percentage */}
+        <div className="flex items-center gap-0.5">
           <TooltipProvider>
-            {MANUFACTURING_STAGES.map((stage, index) => {
+            {MANUFACTURING_STAGES.map((stage) => {
               const status = manufacturingMap.get(stage) || 'not_started';
-              const stageLabels: Record<string, string> = {
-                frame_cutting: 'Frame Cutting',
-                welding: 'Welding',
-                assembly: 'Assembly',
-                glass_installation: 'Glass Installation',
-              };
-              
               return (
                 <Tooltip key={stage}>
                   <TooltipTrigger asChild>
                     <div
-                      className={`h-2 w-2 rounded-full ${
+                      className={`h-1.5 w-1.5 rounded-full ${
                         status === 'complete'
                           ? 'bg-green-500'
                           : status === 'partial'
@@ -136,22 +115,17 @@ export function ConstructionCard({ construction, onClick, isSelected }: Construc
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p className="text-xs">{stageLabels[stage]}: {status.replace('_', ' ')}</p>
+                    <p className="text-xs">{stage.replace('_', ' ')}</p>
                   </TooltipContent>
                 </Tooltip>
               );
             })}
           </TooltipProvider>
-          <span className="text-xs text-muted-foreground ml-1">{progressPercent}%</span>
+          <span className="text-[10px] text-muted-foreground ml-0.5">{progressPercent}%</span>
+          {construction.is_delivered && (
+            <Check className="h-3 w-3 text-green-500 ml-auto" />
+          )}
         </div>
-
-        {/* Notes indicator */}
-        {(construction.notes_count || 0) > 0 && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <MessageSquare className="h-3 w-3" />
-            <span>{construction.notes_count} notes</span>
-          </div>
-        )}
       </div>
     </Card>
   );
