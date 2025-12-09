@@ -368,12 +368,15 @@ export function ExtractionConfirmationDialog({
 
               <div className="space-y-2">
                 <Label>Screen Type</Label>
-                <Select value={screenType} onValueChange={setScreenType}>
+                <Select 
+                  value={screenType || "none"} 
+                  onValueChange={(v) => setScreenType(v === "none" ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="No screens" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No screens</SelectItem>
+                    <SelectItem value="none">No screens</SelectItem>
                     {SCREEN_TYPES.map((t) => (
                       <SelectItem key={t.value} value={t.value}>
                         {t.label}
