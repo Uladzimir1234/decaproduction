@@ -187,6 +187,38 @@ export default function OrderDetail() {
     }
   }, [id, roleLoading, isWorker]);
 
+  // Real-time subscription for order changes
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`order-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          setOrder(prev => prev ? { ...prev, ...payload.new } : prev);
+          // If order was put on hold, notify the user
+          if (payload.new.production_status === 'hold' && payload.old?.production_status !== 'hold') {
+            toast({
+              title: "Order put on hold",
+              description: "This order has been put on hold. Manufacturing stages are now locked.",
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, toast]);
+
   const fetchCustomSteps = async () => {
     if (!id) return;
     const { data, error } = await supabase
@@ -408,7 +440,21 @@ export default function OrderDetail() {
         .update(updatedFulfillment)
         .eq("id", fulfillment.id);
 
-      if (fulfillmentError) throw fulfillmentError;
+      if (fulfillmentError) {
+        // Check if error is due to order being on hold
+        if (fulfillmentError.message?.includes('order is on hold')) {
+          toast({
+            title: "Order is on hold",
+            description: "This order has been put on hold. Manufacturing stages cannot be updated.",
+            variant: "destructive"
+          });
+          // Revert local state and refresh
+          setFulfillment(fulfillment);
+          fetchOrder();
+          return;
+        }
+        throw fulfillmentError;
+      }
 
       const { error: orderError } = await supabase
         .from("orders")
@@ -437,6 +483,8 @@ export default function OrderDetail() {
         description: error.message || "Failed to save changes",
         variant: "destructive"
       });
+      // Revert on error
+      setFulfillment(fulfillment);
     } finally {
       setSaving(false);
     }
