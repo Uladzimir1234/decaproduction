@@ -477,7 +477,7 @@ export function useDashboardData() {
         productionReadyCount,
       });
 
-      // Calculate component summary
+      // Calculate component summary - only include components that at least one order uses
       const summary: ComponentSummary[] = COMPONENT_FIELDS.map(({ name, field }) => {
         const result: ComponentSummary = {
           name,
@@ -505,6 +505,10 @@ export function useDashboardData() {
         });
 
         return result;
+      }).filter(component => {
+        // Only include components that have at least one applicable order
+        const totalApplicable = component.notOrdered + component.ordered + component.available;
+        return totalApplicable > 0;
       });
 
       setComponentSummary(summary);
