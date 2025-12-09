@@ -657,6 +657,32 @@ export default function Orders() {
     
     // Check if order has construction-level manufacturing data
     const mfgData = constructionManufacturing[order.id];
+    const components = constructionComponents[order.id] || [];
+    
+    // Helper to check component availability from construction_components
+    const isComponentAvailable = (componentTypes: string[]): boolean => {
+      if (components.length === 0) return false;
+      const matchingComponents = components.filter(c => 
+        componentTypes.some(type => c.component_type.toLowerCase().includes(type.toLowerCase()))
+      );
+      if (matchingComponents.length === 0) return true; // No such component needed
+      return matchingComponents.every(c => c.status === 'available');
+    };
+    
+    const getComponentLockStatus = (componentTypes: string[], componentName: string): LockInfo => {
+      if (components.length === 0) return { isLocked: false }; // No components data, don't lock
+      const matchingComponents = components.filter(c => 
+        componentTypes.some(type => c.component_type.toLowerCase().includes(type.toLowerCase()))
+      );
+      if (matchingComponents.length === 0) return { isLocked: false }; // No such component needed
+      
+      const allAvailable = matchingComponents.every(c => c.status === 'available');
+      if (allAvailable) return { isLocked: false };
+      
+      const anyOrdered = matchingComponents.some(c => c.status === 'ordered');
+      const statusText = anyOrdered ? 'Ordered' : 'Not Ordered';
+      return { isLocked: true, lockReason: `${componentName} ${statusText}` };
+    };
     
     if (mfgData && mfgData.length > 0) {
       // Aggregate construction manufacturing stages
@@ -684,6 +710,14 @@ export default function Orders() {
         'glass_installation': 'Glass Installed'
       };
       
+      // Define lock dependencies for each stage (matching OrderDetail page)
+      const stageLockDependencies: Record<string, { types: string[]; name: string }> = {
+        'frame_cutting': { types: ['profile', 'window_profile'], name: 'Profile' },
+        'welding': { types: ['profile', 'window_profile'], name: 'Profile' },
+        'assembly': { types: ['hardware', 'handle'], name: 'Hardware' },
+        'glass_installation': { types: ['glass'], name: 'Glass' }
+      };
+      
       stageOrder.forEach(stageName => {
         const agg = stageAggregation.get(stageName);
         if (agg) {
@@ -691,12 +725,16 @@ export default function Orders() {
           if (agg.complete === agg.total) status = 'complete';
           else if (agg.complete > 0 || agg.partial > 0) status = 'partial';
           
+          const lockDep = stageLockDependencies[stageName];
+          const lock = lockDep ? getComponentLockStatus(lockDep.types, lockDep.name) : { isLocked: false };
+          
           stages.push({
             name: stageDisplayNames[stageName] || stageName,
             status,
             hasNotes: false,
             field: stageName,
-            progress: `${agg.complete}/${agg.total}`
+            progress: `${agg.complete}/${agg.total}`,
+            lock
           });
         }
       });
