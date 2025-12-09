@@ -165,6 +165,16 @@ const calculateFulfillmentPercentageStatic = (data: Partial<OrderFulfillment>, o
   return Math.round(completedSteps / totalSteps * 100);
 };
 
+// Aggregated component from constructions
+interface AggregatedComponent {
+  component_type: string;
+  component_name: string | null;
+  total_quantity: number;
+  status: string;
+  order_date: string | null;
+  component_ids: string[];
+}
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -181,6 +191,7 @@ export default function OrderDetail() {
   const [manufacturingDialogOpen, setManufacturingDialogOpen] = useState(false);
   const [orderMapOpen, setOrderMapOpen] = useState(false);
   const [hasConstructions, setHasConstructions] = useState(false);
+  const [aggregatedComponents, setAggregatedComponents] = useState<AggregatedComponent[]>([]);
 
   useEffect(() => {
     // Wait for role to be loaded before fetching order
@@ -188,6 +199,7 @@ export default function OrderDetail() {
       fetchOrder();
       fetchCustomSteps();
       checkConstructions();
+      fetchAggregatedComponents();
     }
   }, [id, roleLoading, isWorker]);
 
@@ -288,6 +300,101 @@ export default function OrderDetail() {
     if (!error && data) {
       setCustomSteps(data as CustomStep[]);
     }
+  };
+
+  const fetchAggregatedComponents = async () => {
+    if (!id) return;
+    
+    // Fetch all construction components for this order through constructions
+    const { data, error } = await supabase
+      .from("construction_components")
+      .select(`
+        id,
+        component_type,
+        component_name,
+        quantity,
+        status,
+        order_date,
+        construction:order_constructions!inner(order_id)
+      `)
+      .eq("construction.order_id", id);
+    
+    if (error) {
+      console.error("Error fetching components:", error);
+      return;
+    }
+    
+    if (!data || data.length === 0) {
+      setAggregatedComponents([]);
+      return;
+    }
+    
+    // Aggregate by component_type + component_name
+    const aggregated: Record<string, AggregatedComponent> = {};
+    
+    for (const comp of data) {
+      const key = `${comp.component_type}::${comp.component_name || 'default'}`;
+      
+      if (!aggregated[key]) {
+        aggregated[key] = {
+          component_type: comp.component_type,
+          component_name: comp.component_name,
+          total_quantity: 0,
+          status: comp.status || 'not_ordered',
+          order_date: comp.order_date,
+          component_ids: [],
+        };
+      }
+      
+      aggregated[key].total_quantity += comp.quantity;
+      aggregated[key].component_ids.push(comp.id);
+      
+      // Use worst-case status (not_ordered > ordered > available)
+      const statusPriority: Record<string, number> = { 'not_ordered': 0, 'ordered': 1, 'available': 2 };
+      if (statusPriority[comp.status || 'not_ordered'] < statusPriority[aggregated[key].status]) {
+        aggregated[key].status = comp.status || 'not_ordered';
+      }
+    }
+    
+    setAggregatedComponents(Object.values(aggregated));
+  };
+
+  const updateAggregatedComponent = async (component: AggregatedComponent, updates: { status: string; order_date?: string | null }) => {
+    const { error } = await supabase
+      .from("construction_components")
+      .update({
+        status: updates.status,
+        order_date: updates.order_date || null,
+      })
+      .in("id", component.component_ids);
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update component",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Update local state
+    setAggregatedComponents(prev => prev.map(c => 
+      c.component_type === component.component_type && c.component_name === component.component_name
+        ? { ...c, status: updates.status, order_date: updates.order_date || null }
+        : c
+    ));
+    
+    toast({
+      title: "Saved",
+      description: `${formatComponentName(component.component_type)} status updated`
+    });
+  };
+
+  const formatComponentName = (type: string) => {
+    return type
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const addCustomStep = async (stepType: 'ordering' | 'manufacturing', name: string) => {
@@ -1123,6 +1230,68 @@ export default function OrderDetail() {
                   )}
                 </AccordionContent>
               </AccordionItem>
+
+              {/* Aggregated Components from Constructions */}
+              {aggregatedComponents.length > 0 && (
+                <>
+                  <div className="text-xs text-muted-foreground mt-4 mb-2 font-medium uppercase tracking-wide">
+                    Components from File
+                  </div>
+                  {aggregatedComponents.map((comp, index) => (
+                    <AccordionItem key={`aggr-${comp.component_type}-${index}`} value={`aggr-${comp.component_type}-${index}`}>
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          {comp.status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                           comp.status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                           <AlertCircle className="h-4 w-4 text-destructive" />}
+                          <span>{formatComponentName(comp.component_type)}</span>
+                          {comp.component_name && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                              ({comp.component_name})
+                            </span>
+                          )}
+                          <Badge variant="secondary" className="ml-1 text-xs">
+                            x{comp.total_quantity}
+                          </Badge>
+                          <Badge variant="outline" className="ml-2 capitalize">
+                            {(comp.status || 'not_ordered').replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        {comp.component_name && (
+                          <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                            {comp.component_name}
+                          </div>
+                        )}
+                        <div className="space-y-3">
+                          <Label>Status</Label>
+                          <StatusButtonGroup
+                            value={comp.status || 'not_ordered'}
+                            onChange={value => updateAggregatedComponent(comp, {
+                              status: value,
+                              order_date: value === 'ordered' ? comp.order_date || new Date().toISOString().split('T')[0] : null
+                            })}
+                            options={orderingStatusOptions}
+                            disabled={!canUpdateOrdering || isSeller}
+                          />
+                        </div>
+                        {comp.status === 'ordered' && (
+                          <div className="space-y-2">
+                            <Label>Order Date</Label>
+                            <Input
+                              type="date"
+                              value={comp.order_date || ''}
+                              onChange={e => updateAggregatedComponent(comp, { status: comp.status, order_date: e.target.value })}
+                              disabled={!canUpdateOrdering || isSeller}
+                            />
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </>
+              )}
 
               {/* Custom Ordering Steps */}
               {customSteps.filter(s => s.step_type === 'ordering').map(step => (

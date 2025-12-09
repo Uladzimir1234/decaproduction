@@ -457,9 +457,10 @@ Extract all construction items and return structured JSON.`
               text: 'Extract all window and door constructions from this IT Okna Excel order file. Return a JSON object with: quote_number, customer_name, order_date, and an array of constructions with all specifications. For each construction, include a "components" array listing all components that need ordering (blinds, screens, coupling profiles, sash limiters, glass, etc.) with their types, names, and quantities.'
             },
             {
-              type: 'image_url',
-              image_url: {
-                url: `data:application/vnd.ms-excel;base64,${base64Content}`
+              type: 'file',
+              file: {
+                filename: 'order.xls',
+                file_data: `data:application/vnd.ms-excel;base64,${base64Content}`
               }
             }
           ]
