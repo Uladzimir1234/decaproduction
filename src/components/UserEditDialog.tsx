@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 interface UserEditDialogProps {
   open: boolean;
@@ -25,6 +25,29 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState<string | null>(null);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+
+  useEffect(() => {
+    if (open && user) {
+      // Fetch the temporary password from user_invitations
+      const fetchCurrentPassword = async () => {
+        const { data } = await supabase
+          .from('user_invitations')
+          .select('temporary_password')
+          .eq('email', user.email)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        setCurrentPassword(data?.temporary_password || null);
+      };
+      fetchCurrentPassword();
+    } else {
+      setCurrentPassword(null);
+      setShowCurrentPassword(false);
+    }
+  }, [open, user]);
 
   const handleUpdateEmail = async () => {
     if (!user || !newEmail) return;
@@ -156,6 +179,32 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
           </TabsContent>
 
           <TabsContent value="password" className="space-y-4 pt-4">
+            {currentPassword && (
+              <div className="space-y-2">
+                <Label>Current Password</Label>
+                <div className="relative">
+                  <Input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    disabled
+                    className="bg-muted pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <Input
