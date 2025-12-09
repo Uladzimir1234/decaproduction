@@ -407,8 +407,49 @@ async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  console.log('Sending Excel to AI for parsing...');
+  console.log('Converting Excel to text for AI parsing...');
 
+  // Decode base64 to binary
+  const binaryString = atob(base64Content);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  // Extract text content from the Excel file
+  // We'll extract readable text by looking for string patterns in the binary data
+  let textContent = '';
+  
+  // Try to extract text from the binary - Excel files contain text in various encoding
+  // Look for ASCII/UTF-8 readable sequences
+  let currentString = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    // Check if it's a printable ASCII character or common special chars
+    if ((byte >= 32 && byte <= 126) || byte === 10 || byte === 13 || byte === 9) {
+      currentString += String.fromCharCode(byte);
+    } else if (currentString.length > 3) {
+      // Only keep strings longer than 3 chars to filter noise
+      textContent += currentString + '\n';
+      currentString = '';
+    } else {
+      currentString = '';
+    }
+  }
+  if (currentString.length > 3) {
+    textContent += currentString;
+  }
+
+  // Clean up the extracted text
+  textContent = textContent
+    .split('\n')
+    .filter(line => line.trim().length > 2)
+    .filter(line => !/^[\x00-\x1F\x7F]+$/.test(line)) // Remove control character lines
+    .join('\n');
+
+  console.log('Extracted text content preview:', textContent.substring(0, 1000));
+
+  // Now send the extracted text to AI for parsing, similar to CSV
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -420,8 +461,8 @@ async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
       messages: [
         {
           role: 'system',
-          content: `You are an expert at extracting data from IT Okna window and door order Excel exports.
-These Excel files have a specific structure:
+          content: `You are an expert at extracting data from IT Okna window and door order exports.
+The data comes from an Excel file and contains:
 - Company info at the top
 - Quote number and date (e.g., "Quote ? 1/1681 Date 11/26/2025")
 - Customer name and phone
@@ -451,19 +492,7 @@ Extract all construction items and return structured JSON.`
         },
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Extract all window and door constructions from this IT Okna Excel order file. Return a JSON object with: quote_number, customer_name, order_date, and an array of constructions with all specifications. For each construction, include a "components" array listing all components that need ordering (blinds, screens, coupling profiles, sash limiters, glass, etc.) with their types, names, and quantities.'
-            },
-            {
-              type: 'file',
-              file: {
-                filename: 'order.xls',
-                file_data: `data:application/vnd.ms-excel;base64,${base64Content}`
-              }
-            }
-          ]
+          content: `Extract all window and door constructions from this IT Okna order data. Return a JSON object with: quote_number, customer_name, order_date, and an array of constructions with all specifications. For each construction, include a "components" array listing all components that need ordering (blinds, screens, coupling profiles, sash limiters, glass, etc.) with their types, names, and quantities.\n\nOrder Data:\n${textContent}`
         }
       ],
       tools: [
@@ -471,7 +500,7 @@ Extract all construction items and return structured JSON.`
           type: 'function',
           function: {
             name: 'extract_order_data',
-            description: 'Extract structured order data from the IT Okna Excel file',
+            description: 'Extract structured order data from the IT Okna order data',
             parameters: {
               type: 'object',
               properties: {
