@@ -1,7 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Square, DoorOpen, PanelLeftOpen, Check, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface ConstructionManufacturing {
   stage: string;
@@ -29,129 +27,91 @@ interface ConstructionCardProps {
   isSelected?: boolean;
 }
 
-const MANUFACTURING_STAGES = ['frame_cutting', 'welding', 'assembly', 'glass_installation'];
+// Determine status color based on manufacturing progress
+const getStatusColor = (manufacturing?: ConstructionManufacturing[]) => {
+  if (!manufacturing || manufacturing.length === 0) {
+    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+  }
+
+  const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
+  
+  // Check stages in reverse order of completion
+  if (statusMap.get('glass_installation') === 'complete') {
+    return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+  }
+  if (statusMap.get('assembly') === 'complete') {
+    return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+  }
+  if (statusMap.get('welding') === 'complete') {
+    return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+  }
+  
+  return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+};
+
+// Get type prefix
+const getTypePrefix = (type: string) => {
+  switch (type) {
+    case 'window': return 'W';
+    case 'door': return 'D';
+    case 'sliding_door': return 'S';
+    default: return 'W';
+  }
+};
 
 export function ConstructionCard({ construction, onClick, isSelected }: ConstructionCardProps) {
-  const typeIcons = {
-    window: Square,
-    door: DoorOpen,
-    sliding_door: PanelLeftOpen,
-  };
-  
-  const Icon = typeIcons[construction.construction_type] || Square;
-
-  // Calculate manufacturing progress
-  const manufacturingMap = new Map(
-    construction.manufacturing?.map(m => [m.stage, m.status]) || []
-  );
-  
-  const completedStages = MANUFACTURING_STAGES.filter(
-    stage => manufacturingMap.get(stage) === 'complete'
-  ).length;
-  
-  const progressPercent = Math.round((completedStages / MANUFACTURING_STAGES.length) * 100);
-
-  // Format dimensions
-  const dimensions = construction.width_inches && construction.height_inches
-    ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
-    : 'N/A';
-
+  const statusColor = getStatusColor(construction.manufacturing);
+  const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
 
+  const dimensions = construction.width_inches && construction.height_inches
+    ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
+    : null;
+
   return (
-    <Card
-      onClick={onClick}
-      className={`
-        p-2 cursor-pointer transition-all hover:shadow-md relative
-        ${isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}
-        ${construction.is_delivered ? 'opacity-60' : ''}
-        ${hasOpenIssues ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}
-      `}
-    >
-      {/* Issue indicator */}
-      {hasOpenIssues && (
-        <div className="absolute -top-1.5 -right-1.5">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="bg-amber-500 text-white rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold shadow-sm">
-                  {construction.open_issues_count}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="text-xs">{construction.open_issues_count} open issue{construction.open_issues_count > 1 ? 's' : ''}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      )}
-
-      <div className="space-y-1">
-        {/* Header with number and quantity */}
-        <div className="flex items-center justify-between">
-          <span className="font-mono font-bold text-xs">
-            C-{construction.construction_number.padStart(3, '0')}
-          </span>
-          {construction.quantity > 1 && (
-            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
-              ×{construction.quantity}
-            </Badge>
-          )}
-        </div>
-
-        {/* Type icon and label */}
-        <div className="flex items-center gap-1">
-          <Icon className="h-3 w-3 text-muted-foreground" />
-          <span className="text-[10px] text-muted-foreground">
-            {construction.construction_type === 'window' ? 'Window' : 
-             construction.construction_type === 'door' ? 'Door' : 'Sliding'}
-          </span>
-          {hasOpenIssues && (
-            <AlertTriangle className="h-3 w-3 text-amber-500 ml-auto" />
-          )}
-        </div>
-
-        {/* Dimensions */}
-        <div className="text-xs font-medium">{dimensions}</div>
-
-        {/* Location - truncated */}
-        {construction.location && (
-          <div className="text-[10px] text-muted-foreground truncate">
-            {construction.location}
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={onClick}
+            className={`
+              relative w-10 h-10 rounded flex items-center justify-center
+              font-mono text-[10px] font-bold cursor-pointer
+              transition-all hover:scale-110 hover:shadow-lg
+              ${statusColor.bg} ${statusColor.text}
+              ${isSelected ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''}
+              ${construction.is_delivered ? 'opacity-50' : ''}
+            `}
+          >
+            {typePrefix}{construction.construction_number}
+            
+            {/* Issue indicator */}
+            {hasOpenIssues && (
+              <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-3 w-3 flex items-center justify-center">
+                <AlertTriangle className="h-2 w-2 text-white" />
+              </div>
+            )}
+            
+            {/* Quantity indicator */}
+            {construction.quantity > 1 && (
+              <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-3.5 w-3.5 flex items-center justify-center text-[8px] font-bold border">
+                {construction.quantity}
+              </div>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <div className="space-y-0.5">
+            <p className="font-bold">{typePrefix}-{construction.construction_number}</p>
+            {dimensions && <p>{dimensions}</p>}
+            {construction.location && <p className="text-muted-foreground">{construction.location}</p>}
+            <p className="text-muted-foreground">{statusColor.label}</p>
+            {hasOpenIssues && (
+              <p className="text-amber-500 font-medium">{construction.open_issues_count} issue{construction.open_issues_count > 1 ? 's' : ''}</p>
+            )}
           </div>
-        )}
-
-        {/* Progress dots and percentage */}
-        <div className="flex items-center gap-0.5">
-          <TooltipProvider>
-            {MANUFACTURING_STAGES.map((stage) => {
-              const status = manufacturingMap.get(stage) || 'not_started';
-              return (
-                <Tooltip key={stage}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        status === 'complete'
-                          ? 'bg-green-500'
-                          : status === 'partial'
-                          ? 'bg-amber-500'
-                          : 'bg-muted'
-                      }`}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="text-xs">{stage.replace('_', ' ')}</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </TooltipProvider>
-          <span className="text-[10px] text-muted-foreground ml-0.5">{progressPercent}%</span>
-          {construction.is_delivered && (
-            <Check className="h-3 w-3 text-green-500 ml-auto" />
-          )}
-        </div>
-      </div>
-    </Card>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

@@ -204,7 +204,14 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
         ) : (
           <ScrollArea className="h-[calc(85vh-60px)]">
             <div className="p-3">
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+              {/* Legend */}
+              <div className="flex items-center gap-4 mb-3 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-500" /> Not started</div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-amber-400" /> Welded</div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" /> Assembled</div>
+                <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Glass installed</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
                 {constructions.map(construction => (
                   <ConstructionCard
                     key={construction.id}
