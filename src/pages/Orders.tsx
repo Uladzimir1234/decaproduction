@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3 } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 import { format } from "date-fns";
+import { OrderMap } from "@/components/order/OrderMap";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -162,6 +163,9 @@ export default function Orders() {
   const [deleting, setDeleting] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
+  const [orderMapOpen, setOrderMapOpen] = useState(false);
+  const [selectedOrderForMap, setSelectedOrderForMap] = useState<Order | null>(null);
+  const [ordersWithConstructions, setOrdersWithConstructions] = useState<Set<string>>(new Set());
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
@@ -173,7 +177,8 @@ export default function Orders() {
         fetchFulfillments(),
         fetchCustomSteps(),
         fetchDeliveryBatches(),
-        fetchSellers()
+        fetchSellers(),
+        fetchOrdersWithConstructions()
       ]);
       // Mark initial load as complete after data is fetched
       setTimeout(() => {
@@ -371,6 +376,26 @@ export default function Orders() {
     } catch (error) {
       console.error("Error fetching delivery batches:", error);
     }
+  };
+
+  const fetchOrdersWithConstructions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("order_constructions")
+        .select("order_id");
+      if (error) throw error;
+      const orderIds = new Set(data?.map(c => c.order_id) || []);
+      setOrdersWithConstructions(orderIds);
+    } catch (error) {
+      console.error("Error fetching orders with constructions:", error);
+    }
+  };
+
+  const handleOpenOrderMap = (e: React.MouseEvent, order: Order) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedOrderForMap(order);
+    setOrderMapOpen(true);
   };
 
   const getOrderDeliveryBatches = (orderId: string) => {
@@ -1385,6 +1410,17 @@ export default function Orders() {
                           customValue={daysUntil < 0 ? `${Math.abs(daysUntil)}d` : `${daysUntil}d`}
                           label={daysUntil < 0 ? "Overdue" : "Time Left"}
                         />
+                        {ordersWithConstructions.has(order.id) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleOpenOrderMap(e, order)}
+                            className="shrink-0"
+                            title="Order Map"
+                          >
+                            <Grid3X3 className="h-4 w-4" />
+                          </Button>
+                        )}
                         {!isWorker && (
                           <Button
                             variant="ghost"
@@ -1440,5 +1476,18 @@ export default function Orders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Map Overlay */}
+      {orderMapOpen && selectedOrderForMap && (
+        <OrderMap
+          orderId={selectedOrderForMap.id}
+          orderNumber={selectedOrderForMap.order_number}
+          isProductionReady={selectedOrderForMap.production_status === 'production_ready'}
+          onClose={() => {
+            setOrderMapOpen(false);
+            setSelectedOrderForMap(null);
+          }}
+        />
+      )}
     </div>;
 }
