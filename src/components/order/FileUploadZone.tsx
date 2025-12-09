@@ -218,7 +218,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
             <Upload className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm font-medium">Upload Order File</p>
             <p className="text-xs text-muted-foreground">
-              Drag & drop or click to upload CSV, PDF, or Excel
+              PDF <span className="text-primary">(fastest)</span>, CSV, or Excel
             </p>
           </div>
         )}
