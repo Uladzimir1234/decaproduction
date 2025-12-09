@@ -11,13 +11,15 @@ import logo from "@/assets/logo.png";
 export function Header() {
   const location = useLocation();
   const { toast } = useToast();
-  const { isAdmin, loading: roleLoading } = useRole();
+  const { isAdmin, isManager, loading: roleLoading } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const canViewLogs = isAdmin || isManager;
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Orders", href: "/orders", icon: ClipboardList },
-    { name: "Logs", href: "/logs", icon: FileText },
+    ...(canViewLogs ? [{ name: "Logs", href: "/logs", icon: FileText }] : []),
     ...(isAdmin ? [{ name: "Users", href: "/users", icon: Users }] : []),
   ];
 
