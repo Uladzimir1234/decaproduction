@@ -36,6 +36,14 @@ interface ConstructionWithExtra extends Construction {
   open_issues_count?: number;
 }
 
+interface OrderFulfillment {
+  welding_status?: string | null;
+  assembly_status?: string | null;
+  glass_status?: string | null;
+  doors_status?: string | null;
+  sliding_doors_status?: string | null;
+}
+
 interface OrderMapInlineProps {
   orderId: string;
   orderNumber: string;
@@ -46,6 +54,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
   const [constructions, setConstructions] = useState<ConstructionWithExtra[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedConstruction, setSelectedConstruction] = useState<ConstructionWithExtra | null>(null);
+  const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillment | null>(null);
 
   useEffect(() => {
     fetchConstructions();
@@ -80,6 +89,16 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
         },
         () => fetchConstructions()
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_fulfillment',
+          filter: `order_id=eq.${orderId}`,
+        },
+        () => fetchConstructions()
+      )
       .subscribe();
 
     return () => {
@@ -89,6 +108,15 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
 
   const fetchConstructions = async () => {
     setLoading(true);
+    
+    // Fetch order_fulfillment for fallback status
+    const { data: fulfillmentData } = await supabase
+      .from('order_fulfillment')
+      .select('welding_status, assembly_status, glass_status, doors_status, sliding_doors_status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    
+    setOrderFulfillment(fulfillmentData);
     
     const { data: constructionsData, error } = await supabase
       .from('order_constructions')
@@ -187,6 +215,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
             construction={construction}
             onClick={() => setSelectedConstruction(construction)}
             isSelected={selectedConstruction?.id === construction.id}
+            orderFulfillment={orderFulfillment}
           />
         ))}
       </div>
