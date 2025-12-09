@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3 } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -653,6 +653,7 @@ export default function Orders() {
 
   const getManufacturingStages = (order: Order) => {
     type StageStatus = 'complete' | 'partial' | 'not_started';
+    type LockInfo = { isLocked: boolean; lockReason?: string };
     
     // Check if order has construction-level manufacturing data
     const mfgData = constructionManufacturing[order.id];
@@ -672,15 +673,15 @@ export default function Orders() {
         else agg.not_started++;
       });
       
-      const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string }[] = [];
+      const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string; lock?: LockInfo }[] = [];
       
-      // Define stage display order
+      // Define stage display order - match OrderDetail page names
       const stageOrder = ['frame_cutting', 'welding', 'assembly', 'glass_installation'];
       const stageDisplayNames: Record<string, string> = {
-        'frame_cutting': 'Frame Cut',
-        'welding': 'Welding',
-        'assembly': 'Assembly',
-        'glass_installation': 'Glass Install'
+        'frame_cutting': 'Profile Cutting',
+        'welding': 'Frames/Sashes Welded',
+        'assembly': 'Frame & Sash Assembled',
+        'glass_installation': 'Glass Installed'
       };
       
       stageOrder.forEach(stageName => {
@@ -703,9 +704,9 @@ export default function Orders() {
       return stages;
     }
     
-    // Fall back to legacy order_fulfillment data
+    // Fall back to legacy order_fulfillment data with lock dependencies (matching OrderDetail page)
     const f = fulfillments[order.id];
-    const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string }[] = [];
+    const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string; lock?: LockInfo }[] = [];
     
     const getStatus = (value: string | null | undefined): StageStatus => {
       if (value === 'complete') return 'complete';
@@ -713,22 +714,91 @@ export default function Orders() {
       return 'not_started';
     };
     
-    // Always show these stages
-    stages.push({ name: 'Reinforcement', status: getStatus(f?.reinforcement_cutting), hasNotes: false, field: 'reinforcement_cutting' });
-    stages.push({ name: 'Profile Cut', status: getStatus(f?.profile_cutting), hasNotes: false, field: 'profile_cutting' });
-    stages.push({ name: 'Welding', status: getStatus(f?.welding_status), hasNotes: !!(f?.welding_notes), field: 'welding_status' });
+    const getLockStatus = (componentStatus: string | null | undefined, componentName: string): LockInfo => {
+      if (componentStatus === 'available') {
+        return { isLocked: false };
+      }
+      const statusText = componentStatus === 'ordered' ? 'Ordered' : 'Not Ordered';
+      return { isLocked: true, lockReason: `${componentName} ${statusText}` };
+    };
     
-    // Conditional stages based on order
+    // Reinforcement Cutting - depends on reinforcement_status
+    stages.push({ 
+      name: 'Reinforcement Cutting', 
+      status: getStatus(f?.reinforcement_cutting), 
+      hasNotes: false, 
+      field: 'reinforcement_cutting',
+      lock: getLockStatus(order.reinforcement_status, '')
+    });
+    
+    // Profile Cutting - depends on windows_profile_status
+    stages.push({ 
+      name: 'Profile Cutting', 
+      status: getStatus(f?.profile_cutting), 
+      hasNotes: false, 
+      field: 'profile_cutting',
+      lock: getLockStatus(order.windows_profile_status, '')
+    });
+    
+    // Frames/Sashes Welded - depends on windows_profile_status
+    stages.push({ 
+      name: 'Frames/Sashes Welded', 
+      status: getStatus(f?.welding_status), 
+      hasNotes: !!(f?.welding_notes), 
+      field: 'welding_status',
+      lock: getLockStatus(order.windows_profile_status, 'Profile')
+    });
+    
+    // Doors Assembled - conditional, depends on hardware_status
     if (order.doors_count && order.doors_count > 0) {
-      stages.push({ name: 'Doors', status: getStatus(f?.doors_status), hasNotes: !!(f?.doors_notes), field: 'doors_status' });
-    }
-    if (order.has_sliding_doors) {
-      stages.push({ name: 'Sliding Doors', status: getStatus(f?.sliding_doors_status), hasNotes: !!(f?.sliding_doors_notes), field: 'sliding_doors_status' });
+      stages.push({ 
+        name: 'Doors Assembled', 
+        status: getStatus(f?.doors_status), 
+        hasNotes: !!(f?.doors_notes), 
+        field: 'doors_status',
+        lock: getLockStatus(order.hardware_status, 'Hardware')
+      });
     }
     
-    stages.push({ name: 'Windows', status: getStatus(f?.assembly_status), hasNotes: !!(f?.assembly_notes), field: 'assembly_status' });
-    stages.push({ name: 'Glass', status: getStatus(f?.glass_status), hasNotes: !!(f?.glass_notes), field: 'glass_status' });
-    stages.push({ name: 'Screens', status: getStatus(f?.screens_cutting), hasNotes: !!(f?.screens_notes), field: 'screens_cutting' });
+    // Sliding Doors Assembled - conditional, depends on hardware_status
+    if (order.has_sliding_doors) {
+      stages.push({ 
+        name: 'Sliding Doors Assembled', 
+        status: getStatus(f?.sliding_doors_status), 
+        hasNotes: !!(f?.sliding_doors_notes), 
+        field: 'sliding_doors_status',
+        lock: getLockStatus(order.hardware_status, 'Hardware')
+      });
+    }
+    
+    // Frame & Sash Assembled - depends on hardware_status
+    stages.push({ 
+      name: 'Frame & Sash Assembled', 
+      status: getStatus(f?.assembly_status), 
+      hasNotes: !!(f?.assembly_notes), 
+      field: 'assembly_status',
+      lock: getLockStatus(order.hardware_status, 'Hardware')
+    });
+    
+    // Glass Installed - depends on glass_status
+    stages.push({ 
+      name: 'Glass Installed', 
+      status: getStatus(f?.glass_status), 
+      hasNotes: !!(f?.glass_notes), 
+      field: 'glass_status',
+      lock: getLockStatus(order.glass_status, 'Glass')
+    });
+    
+    // Made Screens - depends on screens_status (only if has screens)
+    if (order.screen_type) {
+      stages.push({ 
+        name: 'Made Screens', 
+        status: getStatus(f?.screens_cutting), 
+        hasNotes: !!(f?.screens_notes), 
+        field: 'screens_cutting',
+        lock: getLockStatus(order.screens_status, 'Screens')
+      });
+    }
     
     return stages;
   };
@@ -1444,19 +1514,24 @@ export default function Orders() {
                             const f = fulfillments[order.id];
                             const trackingInfo = formatTrackingInfo(f?.updated_at, f?.updated_by_email);
                             const isFileExtracted = hasFileExtractedData && stage.progress;
+                            const isLocked = stage.lock?.isLocked && order.production_status !== 'hold';
+                            const lockReason = stage.lock?.lockReason;
                             
                             const badgeContent = (
                               <span 
                                 className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
                                   stage.status === 'complete' ? 'bg-emerald-500' : 
                                   stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isFileExtracted ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                                } ${order.production_status === 'hold' || isLocked ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isFileExtracted && !isLocked ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                               >
                                 {stage.name}
                                 {stage.progress && (
                                   <span className="opacity-80">({stage.progress})</span>
                                 )}
-                                {stage.hasNotes && !stage.progress && (
+                                {isLocked && (
+                                  <Lock className="h-3 w-3" />
+                                )}
+                                {stage.hasNotes && !stage.progress && !isLocked && (
                                   <AlertCircle className="h-3 w-3" />
                                 )}
                               </span>
@@ -1472,6 +1547,22 @@ export default function Orders() {
                                     </TooltipTrigger>
                                     <TooltipContent>
                                       <p>Edit via Order Map</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
+                            
+                            // Locked stages show tooltip with lock reason
+                            if (isLocked) {
+                              return (
+                                <TooltipProvider key={stage.name}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      {badgeContent}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{lockReason || 'Component not available'}</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
