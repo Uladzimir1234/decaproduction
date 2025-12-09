@@ -219,10 +219,35 @@ export default function Orders() {
       )
       .subscribe();
 
+    // Subscribe to real-time updates on delivery_batches table
+    const deliveryBatchesChannel = supabase
+      .channel('deliverybatches-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'delivery_batches'
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setDeliveryBatches(prev => [...prev, payload.new as DeliveryBatch]);
+          } else if (payload.eventType === 'UPDATE') {
+            setDeliveryBatches(prev => prev.map(batch => 
+              batch.id === payload.new.id ? { ...batch, ...payload.new } : batch
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setDeliveryBatches(prev => prev.filter(batch => batch.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(fulfillmentChannel);
       supabase.removeChannel(customStepsChannel);
+      supabase.removeChannel(deliveryBatchesChannel);
     };
   }, []);
 

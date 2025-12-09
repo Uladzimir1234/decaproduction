@@ -150,7 +150,38 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   useEffect(() => {
     fetchBatches();
-  }, [fetchBatches]);
+
+    // Subscribe to real-time updates on delivery_batches for this order
+    const batchesChannel = supabase
+      .channel(`deliverybatches-${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'delivery_batches',
+          filter: `order_id=eq.${order.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newBatch = payload.new as DeliveryBatch;
+            setBatches(prev => [...prev, newBatch]);
+            fetchBatchItems(newBatch.id);
+          } else if (payload.eventType === 'UPDATE') {
+            setBatches(prev => prev.map(batch => 
+              batch.id === payload.new.id ? { ...batch, ...payload.new } : batch
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setBatches(prev => prev.filter(batch => batch.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(batchesChannel);
+    };
+  }, [fetchBatches, order.id]);
 
   const initNewBatch = () => {
     setEditingBatchId(null);
