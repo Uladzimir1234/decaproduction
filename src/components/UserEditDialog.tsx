@@ -22,6 +22,7 @@ interface UserEditDialogProps {
 export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEditDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,6 +30,14 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    if (open && user) {
+      setNewName(user.full_name || "");
+    } else {
+      setNewName("");
+    }
+  }, [open, user]);
 
   useEffect(() => {
     if (open && user) {
@@ -50,6 +59,35 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
       setShowCurrentPassword(false);
     }
   }, [open, user]);
+
+  const handleUpdateName = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ full_name: newName.trim() || null })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Name updated",
+        description: newName.trim() ? `Name changed to ${newName.trim()}` : "Name has been cleared",
+      });
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update name",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUpdateEmail = async () => {
     if (!user || !newEmail) return;
@@ -151,11 +189,31 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="email" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="name" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="name">Name</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
             <TabsTrigger value="password">Password</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="name" className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="newName">Full Name</Label>
+              <Input
+                id="newName"
+                type="text"
+                placeholder="Enter full name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button onClick={handleUpdateName} disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Name
+              </Button>
+            </DialogFooter>
+          </TabsContent>
 
           <TabsContent value="email" className="space-y-4 pt-4">
             <div className="space-y-2">
