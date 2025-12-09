@@ -6,6 +6,14 @@ interface ConstructionManufacturing {
   status: string;
 }
 
+interface OrderFulfillment {
+  welding_status?: string | null;
+  assembly_status?: string | null;
+  glass_status?: string | null;
+  doors_status?: string | null;
+  sliding_doors_status?: string | null;
+}
+
 interface Construction {
   id: string;
   construction_number: string;
@@ -25,25 +33,73 @@ interface ConstructionCardProps {
   construction: Construction;
   onClick: () => void;
   isSelected?: boolean;
+  orderFulfillment?: OrderFulfillment | null;
 }
 
 // Determine status color based on manufacturing progress
-const getStatusColor = (manufacturing?: ConstructionManufacturing[]) => {
-  if (!manufacturing || manufacturing.length === 0) {
-    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+const getStatusColor = (
+  manufacturing?: ConstructionManufacturing[],
+  constructionType?: string,
+  orderFulfillment?: OrderFulfillment | null
+) => {
+  // First check if construction_manufacturing has any progress
+  if (manufacturing && manufacturing.length > 0) {
+    const hasProgress = manufacturing.some(m => m.status !== 'not_started');
+    if (hasProgress) {
+      const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
+      
+      // Check stages in reverse order of completion
+      if (statusMap.get('glass_installation') === 'complete') {
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      }
+      if (statusMap.get('assembly') === 'complete') {
+        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+      }
+      if (statusMap.get('welding') === 'complete') {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+      }
+      
+      // Has some partial progress
+      const hasPartial = manufacturing.some(m => m.status === 'partial');
+      if (hasPartial) {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+      }
+    }
   }
-
-  const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
   
-  // Check stages in reverse order of completion
-  if (statusMap.get('glass_installation') === 'complete') {
-    return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-  }
-  if (statusMap.get('assembly') === 'complete') {
-    return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-  }
-  if (statusMap.get('welding') === 'complete') {
-    return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+  // Fall back to order_fulfillment data
+  if (orderFulfillment) {
+    if (constructionType === 'window') {
+      if (orderFulfillment.glass_status === 'complete') {
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      }
+      if (orderFulfillment.assembly_status === 'complete') {
+        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+      }
+      if (orderFulfillment.welding_status === 'complete') {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+      }
+      // Check for partial statuses
+      if (orderFulfillment.glass_status === 'partial' || 
+          orderFulfillment.assembly_status === 'partial' || 
+          orderFulfillment.welding_status === 'partial') {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+      }
+    } else if (constructionType === 'door') {
+      if (orderFulfillment.doors_status === 'complete') {
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      }
+      if (orderFulfillment.doors_status === 'partial') {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+      }
+    } else if (constructionType === 'sliding_door') {
+      if (orderFulfillment.sliding_doors_status === 'complete') {
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      }
+      if (orderFulfillment.sliding_doors_status === 'partial') {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+      }
+    }
   }
   
   return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
@@ -59,8 +115,8 @@ const getTypePrefix = (type: string) => {
   }
 };
 
-export function ConstructionCard({ construction, onClick, isSelected }: ConstructionCardProps) {
-  const statusColor = getStatusColor(construction.manufacturing);
+export function ConstructionCard({ construction, onClick, isSelected, orderFulfillment }: ConstructionCardProps) {
+  const statusColor = getStatusColor(construction.manufacturing, construction.construction_type, orderFulfillment);
   const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
 
