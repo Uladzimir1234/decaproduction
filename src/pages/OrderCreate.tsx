@@ -61,6 +61,7 @@ export default function OrderCreate() {
   const [step, setStep] = useState(1);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sellers, setSellers] = useState<{ id: string; email: string; full_name: string | null }[]>([]);
 
   // Step 1: Basic Info
   const [customerId, setCustomerId] = useState("");
@@ -69,6 +70,7 @@ export default function OrderCreate() {
   const [orderNumber, setOrderNumber] = useState("");
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
+  const [assignedSellerId, setAssignedSellerId] = useState("");
 
   // Step 2: Product Details
   const [windowsCount, setWindowsCount] = useState(0);
@@ -100,7 +102,35 @@ export default function OrderCreate() {
   const [visibleHingesCount, setVisibleHingesCount] = useState(0);
   useEffect(() => {
     fetchCustomers();
+    fetchSellers();
   }, []);
+
+  const fetchSellers = async () => {
+    try {
+      // Get all users with seller role
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "seller");
+      
+      if (roleError) throw roleError;
+      
+      if (roleData && roleData.length > 0) {
+        const sellerIds = roleData.map(r => r.user_id);
+        const { data: profileData, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("id, email, full_name")
+          .in("id", sellerIds)
+          .eq("status", "active");
+        
+        if (profileError) throw profileError;
+        setSellers(profileData || []);
+      }
+    } catch (error) {
+      console.error("Error fetching sellers:", error);
+    }
+  };
+
   const fetchCustomers = async () => {
     const {
       data,
@@ -129,10 +159,20 @@ export default function OrderCreate() {
   const validateStep = () => {
     if (step === 1) {
       const hasCustomer = isNewCustomer ? customerName.trim() : customerId;
+      // Admin/Manager must select a seller, sellers auto-assign to themselves
+      const needsSeller = !isSeller && !assignedSellerId;
       if (!hasCustomer || !orderNumber || !orderDate || !deliveryDate) {
         toast({
           title: "Missing fields",
           description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        return false;
+      }
+      if (needsSeller) {
+        toast({
+          title: "Missing seller",
+          description: "Please assign this order to a seller",
           variant: "destructive"
         });
         return false;
@@ -168,16 +208,19 @@ export default function OrderCreate() {
         }
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      // Determine the assigned seller: for sellers, auto-assign to themselves
+      const finalSellerId = isSeller ? user.id : assignedSellerId;
+
       let finalCustomerId = customerId;
       let finalCustomerName = customerName;
 
-      // Create new customer if needed
+      // Create new customer if needed - assign to the seller, not the creator
       if (isNewCustomer && customerName.trim()) {
         const {
           data: newCustomer,
           error: customerError
         } = await supabase.from("customers").insert({
-          user_id: user.id,
+          user_id: finalSellerId,
           name: customerName.trim()
         }).select().single();
         if (customerError) throw customerError;
@@ -188,7 +231,8 @@ export default function OrderCreate() {
         data,
         error
       } = await supabase.from("orders").insert({
-        user_id: user.id,
+        user_id: finalSellerId,
+        created_by: user.id,
         customer_id: finalCustomerId,
         customer_name: finalCustomerName,
         order_number: orderNumber,
@@ -303,6 +347,28 @@ export default function OrderCreate() {
                 <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
               </div>
             </div>
+            
+            {/* Seller Assignment - only for admin/manager */}
+            {!isSeller && (
+              <div className="space-y-2">
+                <Label>Assign to Seller *</Label>
+                <Select value={assignedSellerId} onValueChange={setAssignedSellerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a seller" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sellers.map(seller => (
+                      <SelectItem key={seller.id} value={seller.id}>
+                        {seller.full_name || seller.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This order will only be visible to the assigned seller
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>}
 

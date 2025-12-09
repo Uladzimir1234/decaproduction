@@ -602,6 +602,7 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          created_by: string | null
           customer_id: string
           customer_name: string
           delivery_complete: boolean | null
@@ -650,6 +651,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           customer_id: string
           customer_name: string
           delivery_complete?: boolean | null
@@ -698,6 +700,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           customer_id?: string
           customer_name?: string
           delivery_complete?: boolean | null
