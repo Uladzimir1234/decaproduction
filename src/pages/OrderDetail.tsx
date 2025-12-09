@@ -1100,6 +1100,16 @@ export default function OrderDetail() {
                 </Dialog>
               )}
             </div>
+            {/* On Hold Warning Banner */}
+            {order.production_status === 'hold' && (
+              <div className="mt-4 flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <Pause className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Manufacturing is locked - Order On Hold</p>
+                  <p className="text-xs text-muted-foreground">Change the production status to "Production Ready" to enable manufacturing stages.</p>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <Accordion type="multiple" className="w-full">
@@ -1109,7 +1119,12 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.reinforcement_cutting as StageStatus || "not_started"} />
                     <span>Reinforcement Cutting</span>
-                    {order.reinforcement_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.reinforcement_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         {order.reinforcement_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1118,7 +1133,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                  {order.reinforcement_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.reinforcement_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Reinforcement must be available before this stage can be updated.</p>
                   ) : (
                     <StatusButtonGroup
@@ -1137,7 +1154,12 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.profile_cutting as StageStatus || "not_started"} />
                     <span>Profile Cutting</span>
-                    {order.windows_profile_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.windows_profile_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         {order.windows_profile_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1146,7 +1168,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                  {order.windows_profile_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.windows_profile_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Windows Profile must be available before this stage can be updated.</p>
                   ) : (
                     <StatusButtonGroup
@@ -1165,7 +1189,12 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.welding_status === 'complete' ? 'complete' : fulfillment.welding_status === 'partial' ? 'partial' : 'not_started'} />
                     <span>Frames/Sashes Welded</span>
-                    {order.windows_profile_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.windows_profile_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         Profile {order.windows_profile_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1174,7 +1203,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
-                  {order.windows_profile_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.windows_profile_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Windows Profile must be available before this stage can be updated.</p>
                   ) : (
                     <>
@@ -1210,7 +1241,12 @@ export default function OrderDetail() {
                     <div className="flex items-center gap-3">
                       <StatusBadge status={fulfillment.doors_status === 'complete' ? 'complete' : fulfillment.doors_status === 'partial' ? 'partial' : 'not_started'} />
                       <span>Doors Assembled</span>
-                      {order.hardware_status !== 'available' && (
+                      {order.production_status === 'hold' ? (
+                        <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                          <Pause className="h-3 w-3" />
+                          On Hold
+                        </Badge>
+                      ) : order.hardware_status !== 'available' && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
                           Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1219,7 +1255,9 @@ export default function OrderDetail() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4 space-y-4">
-                    {order.hardware_status !== 'available' ? (
+                    {order.production_status === 'hold' ? (
+                      <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                    ) : order.hardware_status !== 'available' ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
                       <>
@@ -1288,7 +1326,12 @@ export default function OrderDetail() {
                     <div className="flex items-center gap-3">
                       <StatusBadge status={fulfillment.sliding_doors_status === 'complete' ? 'complete' : fulfillment.sliding_doors_status === 'partial' ? 'partial' : 'not_started'} />
                       <span>Sliding Doors Assembled</span>
-                      {order.hardware_status !== 'available' && (
+                      {order.production_status === 'hold' ? (
+                        <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                          <Pause className="h-3 w-3" />
+                          On Hold
+                        </Badge>
+                      ) : order.hardware_status !== 'available' && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
                           Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1297,7 +1340,9 @@ export default function OrderDetail() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4 space-y-4">
-                    {order.hardware_status !== 'available' ? (
+                    {order.production_status === 'hold' ? (
+                      <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                    ) : order.hardware_status !== 'available' ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
                       <>
@@ -1365,7 +1410,12 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.assembly_status === 'complete' ? 'complete' : fulfillment.assembly_status === 'partial' ? 'partial' : 'not_started'} />
                     <span>Frame & Sash Assembled</span>
-                    {order.hardware_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.hardware_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1374,7 +1424,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
-                  {order.hardware_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.hardware_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                   ) : (
                     <>
@@ -1409,13 +1461,17 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.glass_status === 'complete' ? 'complete' : fulfillment.glass_status === 'partial' ? 'partial' : 'not_started'} />
                     <span>Glass Installed</span>
-                    {order.glass_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.glass_status !== 'available' ? (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         Glass {order.glass_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
                       </Badge>
-                    )}
-                    {order.glass_status === 'available' && fulfillment.assembly_status !== 'complete' && (
+                    ) : fulfillment.assembly_status !== 'complete' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         Frame & Sash Not Complete
@@ -1424,7 +1480,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
-                  {order.glass_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.glass_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p>
                   ) : fulfillment.assembly_status !== 'complete' ? (
                     <p className="text-sm text-muted-foreground">Frame & Sash must be assembled before glass can be installed.</p>
@@ -1461,7 +1519,12 @@ export default function OrderDetail() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={fulfillment.screens_cutting === 'complete' ? 'complete' : fulfillment.screens_cutting === 'partial' ? 'partial' : 'not_started'} />
                     <span>Made Screens</span>
-                    {order.screens_status !== 'available' && (
+                    {order.production_status === 'hold' ? (
+                      <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                        <Pause className="h-3 w-3" />
+                        On Hold
+                      </Badge>
+                    ) : order.screens_status !== 'available' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
                         Screens {order.screens_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
@@ -1470,7 +1533,9 @@ export default function OrderDetail() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4 space-y-4">
-                  {order.screens_status !== 'available' ? (
+                  {order.production_status === 'hold' ? (
+                    <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : order.screens_status !== 'available' ? (
                     <p className="text-sm text-muted-foreground">Screens must be available before this stage can be updated.</p>
                   ) : (
                     <>
@@ -1504,18 +1569,28 @@ export default function OrderDetail() {
                     <div className="flex items-center gap-3">
                       <StatusBadge status={step.status === 'complete' ? 'complete' : step.status === 'partial' ? 'partial' : 'not_started'} />
                       <span>{step.name}</span>
+                      {order.production_status === 'hold' && (
+                        <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                          <Pause className="h-3 w-3" />
+                          On Hold
+                        </Badge>
+                      )}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={step.status}
-                        onChange={value => updateCustomStep(step.id, { status: value })}
-                        options={manufacturingStatusOptions}
-                        disabled={!canUpdateManufacturing}
-                      />
-                    </div>
+                    {order.production_status === 'hold' ? (
+                      <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <Label>Status</Label>
+                        <StatusButtonGroup
+                          value={step.status}
+                          onChange={value => updateCustomStep(step.id, { status: value })}
+                          options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Notes</Label>
                       <Textarea
