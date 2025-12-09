@@ -701,9 +701,9 @@ export default function OrderDetail() {
                 { name: 'Reinforcement', status: order.reinforcement_status },
                 { name: 'Windows Profile', status: order.windows_profile_status },
                 { name: 'Glass', status: order.glass_status },
-                { name: 'Screens', status: order.screens_status },
-                { name: 'Plisse Screens', status: order.plisse_screens_status },
-                { name: 'Nail Fins', status: order.nail_fins_status },
+                ...(order.screen_type ? [{ name: 'Screens', status: order.screens_status }] : []),
+                ...(order.has_plisse_screens ? [{ name: 'Plisse Screens', status: order.plisse_screens_status }] : []),
+                ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: order.nail_fins_status }] : []),
                 { name: 'Hardware', status: order.hardware_status }
               ].map(component => {
                 const status = component.status || 'not_ordered';
