@@ -13,6 +13,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import { useRole } from "@/hooks/useRole";
 import { FileUploadZone, ParsedOrderData } from "@/components/order/FileUploadZone";
 import { ConstructionsPreview } from "@/components/order/ConstructionsPreview";
+import { ExtractionConfirmationDialog, ConfirmedExtractionData } from "@/components/order/ExtractionConfirmationDialog";
 
 interface SlidingDoorEntry {
   type: string;
@@ -105,7 +106,8 @@ export default function OrderCreate() {
   
   // Parsed file data
   const [parsedOrderData, setParsedOrderData] = useState<ParsedOrderData | null>(null);
-  
+  const [pendingParsedData, setPendingParsedData] = useState<ParsedOrderData | null>(null);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
   useEffect(() => {
     fetchCustomers();
     fetchSellers();
@@ -164,83 +166,42 @@ export default function OrderCreate() {
   };
 
   const handleFileParsed = (data: ParsedOrderData) => {
-    setParsedOrderData(data);
-    // Auto-fill from parsed data
-    if (data.quote_number) setOrderNumber(data.quote_number);
-    if (data.customer_name) {
+    // Show confirmation dialog instead of directly applying
+    setPendingParsedData(data);
+    setShowConfirmationDialog(true);
+  };
+
+  const handleConfirmExtraction = (confirmedData: ConfirmedExtractionData) => {
+    // Apply confirmed data to form
+    if (confirmedData.customerName) {
       setIsNewCustomer(true);
-      setCustomerName(data.customer_name);
+      setCustomerName(confirmedData.customerName);
     }
-    if (data.order_date) setOrderDate(data.order_date);
-    setWindowsCount(data.windows_count);
-    setDoorsCount(data.doors_count);
-    if (data.sliding_doors_count > 0) {
-      setHasSlidingDoors(true);
+    if (confirmedData.orderNumber) setOrderNumber(confirmedData.orderNumber);
+    if (confirmedData.orderDate) setOrderDate(confirmedData.orderDate);
+    setWindowsCount(confirmedData.windowsCount);
+    setDoorsCount(confirmedData.doorsCount);
+    setHasSlidingDoors(confirmedData.hasSlidingDoors);
+    if (confirmedData.hasSlidingDoors && confirmedData.slidingDoorEntries.length > 0) {
+      setSlidingDoorEntries(confirmedData.slidingDoorEntries);
     }
+    setScreenType(confirmedData.screenType);
+    setHasPlisseScreens(confirmedData.hasPlisseScreens);
+    setHasNailingFlanges(confirmedData.hasNailingFlanges);
+    setParsedOrderData(confirmedData.parsedOrderData);
     
-    // Auto-detect components from constructions
-    let hasScreens = false;
-    let hasPlisse = false;
-    let hasNailingFins = false;
-    let detectedScreenType = "";
-    
-    for (const construction of data.constructions) {
-      // Check screen_type on construction level
-      if (construction.screen_type) {
-        hasScreens = true;
-        const screenLower = construction.screen_type.toLowerCase();
-        if (screenLower.includes("flex")) {
-          detectedScreenType = "flex";
-        } else if (screenLower.includes("deca") || screenLower.includes("aluminum")) {
-          detectedScreenType = "deca";
-        }
-        if (screenLower.includes("plisse") || screenLower.includes("retractable")) {
-          hasPlisse = true;
-        }
-      }
-      
-      // Check components array
-      if (construction.components) {
-        for (const component of construction.components) {
-          const typeLower = component.component_type.toLowerCase();
-          const nameLower = (component.component_name || "").toLowerCase();
-          
-          // Detect screens
-          if (typeLower.includes("screen") || nameLower.includes("screen")) {
-            hasScreens = true;
-            if (typeLower.includes("flex") || nameLower.includes("flex")) {
-              detectedScreenType = "flex";
-            } else if (typeLower.includes("deca") || nameLower.includes("deca") || nameLower.includes("aluminum")) {
-              detectedScreenType = "deca";
-            }
-            if (typeLower.includes("plisse") || nameLower.includes("plisse") || nameLower.includes("retractable")) {
-              hasPlisse = true;
-            }
-          }
-          
-          // Detect nailing fins
-          if (typeLower.includes("nailing") || typeLower.includes("fin") || nameLower.includes("nailing") || nameLower.includes("flange")) {
-            hasNailingFins = true;
-          }
-        }
-      }
-    }
-    
-    // Apply detected components
-    if (hasScreens && detectedScreenType) {
-      setScreenType(detectedScreenType);
-    }
-    if (hasPlisse) {
-      setHasPlisseScreens(true);
-    }
-    if (hasNailingFins) {
-      setHasNailingFlanges(true);
-    }
+    setShowConfirmationDialog(false);
+    setPendingParsedData(null);
     
     toast({
-      title: "File parsed successfully",
-      description: `Extracted ${data.constructions.length} constructions from the file`,
+      title: "Data confirmed",
+      description: `Applied ${confirmedData.parsedOrderData.constructions.length} constructions to the order`,
     });
+  };
+
+  const handleCancelExtraction = () => {
+    setShowConfirmationDialog(false);
+    setPendingParsedData(null);
   };
 
   const handleClearFile = () => {
@@ -460,7 +421,17 @@ export default function OrderCreate() {
       setLoading(false);
     }
   };
-  return <div className="max-w-2xl mx-auto animate-fade-in">
+  return <>
+    {/* Extraction Confirmation Dialog */}
+    <ExtractionConfirmationDialog
+      open={showConfirmationDialog}
+      onOpenChange={setShowConfirmationDialog}
+      parsedData={pendingParsedData}
+      onConfirm={handleConfirmExtraction}
+      onCancel={handleCancelExtraction}
+    />
+    
+    <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate("/orders")} className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" />
@@ -950,5 +921,6 @@ export default function OrderCreate() {
             {loading ? "Creating..." : "Create Order"}
           </Button>}
       </div>
-    </div>;
+    </div>
+  </>;
 }
