@@ -37,6 +37,7 @@ interface Order {
   customer_name: string;
   order_date: string;
   delivery_date: string;
+  user_id: string;
   windows_count: number | null;
   doors_count: number | null;
   has_sliding_doors: boolean | null;
@@ -90,6 +91,7 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [sellers, setSellers] = useState<{ id: string; email: string; full_name: string | null }[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Step 1: Basic Info
@@ -98,6 +100,7 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
   const [orderNumber, setOrderNumber] = useState("");
   const [orderDate, setOrderDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
+  const [assignedSellerId, setAssignedSellerId] = useState("");
 
   // Step 2: Product Details
   const [windowsCount, setWindowsCount] = useState(0);
@@ -131,9 +134,35 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
   useEffect(() => {
     if (open) {
       fetchCustomers();
+      fetchSellers();
       setStep(1);
     }
   }, [open]);
+
+  const fetchSellers = async () => {
+    try {
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "seller");
+      
+      if (roleError) throw roleError;
+      
+      if (roleData && roleData.length > 0) {
+        const sellerIds = roleData.map(r => r.user_id);
+        const { data: profileData, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("id, email, full_name")
+          .in("id", sellerIds)
+          .eq("status", "active");
+        
+        if (profileError) throw profileError;
+        setSellers(profileData || []);
+      }
+    } catch (error) {
+      console.error("Error fetching sellers:", error);
+    }
+  };
 
   useEffect(() => {
     if (order && open) {
@@ -142,6 +171,7 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
       setOrderNumber(order.order_number);
       setOrderDate(order.order_date);
       setDeliveryDate(order.delivery_date);
+      setAssignedSellerId(order.user_id || "");
       setWindowsCount(order.windows_count || 0);
       setDoorsCount(order.doors_count || 0);
       setHasSlidingDoors(order.has_sliding_doors || false);
@@ -255,6 +285,7 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
       const { error } = await supabase
         .from("orders")
         .update({
+          user_id: assignedSellerId,
           customer_id: customerId,
           customer_name: customerName,
           order_number: orderNumber,
@@ -379,6 +410,26 @@ export function OrderEditDialog({ order, open, onOpenChange, onSave }: OrderEdit
                   onChange={(e) => setDeliveryDate(e.target.value)}
                 />
               </div>
+            </div>
+            
+            {/* Seller Assignment */}
+            <div className="space-y-2">
+              <Label>Assigned Seller *</Label>
+              <Select value={assignedSellerId} onValueChange={setAssignedSellerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a seller" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sellers.map((seller) => (
+                    <SelectItem key={seller.id} value={seller.id}>
+                      {seller.full_name || seller.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This order will only be visible to the assigned seller
+              </p>
             </div>
           </div>
         )}

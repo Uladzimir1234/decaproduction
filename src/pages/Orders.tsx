@@ -84,6 +84,7 @@ interface Order {
   customer_name: string;
   order_date: string;
   delivery_date: string;
+  user_id: string;
   fulfillment_percentage: number;
   windows_count: number;
   doors_count: number;
@@ -122,6 +123,7 @@ export default function Orders() {
   const { isWorker, isSeller, isAdmin, isManager, canUpdateOrdering, canUpdateManufacturing } = useRole();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
+  const [sellers, setSellers] = useState<Record<string, { email: string; full_name: string | null }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -138,7 +140,38 @@ export default function Orders() {
     fetchFulfillments();
     fetchCustomSteps();
     fetchDeliveryBatches();
+    fetchSellers();
   }, []);
+
+  const fetchSellers = async () => {
+    try {
+      // Get all users with seller role
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "seller");
+      
+      if (roleError) throw roleError;
+      
+      if (roleData && roleData.length > 0) {
+        const sellerIds = roleData.map(r => r.user_id);
+        const { data: profileData, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("id, email, full_name")
+          .in("id", sellerIds);
+        
+        if (profileError) throw profileError;
+        
+        const sellerMap: Record<string, { email: string; full_name: string | null }> = {};
+        profileData?.forEach(s => {
+          sellerMap[s.id] = { email: s.email, full_name: s.full_name };
+        });
+        setSellers(sellerMap);
+      }
+    } catch (error) {
+      console.error("Error fetching sellers:", error);
+    }
+  };
 
   const fetchCustomSteps = async () => {
     try {
@@ -727,6 +760,15 @@ export default function Orders() {
                                 {order.sliding_doors_count} Sliding
                               </span>
                             </>}
+                          {/* Show assigned seller for admin/manager */}
+                          {(isAdmin || isManager) && order.user_id && sellers[order.user_id] && (
+                            <>
+                              <span>•</span>
+                              <span className="text-primary font-medium">
+                                {sellers[order.user_id].full_name || sellers[order.user_id].email}
+                              </span>
+                            </>
+                          )}
                         </div>
                         {/* Ordering stages - show for non-workers, editable only for admin/manager */}
                         {!isWorker && notOrderedComponents.length > 0 && (
