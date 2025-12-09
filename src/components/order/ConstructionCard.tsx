@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Square, DoorOpen, PanelLeftOpen, Check } from "lucide-react";
+import { Square, DoorOpen, PanelLeftOpen, Check, AlertTriangle } from "lucide-react";
 
 interface ConstructionManufacturing {
   stage: string;
@@ -20,6 +20,7 @@ interface Construction {
   manufacturing?: ConstructionManufacturing[];
   notes_count?: number;
   is_delivered?: boolean;
+  open_issues_count?: number;
 }
 
 interface ConstructionCardProps {
@@ -55,15 +56,36 @@ export function ConstructionCard({ construction, onClick, isSelected }: Construc
     ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
     : 'N/A';
 
+  const hasOpenIssues = (construction.open_issues_count || 0) > 0;
+
   return (
     <Card
       onClick={onClick}
       className={`
-        p-2 cursor-pointer transition-all hover:shadow-md
+        p-2 cursor-pointer transition-all hover:shadow-md relative
         ${isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}
         ${construction.is_delivered ? 'opacity-60' : ''}
+        ${hasOpenIssues ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''}
       `}
     >
+      {/* Issue indicator */}
+      {hasOpenIssues && (
+        <div className="absolute -top-1.5 -right-1.5">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="bg-amber-500 text-white rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold shadow-sm">
+                  {construction.open_issues_count}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">{construction.open_issues_count} open issue{construction.open_issues_count > 1 ? 's' : ''}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
+
       <div className="space-y-1">
         {/* Header with number and quantity */}
         <div className="flex items-center justify-between">
@@ -84,6 +106,9 @@ export function ConstructionCard({ construction, onClick, isSelected }: Construc
             {construction.construction_type === 'window' ? 'Window' : 
              construction.construction_type === 'door' ? 'Door' : 'Sliding'}
           </span>
+          {hasOpenIssues && (
+            <AlertTriangle className="h-3 w-3 text-amber-500 ml-auto" />
+          )}
         </div>
 
         {/* Dimensions */}

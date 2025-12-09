@@ -291,6 +291,59 @@ export type Database = {
           },
         ]
       }
+      construction_issues: {
+        Row: {
+          construction_id: string
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          description: string
+          id: string
+          issue_type: string
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_by_email: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          construction_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          description: string
+          id?: string
+          issue_type: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_by_email?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          construction_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          description?: string
+          id?: string
+          issue_type?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_by_email?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_issues_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_manufacturing: {
         Row: {
           construction_id: string

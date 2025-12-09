@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { format } from "date-fns";
+import { ConstructionIssuesPanel, ConstructionIssue } from "./ConstructionIssuesPanel";
 
 interface ConstructionManufacturing {
   id: string;
@@ -108,6 +109,7 @@ export function ConstructionDetailPanel({
   const [notes, setNotes] = useState<ConstructionNote[]>([]);
   const [delivery, setDelivery] = useState<ConstructionDelivery | null>(null);
   const [components, setComponents] = useState<ConstructionComponent[]>([]);
+  const [issues, setIssues] = useState<ConstructionIssue[]>([]);
   const [newNoteText, setNewNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
 
@@ -200,6 +202,15 @@ export function ConstructionDetailPanel({
       .order('component_type');
     
     if (componentsData) setComponents(componentsData);
+
+    // Fetch issues
+    const { data: issuesData } = await supabase
+      .from('construction_issues')
+      .select('*')
+      .eq('construction_id', construction.id)
+      .order('created_at', { ascending: false });
+    
+    if (issuesData) setIssues(issuesData);
   };
 
   const handleComponentStatusUpdate = async (componentId: string, status: string) => {
@@ -519,6 +530,16 @@ export function ConstructionDetailPanel({
               </label>
             </div>
           </div>
+
+          <Separator />
+
+          {/* Issues Section */}
+          <ConstructionIssuesPanel
+            constructionId={construction.id}
+            issues={issues}
+            onIssuesChange={setIssues}
+            canEdit={canEdit}
+          />
 
           <Separator />
 

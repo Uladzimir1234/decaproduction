@@ -36,6 +36,7 @@ interface ConstructionWithExtra extends Construction {
   manufacturing?: { stage: string; status: string }[];
   notes_count?: number;
   is_delivered?: boolean;
+  open_issues_count?: number;
 }
 
 interface OrderMapProps {
@@ -71,6 +72,15 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
           event: '*',
           schema: 'public',
           table: 'construction_manufacturing',
+        },
+        () => fetchConstructions()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'construction_issues',
         },
         () => fetchConstructions()
       )
@@ -119,16 +129,25 @@ export function OrderMap({ orderId, orderNumber, isProductionReady, onClose }: O
       .select('construction_id, is_delivered')
       .in('construction_id', constructionIds);
 
+    // Fetch open issues count
+    const { data: issuesData } = await supabase
+      .from('construction_issues')
+      .select('construction_id')
+      .in('construction_id', constructionIds)
+      .eq('status', 'open');
+
     const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
       const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
       const notes_count = notesData?.filter(n => n.construction_id === c.id).length || 0;
       const deliveryRecord = deliveryData?.find(d => d.construction_id === c.id);
+      const open_issues_count = issuesData?.filter(i => i.construction_id === c.id).length || 0;
       
       return {
         ...c,
         manufacturing,
         notes_count,
         is_delivered: deliveryRecord?.is_delivered || false,
+        open_issues_count,
       };
     });
 
