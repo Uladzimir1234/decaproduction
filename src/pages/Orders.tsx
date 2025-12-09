@@ -773,11 +773,28 @@ export default function Orders() {
       return 'not_started';
     };
     
-    const getLockStatus = (componentStatus: string | null | undefined, componentName: string): LockInfo => {
-      if (componentStatus === 'available') {
+    // getLockStatus now checks construction_components first, then falls back to legacy order fields
+    const getLockStatus = (componentTypes: string[], legacyStatus: string | null | undefined, componentName: string): LockInfo => {
+      // First check construction_components if available
+      if (components.length > 0) {
+        const matchingComponents = components.filter(c => 
+          componentTypes.some(type => c.component_type.toLowerCase().includes(type.toLowerCase()))
+        );
+        if (matchingComponents.length > 0) {
+          const allAvailable = matchingComponents.every(c => c.status === 'available');
+          if (allAvailable) return { isLocked: false };
+          const anyOrdered = matchingComponents.some(c => c.status === 'ordered');
+          const statusText = anyOrdered ? 'Ordered' : 'Not Ordered';
+          return { isLocked: true, lockReason: `${componentName} ${statusText}` };
+        }
+        // No matching components in construction_components, check legacy
+      }
+      
+      // Fall back to legacy order field
+      if (legacyStatus === 'available') {
         return { isLocked: false };
       }
-      const statusText = componentStatus === 'ordered' ? 'Ordered' : 'Not Ordered';
+      const statusText = legacyStatus === 'ordered' ? 'Ordered' : 'Not Ordered';
       return { isLocked: true, lockReason: `${componentName} ${statusText}` };
     };
     
@@ -787,7 +804,7 @@ export default function Orders() {
       status: getStatus(f?.reinforcement_cutting), 
       hasNotes: false, 
       field: 'reinforcement_cutting',
-      lock: getLockStatus(order.reinforcement_status, '')
+      lock: getLockStatus(['reinforcement'], order.reinforcement_status, '')
     });
     
     // Profile Cutting - depends on windows_profile_status
@@ -796,7 +813,7 @@ export default function Orders() {
       status: getStatus(f?.profile_cutting), 
       hasNotes: false, 
       field: 'profile_cutting',
-      lock: getLockStatus(order.windows_profile_status, '')
+      lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, '')
     });
     
     // Frames/Sashes Welded - depends on windows_profile_status
@@ -805,7 +822,7 @@ export default function Orders() {
       status: getStatus(f?.welding_status), 
       hasNotes: !!(f?.welding_notes), 
       field: 'welding_status',
-      lock: getLockStatus(order.windows_profile_status, 'Profile')
+      lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, 'Profile')
     });
     
     // Doors Assembled - conditional, depends on hardware_status
@@ -815,7 +832,7 @@ export default function Orders() {
         status: getStatus(f?.doors_status), 
         hasNotes: !!(f?.doors_notes), 
         field: 'doors_status',
-        lock: getLockStatus(order.hardware_status, 'Hardware')
+        lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
       });
     }
     
@@ -826,7 +843,7 @@ export default function Orders() {
         status: getStatus(f?.sliding_doors_status), 
         hasNotes: !!(f?.sliding_doors_notes), 
         field: 'sliding_doors_status',
-        lock: getLockStatus(order.hardware_status, 'Hardware')
+        lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
       });
     }
     
@@ -836,7 +853,7 @@ export default function Orders() {
       status: getStatus(f?.assembly_status), 
       hasNotes: !!(f?.assembly_notes), 
       field: 'assembly_status',
-      lock: getLockStatus(order.hardware_status, 'Hardware')
+      lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
     });
     
     // Glass Installed - depends on glass_status
@@ -845,7 +862,7 @@ export default function Orders() {
       status: getStatus(f?.glass_status), 
       hasNotes: !!(f?.glass_notes), 
       field: 'glass_status',
-      lock: getLockStatus(order.glass_status, 'Glass')
+      lock: getLockStatus(['glass'], order.glass_status, 'Glass')
     });
     
     // Made Screens - depends on screens_status (only if has screens)
@@ -855,7 +872,7 @@ export default function Orders() {
         status: getStatus(f?.screens_cutting), 
         hasNotes: !!(f?.screens_notes), 
         field: 'screens_cutting',
-        lock: getLockStatus(order.screens_status, 'Screens')
+        lock: getLockStatus(['screen'], order.screens_status, 'Screens')
       });
     }
     
