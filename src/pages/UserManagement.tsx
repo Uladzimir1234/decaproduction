@@ -432,19 +432,19 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
                     <TableCell className="text-right">
-                      {user.email !== "ulad@decawindows.com" && (
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditUser(user);
-                              setEditDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditUser(user);
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        {user.email !== "ulad@decawindows.com" && (
                           <Button
                             variant={user.status === "active" ? "destructive" : "outline"}
                             size="sm"
@@ -462,8 +462,8 @@ export default function UserManagement() {
                               </>
                             )}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
