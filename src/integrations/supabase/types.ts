@@ -267,6 +267,9 @@ export type Database = {
           order_id: string
           status: string
           step_type: string
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_email: string | null
         }
         Insert: {
           created_at?: string
@@ -277,6 +280,9 @@ export type Database = {
           order_id: string
           status?: string
           step_type: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
         }
         Update: {
           created_at?: string
@@ -287,6 +293,9 @@ export type Database = {
           order_id?: string
           status?: string
           step_type?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
         }
         Relationships: [
           {
@@ -456,6 +465,9 @@ export type Database = {
           sliding_doors_image_url: string | null
           sliding_doors_notes: string | null
           sliding_doors_status: string | null
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_email: string | null
           welding_notes: string | null
           welding_status: string | null
           windows_delivered: boolean | null
@@ -520,6 +532,9 @@ export type Database = {
           sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
           sliding_doors_status?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
           welding_notes?: string | null
           welding_status?: string | null
           windows_delivered?: boolean | null
@@ -584,6 +599,9 @@ export type Database = {
           sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
           sliding_doors_status?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
           welding_notes?: string | null
           welding_status?: string | null
           windows_delivered?: boolean | null
@@ -626,6 +644,9 @@ export type Database = {
           nail_fins_status: string | null
           order_date: string
           order_number: string
+          ordering_updated_at: string | null
+          ordering_updated_by: string | null
+          ordering_updated_by_email: string | null
           plisse_door_count: number | null
           plisse_screens_count: number | null
           plisse_screens_order_date: string | null
@@ -675,6 +696,9 @@ export type Database = {
           nail_fins_status?: string | null
           order_date: string
           order_number: string
+          ordering_updated_at?: string | null
+          ordering_updated_by?: string | null
+          ordering_updated_by_email?: string | null
           plisse_door_count?: number | null
           plisse_screens_count?: number | null
           plisse_screens_order_date?: string | null
@@ -724,6 +748,9 @@ export type Database = {
           nail_fins_status?: string | null
           order_date?: string
           order_number?: string
+          ordering_updated_at?: string | null
+          ordering_updated_by?: string | null
+          ordering_updated_by_email?: string | null
           plisse_door_count?: number | null
           plisse_screens_count?: number | null
           plisse_screens_order_date?: string | null
