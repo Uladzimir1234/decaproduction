@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -184,27 +184,39 @@ export default function Orders() {
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
   
-  // Toggle states with localStorage persistence
-  const [showOrderMap, setShowOrderMap] = useState(() => {
-    const saved = localStorage.getItem('orders_showOrderMap');
-    return saved !== null ? saved === 'true' : true;
-  });
-  const [showAvailableComponents, setShowAvailableComponents] = useState(() => {
-    const saved = localStorage.getItem('orders_showAvailableComponents');
-    return saved !== null ? saved === 'true' : true;
-  });
+  // Per-order toggle states for Order Map and Available Components
+  const [expandedOrderMaps, setExpandedOrderMaps] = useState<Set<string>>(new Set());
+  const [expandedAvailableComponents, setExpandedAvailableComponents] = useState<Set<string>>(new Set());
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
 
-  // Persist toggle states to localStorage
-  useEffect(() => {
-    localStorage.setItem('orders_showOrderMap', String(showOrderMap));
-  }, [showOrderMap]);
+  // Toggle handlers for per-order visibility
+  const toggleOrderMap = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedOrderMaps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
 
-  useEffect(() => {
-    localStorage.setItem('orders_showAvailableComponents', String(showAvailableComponents));
-  }, [showAvailableComponents]);
+  const toggleAvailableComponents = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedAvailableComponents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -1342,45 +1354,6 @@ export default function Orders() {
                 </SelectContent>
               </Select>
             )}
-            
-            {/* Toggle switches for visibility */}
-            <div className="flex items-center gap-4 ml-auto">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5">
-                      <Switch 
-                        checked={showOrderMap} 
-                        onCheckedChange={setShowOrderMap}
-                        id="toggle-order-map"
-                      />
-                      <label htmlFor="toggle-order-map" className="cursor-pointer">
-                        <Grid3X3 className="h-4 w-4 text-muted-foreground" />
-                      </label>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>Show/Hide Order Map</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5">
-                      <Switch 
-                        checked={showAvailableComponents} 
-                        onCheckedChange={setShowAvailableComponents}
-                        id="toggle-available"
-                      />
-                      <label htmlFor="toggle-available" className="cursor-pointer">
-                        <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                      </label>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>Show/Hide Available Components</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1606,8 +1579,8 @@ export default function Orders() {
                             })}
                           </div>
                         )}
-                        {/* Available components - only show for file-extracted orders */}
-                        {showAvailableComponents && !isWorker && availableComponents.length > 0 && (
+                        {/* Available components - per-order toggle */}
+                        {expandedAvailableComponents.has(order.id) && !isWorker && availableComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
                             <span className="text-xs text-success font-medium mr-1">Available:</span>
@@ -1932,6 +1905,44 @@ export default function Orders() {
                       </div>
 
                       <div className="flex items-center gap-3">
+                        {/* Per-order toggle buttons */}
+                        <div className="flex items-center gap-1">
+                          {!isWorker && availableComponents.length > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={(e) => toggleAvailableComponents(order.id, e)}
+                                  >
+                                    <CheckCircle className={`h-4 w-4 ${expandedAvailableComponents.has(order.id) ? 'text-success' : 'text-muted-foreground'}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Toggle Available Components</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {ordersWithConstructions.has(order.id) && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={(e) => toggleOrderMap(order.id, e)}
+                                  >
+                                    <Grid3X3 className={`h-4 w-4 ${expandedOrderMaps.has(order.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Toggle Order Map</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                        
                         <ProgressCircle
                           value={calculateFulfillmentPercentage(order)}
                           size="sm"
@@ -1968,8 +1979,8 @@ export default function Orders() {
                       </div>
                     </div>
 
-                    {/* Inline Order Map - Controlled by toggle */}
-                    {showOrderMap && ordersWithConstructions.has(order.id) && (
+                    {/* Inline Order Map - per-order toggle */}
+                    {expandedOrderMaps.has(order.id) && ordersWithConstructions.has(order.id) && (
                       <div className="mt-3 pt-3 border-t border-border">
                         <OrderMapInline
                           orderId={order.id}
