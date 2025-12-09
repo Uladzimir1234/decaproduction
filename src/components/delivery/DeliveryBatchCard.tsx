@@ -61,6 +61,7 @@ interface DeliveryBatchCardProps {
   customShippingItems: BatchCustomShippingItem[];
   customDeliveryItems: BatchCustomDeliveryItem[];
   canEdit: boolean;
+  isAdmin: boolean;
   onRefresh: () => void;
   onEdit: () => void;
   batchNumber: number;
@@ -93,6 +94,7 @@ export function DeliveryBatchCard({
   customShippingItems,
   customDeliveryItems,
   canEdit,
+  isAdmin,
   onRefresh,
   onEdit,
   batchNumber
@@ -320,14 +322,14 @@ export function DeliveryBatchCard({
                 {completedDelivery}/{totalDelivery}
               </Badge>
               {canEdit && (
-                <>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={deleteBatch}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={deleteBatch}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               )}
             </div>
           </div>
@@ -389,7 +391,7 @@ export function DeliveryBatchCard({
                     <Checkbox checked={item.is_complete} onCheckedChange={(c) => toggleCustomShipping(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
                     <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>{item.name}</span>
                     <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    {canEdit && (
+                    {isAdmin && (
                       <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomShipping(item.id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -456,7 +458,7 @@ export function DeliveryBatchCard({
                     <Checkbox checked={item.is_delivered} onCheckedChange={(c) => toggleCustomDelivery(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
                     <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{item.name}</span>
                     <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    {canEdit && (
+                    {isAdmin && (
                       <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomDelivery(item.id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>

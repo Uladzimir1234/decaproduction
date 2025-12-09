@@ -94,7 +94,7 @@ const DELIVERY_ITEM_TYPES = [
 
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
-  const { canUpdateManufacturing, isSeller } = useRole();
+  const { canUpdateManufacturing, isSeller, isAdmin } = useRole();
   const [batches, setBatches] = useState<DeliveryBatch[]>([]);
   const [batchShippingItems, setBatchShippingItems] = useState<Record<string, BatchShippingItem[]>>({});
   const [batchDeliveryItems, setBatchDeliveryItems] = useState<Record<string, BatchDeliveryItem[]>>({});
@@ -590,6 +590,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
               customShippingItems={batchCustomShipping[batch.id] || []}
               customDeliveryItems={batchCustomDelivery[batch.id] || []}
               canEdit={canEdit}
+              isAdmin={isAdmin}
               onRefresh={fetchBatches}
               onEdit={() => initEditBatch(batch.id)}
             />

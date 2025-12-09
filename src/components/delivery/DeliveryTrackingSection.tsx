@@ -122,7 +122,7 @@ export function DeliveryTrackingSection({
   manufacturingProgress 
 }: DeliveryTrackingSectionProps) {
   const { toast } = useToast();
-  const { canUpdateManufacturing, isWorker, isSeller } = useRole();
+  const { canUpdateManufacturing, isWorker, isSeller, isAdmin } = useRole();
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newDeliveryDate, setNewDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
@@ -697,7 +697,7 @@ export function DeliveryTrackingSection({
                       <Badge variant="secondary" className="text-xs">
                         ×{item.quantity}
                       </Badge>
-                      {canEdit && (
+                      {isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -850,7 +850,7 @@ export function DeliveryTrackingSection({
                       <Badge variant="secondary" className="text-xs">
                         ×{item.quantity}
                       </Badge>
-                      {canEdit && !isLocked && (
+                      {isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
