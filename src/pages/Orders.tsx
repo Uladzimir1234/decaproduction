@@ -141,6 +141,34 @@ export default function Orders() {
     fetchCustomSteps();
     fetchDeliveryBatches();
     fetchSellers();
+
+    // Subscribe to real-time updates on orders table
+    const channel = supabase
+      .channel('orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            setOrders(prev => prev.map(order => 
+              order.id === payload.new.id ? { ...order, ...payload.new } : order
+            ));
+          } else if (payload.eventType === 'INSERT') {
+            setOrders(prev => [payload.new as Order, ...prev]);
+          } else if (payload.eventType === 'DELETE') {
+            setOrders(prev => prev.filter(order => order.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchSellers = async () => {
@@ -207,7 +235,20 @@ export default function Orders() {
         .update({ status: newStatus })
         .eq("id", stepId);
       
-      if (error) throw error;
+      if (error) {
+        // Check if error is due to order being on hold
+        if (error.message?.includes('order is on hold')) {
+          toast({
+            title: "Order is on hold",
+            description: "This order was put on hold. Custom steps cannot be updated. Refreshing...",
+            variant: "destructive",
+          });
+          fetchOrders();
+          fetchCustomSteps();
+          return;
+        }
+        throw error;
+      }
       
       setCustomSteps(prev => prev.map(step => 
         step.id === stepId ? { ...step, status: newStatus } : step
@@ -405,7 +446,19 @@ export default function Orders() {
         .update({ [field]: newStatus })
         .eq("order_id", orderId);
       
-      if (error) throw error;
+      if (error) {
+        // Check if error is due to order being on hold
+        if (error.message?.includes('order is on hold')) {
+          toast({
+            title: "Order is on hold",
+            description: "This order was put on hold. Manufacturing stages cannot be updated. Refreshing...",
+            variant: "destructive",
+          });
+          fetchOrders();
+          return;
+        }
+        throw error;
+      }
       
       // Update local state
       setFulfillments(prev => ({
