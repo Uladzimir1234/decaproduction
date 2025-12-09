@@ -397,6 +397,79 @@ export default function OrderDetail() {
       .join(' ');
   };
 
+  // Helper functions to check component availability - considers both legacy order fields AND file-extracted components
+  const isProfileAvailable = () => {
+    // Check if any file-extracted profile components are available
+    const profileComponent = aggregatedComponents.find(c => c.component_type === 'profile');
+    if (profileComponent) {
+      return profileComponent.status === 'available';
+    }
+    // Fall back to legacy order field
+    return order?.windows_profile_status === 'available';
+  };
+
+  const isGlassAvailable = () => {
+    // Check if any file-extracted glass components are available
+    const glassComponent = aggregatedComponents.find(c => c.component_type === 'glass');
+    if (glassComponent) {
+      return glassComponent.status === 'available';
+    }
+    // Fall back to legacy order field
+    return order?.glass_status === 'available';
+  };
+
+  const isHardwareAvailable = () => {
+    // Check if any file-extracted hardware components are available
+    const hardwareComponent = aggregatedComponents.find(c => c.component_type === 'hardware');
+    if (hardwareComponent) {
+      return hardwareComponent.status === 'available';
+    }
+    // Fall back to legacy order field
+    return order?.hardware_status === 'available';
+  };
+
+  const isScreensAvailable = () => {
+    // Check if any file-extracted screens components are available
+    const screensComponent = aggregatedComponents.find(c => c.component_type === 'screens');
+    if (screensComponent) {
+      return screensComponent.status === 'available';
+    }
+    // Fall back to legacy order field
+    return order?.screens_status === 'available';
+  };
+
+  const getProfileLockText = () => {
+    const profileComponent = aggregatedComponents.find(c => c.component_type === 'profile');
+    if (profileComponent) {
+      return profileComponent.status === 'ordered' ? 'Ordered' : 'Not Ordered';
+    }
+    return order?.windows_profile_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  const getGlassLockText = () => {
+    const glassComponent = aggregatedComponents.find(c => c.component_type === 'glass');
+    if (glassComponent) {
+      return glassComponent.status === 'ordered' ? 'Ordered' : 'Not Ordered';
+    }
+    return order?.glass_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  const getHardwareLockText = () => {
+    const hardwareComponent = aggregatedComponents.find(c => c.component_type === 'hardware');
+    if (hardwareComponent) {
+      return hardwareComponent.status === 'ordered' ? 'Ordered' : 'Not Ordered';
+    }
+    return order?.hardware_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  const getScreensLockText = () => {
+    const screensComponent = aggregatedComponents.find(c => c.component_type === 'screens');
+    if (screensComponent) {
+      return screensComponent.status === 'ordered' ? 'Ordered' : 'Not Ordered';
+    }
+    return order?.screens_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
   const addCustomStep = async (stepType: 'ordering' | 'manufacturing', name: string) => {
     if (!id || !name.trim()) return;
     const defaultStatus = stepType === 'ordering' ? 'not_ordered' : 'not_started';
@@ -1216,10 +1289,10 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : order.windows_profile_status !== 'available' && (
+                    ) : !isProfileAvailable() && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        {order.windows_profile_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                        {getProfileLockText()}
                       </Badge>
                     )}
                   </div>
@@ -1227,8 +1300,8 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : order.windows_profile_status !== 'available' ? (
-                    <p className="text-sm text-muted-foreground">Windows Profile must be available before this stage can be updated.</p>
+                  ) : !isProfileAvailable() ? (
+                    <p className="text-sm text-muted-foreground">Profile must be available before this stage can be updated.</p>
                   ) : (
                     <StatusButtonGroup
                       value={fulfillment.profile_cutting || "not_started"}
@@ -1251,10 +1324,10 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : order.windows_profile_status !== 'available' && (
+                    ) : !isProfileAvailable() && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        Profile {order.windows_profile_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                        Profile {getProfileLockText()}
                       </Badge>
                     )}
                   </div>
@@ -1262,8 +1335,8 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : order.windows_profile_status !== 'available' ? (
-                    <p className="text-sm text-muted-foreground">Windows Profile must be available before this stage can be updated.</p>
+                  ) : !isProfileAvailable() ? (
+                    <p className="text-sm text-muted-foreground">Profile must be available before this stage can be updated.</p>
                   ) : (
                     <>
                       <div className="space-y-3">
@@ -1303,10 +1376,10 @@ export default function OrderDetail() {
                           <Pause className="h-3 w-3" />
                           On Hold
                         </Badge>
-                      ) : order.hardware_status !== 'available' && (
+                      ) : !isHardwareAvailable() && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
-                          Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                          Hardware {getHardwareLockText()}
                         </Badge>
                       )}
                     </div>
@@ -1314,7 +1387,7 @@ export default function OrderDetail() {
                   <AccordionContent className="pt-4 space-y-4">
                     {order.production_status === 'hold' ? (
                       <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                    ) : order.hardware_status !== 'available' ? (
+                    ) : !isHardwareAvailable() ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
                       <>
@@ -1388,10 +1461,10 @@ export default function OrderDetail() {
                           <Pause className="h-3 w-3" />
                           On Hold
                         </Badge>
-                      ) : order.hardware_status !== 'available' && (
+                      ) : !isHardwareAvailable() && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
-                          Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                          Hardware {getHardwareLockText()}
                         </Badge>
                       )}
                     </div>
@@ -1399,7 +1472,7 @@ export default function OrderDetail() {
                   <AccordionContent className="pt-4 space-y-4">
                     {order.production_status === 'hold' ? (
                       <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                    ) : order.hardware_status !== 'available' ? (
+                    ) : !isHardwareAvailable() ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
                       <>
@@ -1472,10 +1545,10 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : order.hardware_status !== 'available' && (
+                    ) : !isHardwareAvailable() && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        Hardware {order.hardware_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                        Hardware {getHardwareLockText()}
                       </Badge>
                     )}
                   </div>
@@ -1483,7 +1556,7 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : order.hardware_status !== 'available' ? (
+                  ) : !isHardwareAvailable() ? (
                     <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                   ) : (
                     <>
@@ -1523,10 +1596,10 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : order.glass_status !== 'available' ? (
+                    ) : !isGlassAvailable() ? (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        Glass {order.glass_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                        Glass {getGlassLockText()}
                       </Badge>
                     ) : fulfillment.assembly_status !== 'complete' && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1539,7 +1612,7 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : order.glass_status !== 'available' ? (
+                  ) : !isGlassAvailable() ? (
                     <p className="text-sm text-muted-foreground">Glass must be available before this stage can be updated.</p>
                   ) : fulfillment.assembly_status !== 'complete' ? (
                     <p className="text-sm text-muted-foreground">Frame & Sash must be assembled before glass can be installed.</p>
@@ -1581,10 +1654,10 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : order.screens_status !== 'available' && (
+                    ) : !isScreensAvailable() && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        Screens {order.screens_status === 'not_ordered' ? 'Not Ordered' : 'Ordered'}
+                        Screens {getScreensLockText()}
                       </Badge>
                     )}
                   </div>
@@ -1592,7 +1665,7 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : order.screens_status !== 'available' ? (
+                  ) : !isScreensAvailable() ? (
                     <p className="text-sm text-muted-foreground">Screens must be available before this stage can be updated.</p>
                   ) : (
                     <>
