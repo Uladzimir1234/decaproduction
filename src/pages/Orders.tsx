@@ -961,8 +961,8 @@ export default function Orders() {
                                 {order.sliding_doors_count} Sliding
                               </span>
                             </>}
-                          {/* Show assigned seller for admin/manager */}
-                          {(isAdmin || isManager) && order.user_id && sellers[order.user_id] && (
+                          {/* Show assigned seller for admin/manager/worker */}
+                          {(isAdmin || isManager || isWorker) && order.user_id && sellers[order.user_id] && (
                             <>
                               <span>•</span>
                               <span className="text-primary font-medium">
