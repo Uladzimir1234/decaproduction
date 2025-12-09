@@ -13,6 +13,7 @@ import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 interface OrderFulfillment {
@@ -791,8 +792,23 @@ export default function Orders() {
                         <div className="flex flex-wrap items-center gap-1.5 mt-2">
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
+                          {order.production_status === 'hold' && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 gap-1">
+                                    <Pause className="h-3 w-3" />
+                                    Locked
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Manufacturing is locked while order is on hold</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           {manufacturingStages.map((stage) => (
-                            canUpdateManufacturing ? (
+                            canUpdateManufacturing && order.production_status !== 'hold' ? (
                               <Popover key={stage.name}>
                                 <PopoverTrigger asChild>
                                   <button 
@@ -823,7 +839,7 @@ export default function Orders() {
                                 className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
                                   stage.status === 'complete' ? 'bg-emerald-500' : 
                                   stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                }`}
+                                } ${order.production_status === 'hold' ? 'opacity-50' : ''}`}
                               >
                                 {stage.name}
                                 {stage.hasNotes && (
@@ -834,7 +850,7 @@ export default function Orders() {
                           ))}
                           {/* Custom Manufacturing Steps */}
                           {customManufacturingSteps.map((step) => (
-                            canUpdateManufacturing ? (
+                            canUpdateManufacturing && order.production_status !== 'hold' ? (
                               <Popover key={step.id}>
                                 <PopoverTrigger asChild>
                                   <button 
@@ -865,7 +881,7 @@ export default function Orders() {
                                 className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 border-2 border-dashed border-white/30 ${
                                   step.status === 'complete' ? 'bg-emerald-500' : 
                                   step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                }`}
+                                } ${order.production_status === 'hold' ? 'opacity-50' : ''}`}
                               >
                                 {step.name}
                                 {step.notes && (
