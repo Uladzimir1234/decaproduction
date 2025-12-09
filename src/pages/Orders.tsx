@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
+import { format } from "date-fns";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -58,6 +59,10 @@ interface OrderFulfillment {
   shipping_spec_labels: boolean | null;
   shipping_nailing_fins: boolean | null;
   shipping_brackets: boolean | null;
+  // Tracking fields
+  updated_at: string | null;
+  updated_by: string | null;
+  updated_by_email: string | null;
 }
 
 interface CustomStep {
@@ -68,6 +73,9 @@ interface CustomStep {
   status: string;
   order_date: string | null;
   notes: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  updated_by_email: string | null;
 }
 
 interface DeliveryBatch {
@@ -116,7 +124,26 @@ interface Order {
   hardware_order_date: string | null;
   production_status: string;
   hold_started_at: string | null;
+  // Ordering tracking fields
+  ordering_updated_at: string | null;
+  ordering_updated_by: string | null;
+  ordering_updated_by_email: string | null;
 }
+
+// Helper to format tracking info for tooltips
+const formatTrackingInfo = (updatedAt: string | null, updatedByEmail: string | null): string | null => {
+  if (!updatedAt) return null;
+  try {
+    const date = new Date(updatedAt);
+    const formattedDate = format(date, "MMM d, yyyy 'at' h:mm a");
+    return updatedByEmail 
+      ? `Last updated: ${formattedDate}\nBy: ${updatedByEmail}`
+      : `Last updated: ${formattedDate}`;
+  } catch {
+    return null;
+  }
+};
+
 export default function Orders() {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -134,13 +161,26 @@ export default function Orders() {
   const [deleting, setDeleting] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
+  
+  // Ref to track if initial data has been loaded (to avoid toast on first load)
+  const initialLoadComplete = useRef(false);
 
   useEffect(() => {
-    fetchOrders();
-    fetchFulfillments();
-    fetchCustomSteps();
-    fetchDeliveryBatches();
-    fetchSellers();
+    const loadInitialData = async () => {
+      await Promise.all([
+        fetchOrders(),
+        fetchFulfillments(),
+        fetchCustomSteps(),
+        fetchDeliveryBatches(),
+        fetchSellers()
+      ]);
+      // Mark initial load as complete after data is fetched
+      setTimeout(() => {
+        initialLoadComplete.current = true;
+      }, 1000);
+    };
+    
+    loadInitialData();
 
     // Subscribe to real-time updates on orders table
     const ordersChannel = supabase
@@ -154,9 +194,19 @@ export default function Orders() {
         },
         (payload) => {
           if (payload.eventType === 'UPDATE') {
+            const updatedOrder = payload.new as Order;
             setOrders(prev => prev.map(order => 
-              order.id === payload.new.id ? { ...order, ...payload.new } : order
+              order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
             ));
+            
+            // Show toast for ordering stage updates
+            if (initialLoadComplete.current && updatedOrder.ordering_updated_by_email) {
+              const order = orders.find(o => o.id === updatedOrder.id);
+              toast({
+                title: "Ordering Stage Updated",
+                description: `Order #${order?.order_number || 'Unknown'} updated by ${updatedOrder.ordering_updated_by_email}`,
+              });
+            }
           } else if (payload.eventType === 'INSERT') {
             setOrders(prev => [payload.new as Order, ...prev]);
           } else if (payload.eventType === 'DELETE') {
@@ -183,6 +233,15 @@ export default function Orders() {
               ...prev,
               [newFulfillment.order_id]: newFulfillment
             }));
+            
+            // Show toast for manufacturing stage updates
+            if (initialLoadComplete.current && payload.eventType === 'UPDATE' && newFulfillment.updated_by_email) {
+              const order = orders.find(o => o.id === newFulfillment.order_id);
+              toast({
+                title: "Manufacturing Stage Updated",
+                description: `Order #${order?.order_number || 'Unknown'} updated by ${newFulfillment.updated_by_email}`,
+              });
+            }
           } else if (payload.eventType === 'DELETE') {
             const oldFulfillment = payload.old as { order_id: string };
             setFulfillments(prev => {
@@ -209,9 +268,18 @@ export default function Orders() {
           if (payload.eventType === 'INSERT') {
             setCustomSteps(prev => [...prev, payload.new as CustomStep]);
           } else if (payload.eventType === 'UPDATE') {
+            const updatedStep = payload.new as CustomStep;
             setCustomSteps(prev => prev.map(step => 
-              step.id === payload.new.id ? { ...step, ...payload.new } : step
+              step.id === updatedStep.id ? { ...step, ...updatedStep } : step
             ));
+            
+            // Show toast for custom step updates
+            if (initialLoadComplete.current && updatedStep.updated_by_email) {
+              toast({
+                title: "Custom Step Updated",
+                description: `"${updatedStep.name}" updated by ${updatedStep.updated_by_email}`,
+              });
+            }
           } else if (payload.eventType === 'DELETE') {
             setCustomSteps(prev => prev.filter(step => step.id !== payload.old.id));
           }
@@ -249,7 +317,7 @@ export default function Orders() {
       supabase.removeChannel(customStepsChannel);
       supabase.removeChannel(deliveryBatchesChannel);
     };
-  }, []);
+  }, [orders, toast]);
 
   const fetchSellers = async () => {
     try {
@@ -908,16 +976,29 @@ export default function Orders() {
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                             <span className="text-xs text-destructive font-medium mr-1">Needs ordering:</span>
-                            {notOrderedComponents.map((component) => (
-                              (canUpdateOrdering && !isSeller) ? (
+                            {notOrderedComponents.map((component) => {
+                              const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
+                              
+                              return (canUpdateOrdering && !isSeller) ? (
                                 <Popover key={component.name}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                        {component.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <PopoverTrigger asChild>
+                                        <TooltipTrigger asChild>
+                                          <button onClick={(e) => e.stopPropagation()} type="button">
+                                            <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                              {component.name}
+                                            </Badge>
+                                          </button>
+                                        </TooltipTrigger>
+                                      </PopoverTrigger>
+                                      {orderingTrackingInfo && (
+                                        <TooltipContent className="whitespace-pre-line">
+                                          <p>{orderingTrackingInfo}</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
                                   <PopoverContent className="w-36 p-0" align="start">
                                     <StatusPopoverButtons
                                       currentValue="not_ordered"
@@ -927,27 +1008,51 @@ export default function Orders() {
                                   </PopoverContent>
                                 </Popover>
                               ) : (
-                                <Badge key={component.name} variant="destructive" className="text-xs py-0 px-1.5">
-                                  {component.name}
-                                </Badge>
-                              )
-                            ))}
+                                <TooltipProvider key={component.name}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="destructive" className="text-xs py-0 px-1.5">
+                                        {component.name}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    {orderingTrackingInfo && (
+                                      <TooltipContent className="whitespace-pre-line">
+                                        <p>{orderingTrackingInfo}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })}
                           </div>
                         )}
                         {!isWorker && orderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium mr-1">Ordered:</span>
-                            {orderedComponents.map((component) => (
-                              (canUpdateOrdering && !isSeller) ? (
+                            {orderedComponents.map((component) => {
+                              const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
+                              
+                              return (canUpdateOrdering && !isSeller) ? (
                                 <Popover key={component.name}>
-                                  <PopoverTrigger asChild>
-                                    <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
-                                        {component.name}
-                                      </Badge>
-                                    </button>
-                                  </PopoverTrigger>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <PopoverTrigger asChild>
+                                        <TooltipTrigger asChild>
+                                          <button onClick={(e) => e.stopPropagation()} type="button">
+                                            <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
+                                              {component.name}
+                                            </Badge>
+                                          </button>
+                                        </TooltipTrigger>
+                                      </PopoverTrigger>
+                                      {orderingTrackingInfo && (
+                                        <TooltipContent className="whitespace-pre-line">
+                                          <p>{orderingTrackingInfo}</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
                                   <PopoverContent className="w-36 p-0" align="start">
                                     <StatusPopoverButtons
                                       currentValue="ordered"
@@ -957,11 +1062,22 @@ export default function Orders() {
                                   </PopoverContent>
                                 </Popover>
                               ) : (
-                                <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
-                                  {component.name}
-                                </Badge>
-                              )
-                            ))}
+                                <TooltipProvider key={component.name}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                        {component.name}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    {orderingTrackingInfo && (
+                                      <TooltipContent className="whitespace-pre-line">
+                                        <p>{orderingTrackingInfo}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })}
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -982,24 +1098,45 @@ export default function Orders() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          {manufacturingStages.map((stage) => (
-                            canUpdateManufacturing && order.production_status !== 'hold' ? (
+                          {manufacturingStages.map((stage) => {
+                            const f = fulfillments[order.id];
+                            const trackingInfo = formatTrackingInfo(f?.updated_at, f?.updated_by_email);
+                            
+                            const badgeContent = (
+                              <span 
+                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
+                                  stage.status === 'complete' ? 'bg-emerald-500' : 
+                                  stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                } ${order.production_status === 'hold' ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                              >
+                                {stage.name}
+                                {stage.hasNotes && (
+                                  <AlertCircle className="h-3 w-3" />
+                                )}
+                              </span>
+                            );
+                            
+                            return canUpdateManufacturing && order.production_status !== 'hold' ? (
                               <Popover key={stage.name}>
-                                <PopoverTrigger asChild>
-                                  <button 
-                                    onClick={(e) => e.stopPropagation()}
-                                    type="button"
-                                    className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity ${
-                                      stage.status === 'complete' ? 'bg-emerald-500' : 
-                                      stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                    }`}
-                                  >
-                                    {stage.name}
-                                    {stage.hasNotes && (
-                                      <AlertCircle className="h-3 w-3" />
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <PopoverTrigger asChild>
+                                      <TooltipTrigger asChild>
+                                        <button 
+                                          onClick={(e) => e.stopPropagation()}
+                                          type="button"
+                                        >
+                                          {badgeContent}
+                                        </button>
+                                      </TooltipTrigger>
+                                    </PopoverTrigger>
+                                    {trackingInfo && (
+                                      <TooltipContent className="whitespace-pre-line">
+                                        <p>{trackingInfo}</p>
+                                      </TooltipContent>
                                     )}
-                                  </button>
-                                </PopoverTrigger>
+                                  </Tooltip>
+                                </TooltipProvider>
                                 <PopoverContent className="w-36 p-0" align="start">
                                   <StatusPopoverButtons
                                     currentValue={stage.status}
@@ -1009,39 +1146,59 @@ export default function Orders() {
                                 </PopoverContent>
                               </Popover>
                             ) : (
+                              <TooltipProvider key={stage.name}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    {badgeContent}
+                                  </TooltipTrigger>
+                                  {trackingInfo && (
+                                    <TooltipContent className="whitespace-pre-line">
+                                      <p>{trackingInfo}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })}
+                          {/* Custom Manufacturing Steps */}
+                          {customManufacturingSteps.map((step) => {
+                            const trackingInfo = formatTrackingInfo(step.updated_at, step.updated_by_email);
+                            
+                            const badgeContent = (
                               <span 
-                                key={stage.name}
-                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
-                                  stage.status === 'complete' ? 'bg-emerald-500' : 
-                                  stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' ? 'opacity-50' : ''}`}
+                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 border-2 border-dashed border-white/30 ${
+                                  step.status === 'complete' ? 'bg-emerald-500' : 
+                                  step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
+                                } ${order.production_status === 'hold' ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                               >
-                                {stage.name}
-                                {stage.hasNotes && (
+                                {step.name}
+                                {step.notes && (
                                   <AlertCircle className="h-3 w-3" />
                                 )}
                               </span>
-                            )
-                          ))}
-                          {/* Custom Manufacturing Steps */}
-                          {customManufacturingSteps.map((step) => (
-                            canUpdateManufacturing && order.production_status !== 'hold' ? (
+                            );
+                            
+                            return canUpdateManufacturing && order.production_status !== 'hold' ? (
                               <Popover key={step.id}>
-                                <PopoverTrigger asChild>
-                                  <button 
-                                    onClick={(e) => e.stopPropagation()}
-                                    type="button"
-                                    className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 cursor-pointer hover:opacity-80 transition-opacity border-2 border-dashed border-white/30 ${
-                                      step.status === 'complete' ? 'bg-emerald-500' : 
-                                      step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                    }`}
-                                  >
-                                    {step.name}
-                                    {step.notes && (
-                                      <AlertCircle className="h-3 w-3" />
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <PopoverTrigger asChild>
+                                      <TooltipTrigger asChild>
+                                        <button 
+                                          onClick={(e) => e.stopPropagation()}
+                                          type="button"
+                                        >
+                                          {badgeContent}
+                                        </button>
+                                      </TooltipTrigger>
+                                    </PopoverTrigger>
+                                    {trackingInfo && (
+                                      <TooltipContent className="whitespace-pre-line">
+                                        <p>{trackingInfo}</p>
+                                      </TooltipContent>
                                     )}
-                                  </button>
-                                </PopoverTrigger>
+                                  </Tooltip>
+                                </TooltipProvider>
                                 <PopoverContent className="w-36 p-0" align="start">
                                   <StatusPopoverButtons
                                     currentValue={step.status}
@@ -1051,20 +1208,20 @@ export default function Orders() {
                                 </PopoverContent>
                               </Popover>
                             ) : (
-                              <span 
-                                key={step.id}
-                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 border-2 border-dashed border-white/30 ${
-                                  step.status === 'complete' ? 'bg-emerald-500' : 
-                                  step.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' ? 'opacity-50' : ''}`}
-                              >
-                                {step.name}
-                                {step.notes && (
-                                  <AlertCircle className="h-3 w-3" />
-                                )}
-                              </span>
-                            )
-                          ))}
+                              <TooltipProvider key={step.id}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    {badgeContent}
+                                  </TooltipTrigger>
+                                  {trackingInfo && (
+                                    <TooltipContent className="whitespace-pre-line">
+                                      <p>{trackingInfo}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })}
                         </div>
                         {/* Custom Ordering Steps - visible for non-workers, editable for admin/manager */}
                         {!isWorker && customOrderingSteps.length > 0 && (
