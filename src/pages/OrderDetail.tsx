@@ -92,6 +92,7 @@ interface Order {
   sliding_door_type: string | null;
   screen_type: string | null;
   has_plisse_screens: boolean;
+  has_nailing_flanges: boolean | null;
   glass_ordered: boolean;
   delivery_complete: boolean;
   // Component availability status
@@ -818,125 +819,131 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Screens */}
-              <AccordionItem value="order-screens">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Screens</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.screens_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.screens_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        screens_status: value,
-                        screens_order_date: value === 'ordered' ? order.screens_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.screens_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.screens_order_date || ''}
-                        onChange={e => updateOrderComponent({ screens_order_date: e.target.value })}
+              {/* Screens - only show if screen_type was selected (sold to customer) */}
+              {order.screen_type && (
+                <AccordionItem value="order-screens">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      {order.screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                       order.screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                       <AlertCircle className="h-4 w-4 text-destructive" />}
+                      <span>Screens</span>
+                      <Badge variant="outline" className="ml-2 capitalize">
+                        {(order.screens_status || 'not_ordered').replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-4">
+                    <div className="space-y-3">
+                      <Label>Status</Label>
+                      <StatusButtonGroup
+                        value={order.screens_status || 'not_ordered'}
+                        onChange={value => updateOrderComponent({
+                          screens_status: value,
+                          screens_order_date: value === 'ordered' ? order.screens_order_date || new Date().toISOString().split('T')[0] : null
+                        })}
+                        options={orderingStatusOptions}
                         disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
+                    {order.screens_status === 'ordered' && (
+                      <div className="space-y-2">
+                        <Label>Order Date</Label>
+                        <Input
+                          type="date"
+                          value={order.screens_order_date || ''}
+                          onChange={e => updateOrderComponent({ screens_order_date: e.target.value })}
+                          disabled={!canUpdateOrdering || isSeller}
+                        />
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              )}
 
-              {/* Plisse Screens */}
-              <AccordionItem value="order-plisse-screens">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.plisse_screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.plisse_screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Plisse Screens</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.plisse_screens_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.plisse_screens_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        plisse_screens_status: value,
-                        plisse_screens_order_date: value === 'ordered' ? order.plisse_screens_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.plisse_screens_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.plisse_screens_order_date || ''}
-                        onChange={e => updateOrderComponent({ plisse_screens_order_date: e.target.value })}
+              {/* Plisse Screens - only show if has_plisse_screens is true (sold to customer) */}
+              {order.has_plisse_screens && (
+                <AccordionItem value="order-plisse-screens">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      {order.plisse_screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                       order.plisse_screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                       <AlertCircle className="h-4 w-4 text-destructive" />}
+                      <span>Plisse Screens</span>
+                      <Badge variant="outline" className="ml-2 capitalize">
+                        {(order.plisse_screens_status || 'not_ordered').replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-4">
+                    <div className="space-y-3">
+                      <Label>Status</Label>
+                      <StatusButtonGroup
+                        value={order.plisse_screens_status || 'not_ordered'}
+                        onChange={value => updateOrderComponent({
+                          plisse_screens_status: value,
+                          plisse_screens_order_date: value === 'ordered' ? order.plisse_screens_order_date || new Date().toISOString().split('T')[0] : null
+                        })}
+                        options={orderingStatusOptions}
                         disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
+                    {order.plisse_screens_status === 'ordered' && (
+                      <div className="space-y-2">
+                        <Label>Order Date</Label>
+                        <Input
+                          type="date"
+                          value={order.plisse_screens_order_date || ''}
+                          onChange={e => updateOrderComponent({ plisse_screens_order_date: e.target.value })}
+                          disabled={!canUpdateOrdering || isSeller}
+                        />
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              )}
 
-              {/* Nail Fins */}
-              <AccordionItem value="order-nail-fins">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.nail_fins_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.nail_fins_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Nail Fins</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.nail_fins_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.nail_fins_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        nail_fins_status: value,
-                        nail_fins_order_date: value === 'ordered' ? order.nail_fins_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.nail_fins_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.nail_fins_order_date || ''}
-                        onChange={e => updateOrderComponent({ nail_fins_order_date: e.target.value })}
+              {/* Nail Fins - only show if has_nailing_flanges is true (sold to customer) */}
+              {order.has_nailing_flanges && (
+                <AccordionItem value="order-nail-fins">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      {order.nail_fins_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                       order.nail_fins_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                       <AlertCircle className="h-4 w-4 text-destructive" />}
+                      <span>Nail Fins</span>
+                      <Badge variant="outline" className="ml-2 capitalize">
+                        {(order.nail_fins_status || 'not_ordered').replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-4">
+                    <div className="space-y-3">
+                      <Label>Status</Label>
+                      <StatusButtonGroup
+                        value={order.nail_fins_status || 'not_ordered'}
+                        onChange={value => updateOrderComponent({
+                          nail_fins_status: value,
+                          nail_fins_order_date: value === 'ordered' ? order.nail_fins_order_date || new Date().toISOString().split('T')[0] : null
+                        })}
+                        options={orderingStatusOptions}
                         disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
+                    {order.nail_fins_status === 'ordered' && (
+                      <div className="space-y-2">
+                        <Label>Order Date</Label>
+                        <Input
+                          type="date"
+                          value={order.nail_fins_order_date || ''}
+                          onChange={e => updateOrderComponent({ nail_fins_order_date: e.target.value })}
+                          disabled={!canUpdateOrdering || isSeller}
+                        />
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              )}
 
               {/* Hardware */}
               <AccordionItem value="order-hardware">

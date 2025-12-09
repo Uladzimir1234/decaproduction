@@ -419,25 +419,33 @@ export default function Orders() {
 
   const getNotOrderedComponents = (order: Order) => {
     const components: { name: string; field: string }[] = [];
+    // Always track these core components
     if (order.reinforcement_status === 'not_ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
     if (order.windows_profile_status === 'not_ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
     if (order.glass_status === 'not_ordered') components.push({ name: 'Glass', field: 'glass_status' });
-    if (order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status' });
-    if (order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
-    if (order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
     if (order.hardware_status === 'not_ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
+    // Only track Screens if screen_type was selected (sold to customer)
+    if (order.screen_type && order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status' });
+    // Only track Plisse Screens if has_plisse_screens is true (sold to customer)
+    if (order.has_plisse_screens && order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
+    // Only track Nail Fins if has_nailing_flanges is true (sold to customer)
+    if (order.has_nailing_flanges && order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
     return components;
   };
 
   const getOrderedComponents = (order: Order) => {
     const components: { name: string; field: string }[] = [];
+    // Always track these core components
     if (order.reinforcement_status === 'ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
     if (order.windows_profile_status === 'ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
     if (order.glass_status === 'ordered') components.push({ name: 'Glass', field: 'glass_status' });
-    if (order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status' });
-    if (order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
-    if (order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
     if (order.hardware_status === 'ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
+    // Only track Screens if screen_type was selected (sold to customer)
+    if (order.screen_type && order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status' });
+    // Only track Plisse Screens if has_plisse_screens is true (sold to customer)
+    if (order.has_plisse_screens && order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
+    // Only track Nail Fins if has_nailing_flanges is true (sold to customer)
+    if (order.has_nailing_flanges && order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
     return components;
   };
 
