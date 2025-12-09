@@ -1918,31 +1918,15 @@ export default function Orders() {
                       </div>
                     </div>
 
-                    {/* Inline Collapsible Order Map */}
+                    {/* Inline Order Map - Always visible */}
                     {ordersWithConstructions.has(order.id) && (
-                      <Collapsible open={expandedOrderMapId === order.id}>
-                        <CollapsibleTrigger asChild>
-                          <button
-                            onClick={(e) => handleToggleOrderMap(e, order.id)}
-                            className="w-full mt-3 pt-3 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {expandedOrderMapId === order.id ? (
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            )}
-                            <Grid3X3 className="h-3.5 w-3.5" />
-                            <span>Order Map</span>
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
-                          <OrderMapInline
-                            orderId={order.id}
-                            orderNumber={order.order_number}
-                            isProductionReady={order.production_status === 'production_ready'}
-                          />
-                        </CollapsibleContent>
-                      </Collapsible>
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <OrderMapInline
+                          orderId={order.id}
+                          orderNumber={order.order_number}
+                          isProductionReady={order.production_status === 'production_ready'}
+                        />
+                      </div>
                     )}
                   </div>;
           })}
