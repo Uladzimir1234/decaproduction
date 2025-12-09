@@ -17,7 +17,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 import { format } from "date-fns";
-import { OrderMap } from "@/components/order/OrderMap";
+import { OrderMapInline } from "@/components/order/OrderMapInline";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp } from "lucide-react";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -163,8 +165,7 @@ export default function Orders() {
   const [deleting, setDeleting] = useState(false);
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
-  const [orderMapOpen, setOrderMapOpen] = useState(false);
-  const [selectedOrderForMap, setSelectedOrderForMap] = useState<Order | null>(null);
+  const [expandedOrderMapId, setExpandedOrderMapId] = useState<string | null>(null);
   const [ordersWithConstructions, setOrdersWithConstructions] = useState<Set<string>>(new Set());
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
@@ -391,11 +392,10 @@ export default function Orders() {
     }
   };
 
-  const handleOpenOrderMap = (e: React.MouseEvent, order: Order) => {
+  const handleToggleOrderMap = (e: React.MouseEvent, orderId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedOrderForMap(order);
-    setOrderMapOpen(true);
+    setExpandedOrderMapId(prev => prev === orderId ? null : orderId);
   };
 
   const getOrderDeliveryBatches = (orderId: string) => {
@@ -1410,17 +1410,6 @@ export default function Orders() {
                           customValue={daysUntil < 0 ? `${Math.abs(daysUntil)}d` : `${daysUntil}d`}
                           label={daysUntil < 0 ? "Overdue" : "Time Left"}
                         />
-                        {ordersWithConstructions.has(order.id) && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => handleOpenOrderMap(e, order)}
-                            className="shrink-0"
-                            title="Order Map"
-                          >
-                            <Grid3X3 className="h-4 w-4" />
-                          </Button>
-                        )}
                         {!isWorker && (
                           <Button
                             variant="ghost"
@@ -1443,6 +1432,33 @@ export default function Orders() {
                         )}
                       </div>
                     </div>
+
+                    {/* Inline Collapsible Order Map */}
+                    {ordersWithConstructions.has(order.id) && (
+                      <Collapsible open={expandedOrderMapId === order.id}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            onClick={(e) => handleToggleOrderMap(e, order.id)}
+                            className="w-full mt-3 pt-3 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {expandedOrderMapId === order.id ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                            <Grid3X3 className="h-3.5 w-3.5" />
+                            <span>Order Map</span>
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
+                          <OrderMapInline
+                            orderId={order.id}
+                            orderNumber={order.order_number}
+                            isProductionReady={order.production_status === 'production_ready'}
+                          />
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                   </div>;
           })}
             </div>}
@@ -1477,17 +1493,5 @@ export default function Orders() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Order Map Overlay */}
-      {orderMapOpen && selectedOrderForMap && (
-        <OrderMap
-          orderId={selectedOrderForMap.id}
-          orderNumber={selectedOrderForMap.order_number}
-          isProductionReady={selectedOrderForMap.production_status === 'production_ready'}
-          onClose={() => {
-            setOrderMapOpen(false);
-            setSelectedOrderForMap(null);
-          }}
-        />
-      )}
     </div>;
 }
