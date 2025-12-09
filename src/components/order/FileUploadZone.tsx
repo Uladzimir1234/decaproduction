@@ -58,8 +58,13 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   const { toast } = useToast();
 
   const processFile = useCallback(async (file: File) => {
-    const validTypes = ['text/csv', 'application/pdf', 'application/vnd.ms-excel'];
-    const validExtensions = ['.csv', '.pdf'];
+    const validTypes = [
+      'text/csv', 
+      'application/pdf', 
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    const validExtensions = ['.csv', '.pdf', '.xls', '.xlsx'];
     
     const hasValidExtension = validExtensions.some(ext => 
       file.name.toLowerCase().endsWith(ext)
@@ -68,7 +73,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
     if (!validTypes.includes(file.type) && !hasValidExtension) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a CSV or PDF file",
+        description: "Please upload a CSV, PDF, or Excel file",
         variant: "destructive",
       });
       return;
@@ -91,7 +96,10 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
         reader.readAsDataURL(file);
       });
 
-      const fileType = file.name.toLowerCase().endsWith('.csv') ? 'csv' : 'pdf';
+      const fileName = file.name.toLowerCase();
+      let fileType = 'pdf';
+      if (fileName.endsWith('.csv')) fileType = 'csv';
+      else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) fileType = 'excel';
 
       const { data, error } = await supabase.functions.invoke('process-order-file', {
         body: {
@@ -192,7 +200,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
     >
       <input
         type="file"
-        accept=".csv,.pdf"
+        accept=".csv,.pdf,.xls,.xlsx"
         onChange={handleFileSelect}
         className="hidden"
         id="file-upload"
@@ -210,7 +218,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
             <Upload className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm font-medium">Upload Order File</p>
             <p className="text-xs text-muted-foreground">
-              Drag & drop or click to upload CSV or PDF
+              Drag & drop or click to upload CSV, PDF, or Excel
             </p>
           </div>
         )}
