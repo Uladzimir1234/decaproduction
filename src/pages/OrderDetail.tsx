@@ -168,7 +168,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { canUpdateOrdering, canUpdateManufacturing, isWorker, isSeller, loading: roleLoading } = useRole();
+  const { canUpdateOrdering, canUpdateManufacturing, isWorker, isSeller, isAdmin, loading: roleLoading } = useRole();
   const [order, setOrder] = useState<Order | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1094,7 +1094,7 @@ export default function OrderDetail() {
                         disabled={!canUpdateOrdering || isSeller}
                       />
                     </div>
-                    {canUpdateOrdering && !isSeller && (
+                    {isAdmin && (
                       <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
                         <Trash2 className="h-4 w-4" />
                         Delete Step
@@ -1648,7 +1648,7 @@ export default function OrderDetail() {
                         disabled={!canUpdateManufacturing}
                       />
                     </div>
-                    {canUpdateManufacturing && (
+                    {isAdmin && (
                       <Button variant="destructive" size="sm" onClick={() => deleteCustomStep(step.id)} className="gap-1">
                         <Trash2 className="h-4 w-4" />
                         Delete Step
