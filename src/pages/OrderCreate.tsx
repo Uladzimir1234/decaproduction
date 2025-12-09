@@ -171,11 +171,17 @@ export default function OrderCreate() {
       setIsNewCustomer(true);
       setCustomerName(data.customer_name);
     }
+    if (data.order_date) setOrderDate(data.order_date);
     setWindowsCount(data.windows_count);
     setDoorsCount(data.doors_count);
     if (data.sliding_doors_count > 0) {
       setHasSlidingDoors(true);
     }
+    
+    toast({
+      title: "File parsed successfully",
+      description: `Extracted ${data.constructions.length} constructions from the file`,
+    });
   };
 
   const handleClearFile = () => {
