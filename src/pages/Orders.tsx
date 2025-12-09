@@ -88,6 +88,22 @@ interface DeliveryBatch {
   status: string;
 }
 
+interface ConstructionComponent {
+  construction_id: string;
+  component_type: string;
+  component_name: string | null;
+  status: string;
+  quantity: number;
+  order_id: string;
+}
+
+interface ConstructionManufacturing {
+  construction_id: string;
+  stage: string;
+  status: string;
+  order_id: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -167,6 +183,8 @@ export default function Orders() {
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
   const [expandedOrderMapId, setExpandedOrderMapId] = useState<string | null>(null);
   const [ordersWithConstructions, setOrdersWithConstructions] = useState<Set<string>>(new Set());
+  const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
+  const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
@@ -179,7 +197,9 @@ export default function Orders() {
         fetchCustomSteps(),
         fetchDeliveryBatches(),
         fetchSellers(),
-        fetchOrdersWithConstructions()
+        fetchOrdersWithConstructions(),
+        fetchConstructionComponents(),
+        fetchConstructionManufacturing()
       ]);
       // Mark initial load as complete after data is fetched
       setTimeout(() => {
@@ -318,11 +338,45 @@ export default function Orders() {
       )
       .subscribe();
 
+    // Subscribe to real-time updates on construction_components table
+    const componentsChannel = supabase
+      .channel('construction-components-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'construction_components'
+        },
+        () => {
+          fetchConstructionComponents();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to real-time updates on construction_manufacturing table
+    const manufacturingChannel = supabase
+      .channel('construction-manufacturing-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'construction_manufacturing'
+        },
+        () => {
+          fetchConstructionManufacturing();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(fulfillmentChannel);
       supabase.removeChannel(customStepsChannel);
       supabase.removeChannel(deliveryBatchesChannel);
+      supabase.removeChannel(componentsChannel);
+      supabase.removeChannel(manufacturingChannel);
     };
   }, [orders, toast]);
 
@@ -389,6 +443,74 @@ export default function Orders() {
       setOrdersWithConstructions(orderIds);
     } catch (error) {
       console.error("Error fetching orders with constructions:", error);
+    }
+  };
+
+  const fetchConstructionComponents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("construction_components")
+        .select(`
+          construction_id,
+          component_type,
+          component_name,
+          status,
+          quantity,
+          order_constructions!inner(order_id)
+        `);
+      if (error) throw error;
+      
+      // Group by order_id
+      const componentsByOrder: Record<string, ConstructionComponent[]> = {};
+      data?.forEach((item: any) => {
+        const orderId = item.order_constructions.order_id;
+        if (!componentsByOrder[orderId]) {
+          componentsByOrder[orderId] = [];
+        }
+        componentsByOrder[orderId].push({
+          construction_id: item.construction_id,
+          component_type: item.component_type,
+          component_name: item.component_name,
+          status: item.status,
+          quantity: item.quantity,
+          order_id: orderId
+        });
+      });
+      setConstructionComponents(componentsByOrder);
+    } catch (error) {
+      console.error("Error fetching construction components:", error);
+    }
+  };
+
+  const fetchConstructionManufacturing = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("construction_manufacturing")
+        .select(`
+          construction_id,
+          stage,
+          status,
+          order_constructions!inner(order_id)
+        `);
+      if (error) throw error;
+      
+      // Group by order_id
+      const mfgByOrder: Record<string, ConstructionManufacturing[]> = {};
+      data?.forEach((item: any) => {
+        const orderId = item.order_constructions.order_id;
+        if (!mfgByOrder[orderId]) {
+          mfgByOrder[orderId] = [];
+        }
+        mfgByOrder[orderId].push({
+          construction_id: item.construction_id,
+          stage: item.stage,
+          status: item.status,
+          order_id: orderId
+        });
+      });
+      setConstructionManufacturing(mfgByOrder);
+    } catch (error) {
+      console.error("Error fetching construction manufacturing:", error);
     }
   };
 
@@ -530,10 +652,60 @@ export default function Orders() {
   };
 
   const getManufacturingStages = (order: Order) => {
-    const f = fulfillments[order.id];
-    
     type StageStatus = 'complete' | 'partial' | 'not_started';
-    const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string }[] = [];
+    
+    // Check if order has construction-level manufacturing data
+    const mfgData = constructionManufacturing[order.id];
+    
+    if (mfgData && mfgData.length > 0) {
+      // Aggregate construction manufacturing stages
+      const stageAggregation = new Map<string, { complete: number; partial: number; not_started: number; total: number }>();
+      
+      mfgData.forEach(item => {
+        if (!stageAggregation.has(item.stage)) {
+          stageAggregation.set(item.stage, { complete: 0, partial: 0, not_started: 0, total: 0 });
+        }
+        const agg = stageAggregation.get(item.stage)!;
+        agg.total++;
+        if (item.status === 'complete') agg.complete++;
+        else if (item.status === 'partial') agg.partial++;
+        else agg.not_started++;
+      });
+      
+      const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string }[] = [];
+      
+      // Define stage display order
+      const stageOrder = ['frame_cutting', 'welding', 'assembly', 'glass_installation'];
+      const stageDisplayNames: Record<string, string> = {
+        'frame_cutting': 'Frame Cut',
+        'welding': 'Welding',
+        'assembly': 'Assembly',
+        'glass_installation': 'Glass Install'
+      };
+      
+      stageOrder.forEach(stageName => {
+        const agg = stageAggregation.get(stageName);
+        if (agg) {
+          let status: StageStatus = 'not_started';
+          if (agg.complete === agg.total) status = 'complete';
+          else if (agg.complete > 0 || agg.partial > 0) status = 'partial';
+          
+          stages.push({
+            name: stageDisplayNames[stageName] || stageName,
+            status,
+            hasNotes: false,
+            field: stageName,
+            progress: `${agg.complete}/${agg.total}`
+          });
+        }
+      });
+      
+      return stages;
+    }
+    
+    // Fall back to legacy order_fulfillment data
+    const f = fulfillments[order.id];
+    const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string }[] = [];
     
     const getStatus = (value: string | null | undefined): StageStatus => {
       if (value === 'complete') return 'complete';
@@ -681,35 +853,129 @@ export default function Orders() {
   };
 
   const getNotOrderedComponents = (order: Order) => {
-    const components: { name: string; field: string }[] = [];
-    // Always track these core components
-    if (order.reinforcement_status === 'not_ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
-    if (order.windows_profile_status === 'not_ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
-    if (order.glass_status === 'not_ordered') components.push({ name: 'Glass', field: 'glass_status' });
-    if (order.hardware_status === 'not_ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
-    // Only track Screens if screen_type was selected (sold to customer)
-    if (order.screen_type && order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status' });
-    // Only track Plisse Screens if has_plisse_screens is true (sold to customer)
-    if (order.has_plisse_screens && order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
-    // Only track Nail Fins if has_nailing_flanges is true (sold to customer)
-    if (order.has_nailing_flanges && order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
+    // Check if order has file-extracted components
+    const fileComponents = constructionComponents[order.id];
+    
+    if (fileComponents && fileComponents.length > 0) {
+      // Aggregate file-extracted components by type+name and filter by status
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      fileComponents.filter(c => c.status === 'not_ordered').forEach(c => {
+        const key = `${c.component_type}-${c.component_name || ''}`;
+        const displayName = c.component_name 
+          ? `${c.component_type} (${c.component_name})`
+          : c.component_type;
+        if (aggregated.has(key)) {
+          aggregated.get(key)!.quantity += c.quantity;
+        } else {
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+        }
+      });
+      
+      // Always add Reinforcement from legacy if not_ordered (not file-extracted)
+      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      if (order.reinforcement_status === 'not_ordered') {
+        components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
+      }
+      
+      // Add file-extracted components
+      aggregated.forEach((value) => {
+        components.push({ name: value.name, field: '', isFileExtracted: true });
+      });
+      
+      return components;
+    }
+    
+    // Fall back to legacy order-level fields
+    const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+    if (order.reinforcement_status === 'not_ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
+    if (order.windows_profile_status === 'not_ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status', isFileExtracted: false });
+    if (order.glass_status === 'not_ordered') components.push({ name: 'Glass', field: 'glass_status', isFileExtracted: false });
+    if (order.hardware_status === 'not_ordered') components.push({ name: 'Hardware', field: 'hardware_status', isFileExtracted: false });
+    if (order.screen_type && order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status', isFileExtracted: false });
+    if (order.has_plisse_screens && order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status', isFileExtracted: false });
+    if (order.has_nailing_flanges && order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status', isFileExtracted: false });
     return components;
   };
 
   const getOrderedComponents = (order: Order) => {
-    const components: { name: string; field: string }[] = [];
-    // Always track these core components
-    if (order.reinforcement_status === 'ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status' });
-    if (order.windows_profile_status === 'ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status' });
-    if (order.glass_status === 'ordered') components.push({ name: 'Glass', field: 'glass_status' });
-    if (order.hardware_status === 'ordered') components.push({ name: 'Hardware', field: 'hardware_status' });
-    // Only track Screens if screen_type was selected (sold to customer)
-    if (order.screen_type && order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status' });
-    // Only track Plisse Screens if has_plisse_screens is true (sold to customer)
-    if (order.has_plisse_screens && order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status' });
-    // Only track Nail Fins if has_nailing_flanges is true (sold to customer)
-    if (order.has_nailing_flanges && order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status' });
+    // Check if order has file-extracted components
+    const fileComponents = constructionComponents[order.id];
+    
+    if (fileComponents && fileComponents.length > 0) {
+      // Aggregate file-extracted components by type+name and filter by status
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      fileComponents.filter(c => c.status === 'ordered').forEach(c => {
+        const key = `${c.component_type}-${c.component_name || ''}`;
+        const displayName = c.component_name 
+          ? `${c.component_type} (${c.component_name})`
+          : c.component_type;
+        if (aggregated.has(key)) {
+          aggregated.get(key)!.quantity += c.quantity;
+        } else {
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+        }
+      });
+      
+      // Always add Reinforcement from legacy if ordered (not file-extracted)
+      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      if (order.reinforcement_status === 'ordered') {
+        components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
+      }
+      
+      // Add file-extracted components
+      aggregated.forEach((value) => {
+        components.push({ name: value.name, field: '', isFileExtracted: true });
+      });
+      
+      return components;
+    }
+    
+    // Fall back to legacy order-level fields
+    const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+    if (order.reinforcement_status === 'ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
+    if (order.windows_profile_status === 'ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status', isFileExtracted: false });
+    if (order.glass_status === 'ordered') components.push({ name: 'Glass', field: 'glass_status', isFileExtracted: false });
+    if (order.hardware_status === 'ordered') components.push({ name: 'Hardware', field: 'hardware_status', isFileExtracted: false });
+    if (order.screen_type && order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status', isFileExtracted: false });
+    if (order.has_plisse_screens && order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status', isFileExtracted: false });
+    if (order.has_nailing_flanges && order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status', isFileExtracted: false });
     return components;
+  };
+
+  const getAvailableComponents = (order: Order) => {
+    // Check if order has file-extracted components
+    const fileComponents = constructionComponents[order.id];
+    
+    if (fileComponents && fileComponents.length > 0) {
+      // Aggregate file-extracted components by type+name and filter by status
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      fileComponents.filter(c => c.status === 'available').forEach(c => {
+        const key = `${c.component_type}-${c.component_name || ''}`;
+        const displayName = c.component_name 
+          ? `${c.component_type} (${c.component_name})`
+          : c.component_type;
+        if (aggregated.has(key)) {
+          aggregated.get(key)!.quantity += c.quantity;
+        } else {
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+        }
+      });
+      
+      // Always add Reinforcement from legacy if available (not file-extracted)
+      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      if (order.reinforcement_status === 'available') {
+        components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
+      }
+      
+      // Add file-extracted components
+      aggregated.forEach((value) => {
+        components.push({ name: value.name, field: '', isFileExtracted: true });
+      });
+      
+      return components;
+    }
+    
+    return [];
   };
 
   const handleProductionStatusChange = async (orderId: string, newStatus: string) => {
@@ -933,6 +1199,7 @@ export default function Orders() {
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
             const orderedComponents = getOrderedComponents(order);
+            const availableComponents = getAvailableComponents(order);
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
@@ -943,6 +1210,7 @@ export default function Orders() {
             const preparingBatches = orderBatches.filter(b => b.status === 'preparing').length;
             const showDeliveryBadge = order.fulfillment_percentage >= 50;
             const showShippingBadge = order.fulfillment_percentage >= 50;
+            const hasFileExtractedData = ordersWithConstructions.has(order.id);
             return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
@@ -1015,7 +1283,7 @@ export default function Orders() {
                             </>
                           )}
                         </div>
-                        {/* Ordering stages - show for non-workers, editable only for admin/manager */}
+                        {/* Ordering stages - show for non-workers, editable only for admin/manager (legacy only) */}
                         {!isWorker && notOrderedComponents.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
@@ -1023,7 +1291,16 @@ export default function Orders() {
                             {notOrderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              return (canUpdateOrdering && !isSeller) ? (
+                              // File-extracted components are display-only
+                              if (component.isFileExtracted) {
+                                return (
+                                  <Badge key={component.name} variant="destructive" className="text-xs py-0 px-1.5">
+                                    {component.name}
+                                  </Badge>
+                                );
+                              }
+                              
+                              return (canUpdateOrdering && !isSeller && component.field) ? (
                                 <Popover key={component.name}>
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1077,7 +1354,16 @@ export default function Orders() {
                             {orderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              return (canUpdateOrdering && !isSeller) ? (
+                              // File-extracted components are display-only
+                              if (component.isFileExtracted) {
+                                return (
+                                  <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                    {component.name}
+                                  </Badge>
+                                );
+                              }
+                              
+                              return (canUpdateOrdering && !isSeller && component.field) ? (
                                 <Popover key={component.name}>
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1124,6 +1410,18 @@ export default function Orders() {
                             })}
                           </div>
                         )}
+                        {/* Available components - only show for file-extracted orders */}
+                        {!isWorker && availableComponents.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
+                            <span className="text-xs text-success font-medium mr-1">Available:</span>
+                            {availableComponents.map((component) => (
+                              <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-success/50 text-success">
+                                {component.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-1.5 mt-2">
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
@@ -1145,20 +1443,40 @@ export default function Orders() {
                           {manufacturingStages.map((stage) => {
                             const f = fulfillments[order.id];
                             const trackingInfo = formatTrackingInfo(f?.updated_at, f?.updated_by_email);
+                            const isFileExtracted = hasFileExtractedData && stage.progress;
                             
                             const badgeContent = (
                               <span 
                                 className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
                                   stage.status === 'complete' ? 'bg-emerald-500' : 
                                   stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                                } ${order.production_status === 'hold' ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isFileExtracted ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                               >
                                 {stage.name}
-                                {stage.hasNotes && (
+                                {stage.progress && (
+                                  <span className="opacity-80">({stage.progress})</span>
+                                )}
+                                {stage.hasNotes && !stage.progress && (
                                   <AlertCircle className="h-3 w-3" />
                                 )}
                               </span>
                             );
+                            
+                            // File-extracted stages are display-only (editable via Order Map)
+                            if (isFileExtracted) {
+                              return (
+                                <TooltipProvider key={stage.name}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      {badgeContent}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Edit via Order Map</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
                             
                             return canUpdateManufacturing && order.production_status !== 'hold' ? (
                               <Popover key={stage.name}>
