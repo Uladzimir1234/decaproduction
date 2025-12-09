@@ -178,6 +178,65 @@ export default function OrderCreate() {
       setHasSlidingDoors(true);
     }
     
+    // Auto-detect components from constructions
+    let hasScreens = false;
+    let hasPlisse = false;
+    let hasNailingFins = false;
+    let detectedScreenType = "";
+    
+    for (const construction of data.constructions) {
+      // Check screen_type on construction level
+      if (construction.screen_type) {
+        hasScreens = true;
+        const screenLower = construction.screen_type.toLowerCase();
+        if (screenLower.includes("flex")) {
+          detectedScreenType = "flex";
+        } else if (screenLower.includes("deca") || screenLower.includes("aluminum")) {
+          detectedScreenType = "deca";
+        }
+        if (screenLower.includes("plisse") || screenLower.includes("retractable")) {
+          hasPlisse = true;
+        }
+      }
+      
+      // Check components array
+      if (construction.components) {
+        for (const component of construction.components) {
+          const typeLower = component.component_type.toLowerCase();
+          const nameLower = (component.component_name || "").toLowerCase();
+          
+          // Detect screens
+          if (typeLower.includes("screen") || nameLower.includes("screen")) {
+            hasScreens = true;
+            if (typeLower.includes("flex") || nameLower.includes("flex")) {
+              detectedScreenType = "flex";
+            } else if (typeLower.includes("deca") || nameLower.includes("deca") || nameLower.includes("aluminum")) {
+              detectedScreenType = "deca";
+            }
+            if (typeLower.includes("plisse") || nameLower.includes("plisse") || nameLower.includes("retractable")) {
+              hasPlisse = true;
+            }
+          }
+          
+          // Detect nailing fins
+          if (typeLower.includes("nailing") || typeLower.includes("fin") || nameLower.includes("nailing") || nameLower.includes("flange")) {
+            hasNailingFins = true;
+          }
+        }
+      }
+    }
+    
+    // Apply detected components
+    if (hasScreens && detectedScreenType) {
+      setScreenType(detectedScreenType);
+    }
+    if (hasPlisse) {
+      setHasPlisseScreens(true);
+    }
+    if (hasNailingFins) {
+      setHasNailingFlanges(true);
+    }
+    
     toast({
       title: "File parsed successfully",
       description: `Extracted ${data.constructions.length} constructions from the file`,
