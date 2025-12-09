@@ -143,7 +143,7 @@ export default function Orders() {
     fetchSellers();
 
     // Subscribe to real-time updates on orders table
-    const channel = supabase
+    const ordersChannel = supabase
       .channel('orders-realtime')
       .on(
         'postgres_changes',
@@ -166,8 +166,63 @@ export default function Orders() {
       )
       .subscribe();
 
+    // Subscribe to real-time updates on order_fulfillment table (manufacturing stages)
+    const fulfillmentChannel = supabase
+      .channel('fulfillments-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_fulfillment'
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            const newFulfillment = payload.new as OrderFulfillment;
+            setFulfillments(prev => ({
+              ...prev,
+              [newFulfillment.order_id]: newFulfillment
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const oldFulfillment = payload.old as { order_id: string };
+            setFulfillments(prev => {
+              const updated = { ...prev };
+              delete updated[oldFulfillment.order_id];
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to real-time updates on custom_steps table
+    const customStepsChannel = supabase
+      .channel('customsteps-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'custom_steps'
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setCustomSteps(prev => [...prev, payload.new as CustomStep]);
+          } else if (payload.eventType === 'UPDATE') {
+            setCustomSteps(prev => prev.map(step => 
+              step.id === payload.new.id ? { ...step, ...payload.new } : step
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setCustomSteps(prev => prev.filter(step => step.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(fulfillmentChannel);
+      supabase.removeChannel(customStepsChannel);
     };
   }, []);
 
