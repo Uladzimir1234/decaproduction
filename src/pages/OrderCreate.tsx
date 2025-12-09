@@ -328,18 +328,54 @@ export default function OrderCreate() {
           position_index: index,
         }));
 
-        const { error: constructionsError } = await supabase
+        const { data: insertedConstructions, error: constructionsError } = await supabase
           .from('order_constructions')
-          .insert(constructionsToInsert);
+          .insert(constructionsToInsert)
+          .select('id, construction_number');
 
         if (constructionsError) {
           console.error('Error saving constructions:', constructionsError);
-          // Don't fail the order creation, just warn
           toast({
             title: "Warning",
             description: "Order created but some constructions failed to save",
             variant: "destructive"
           });
+        } else if (insertedConstructions) {
+          // Save construction components
+          const componentsToInsert: {
+            construction_id: string;
+            component_type: string;
+            component_name: string | null;
+            quantity: number;
+            status: string;
+          }[] = [];
+
+          for (const construction of parsedOrderData.constructions) {
+            const insertedConstruction = insertedConstructions.find(
+              ic => ic.construction_number === construction.construction_number
+            );
+            if (insertedConstruction && construction.components && construction.components.length > 0) {
+              for (const component of construction.components) {
+                componentsToInsert.push({
+                  construction_id: insertedConstruction.id,
+                  component_type: component.component_type,
+                  component_name: component.component_name,
+                  quantity: component.quantity,
+                  status: 'not_ordered',
+                });
+              }
+            }
+          }
+
+          if (componentsToInsert.length > 0) {
+            const { error: componentsError } = await supabase
+              .from('construction_components')
+              .insert(componentsToInsert);
+
+            if (componentsError) {
+              console.error('Error saving construction components:', componentsError);
+            }
+          }
         }
       }
       

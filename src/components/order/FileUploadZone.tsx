@@ -4,6 +4,12 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface ParsedComponent {
+  component_type: string;
+  component_name: string | null;
+  quantity: number;
+}
+
 export interface ParsedConstruction {
   construction_number: string;
   construction_type: 'window' | 'door' | 'sliding_door';
@@ -26,6 +32,7 @@ export interface ParsedConstruction {
   comments: string | null;
   quantity: number;
   position_index: number;
+  components?: ParsedComponent[];
 }
 
 export interface ParsedOrderData {
