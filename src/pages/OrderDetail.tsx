@@ -833,42 +833,61 @@ export default function OrderDetail() {
           <CardDescription>Status of components needed for manufacturing</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <TooltipProvider>
-              {[
-                { name: 'Reinforcement', status: order.reinforcement_status },
-                { name: 'Windows Profile', status: order.windows_profile_status },
-                { name: 'Glass', status: order.glass_status },
-                ...(order.screen_type ? [{ name: 'Screens', status: order.screens_status }] : []),
-                ...(order.has_plisse_screens ? [{ name: 'Plisse Screens', status: order.plisse_screens_status }] : []),
-                ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: order.nail_fins_status }] : []),
-                { name: 'Hardware', status: order.hardware_status }
-              ].map(component => {
-                const status = component.status || 'not_ordered';
-                const isAvailable = status === 'available';
-                const isOrdered = status === 'ordered';
+              {/* Reinforcement - always shown */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-colors ${
+                    order.reinforcement_status === 'available' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' :
+                    order.reinforcement_status === 'ordered' ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' :
+                    'bg-destructive/10 border-destructive/30 text-destructive'
+                  }`}>
+                    {order.reinforcement_status === 'available' ? <CheckCircle2 className="h-5 w-5 mb-1" /> :
+                     order.reinforcement_status === 'ordered' ? <Clock className="h-5 w-5 mb-1" /> :
+                     <AlertCircle className="h-5 w-5 mb-1" />}
+                    <span className="text-xs font-medium text-center leading-tight">Reinforcement</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Reinforcement: {order.reinforcement_status === 'available' ? 'Available' : order.reinforcement_status === 'ordered' ? 'Ordered' : 'Not Ordered'}</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              {/* Components from File Summary */}
+              {aggregatedComponents.length > 0 && (() => {
+                const available = aggregatedComponents.filter(c => c.status === 'available').length;
+                const ordered = aggregatedComponents.filter(c => c.status === 'ordered').length;
+                const notOrdered = aggregatedComponents.filter(c => c.status === 'not_ordered' || !c.status).length;
+                const total = aggregatedComponents.length;
+                const allAvailable = available === total;
+                const hasOrdered = ordered > 0 && !allAvailable;
+                
                 return (
-                  <Tooltip key={component.name}>
+                  <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-colors ${
-                        isAvailable ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' :
-                        isOrdered ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' :
+                      <div className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-colors col-span-2 sm:col-span-2 ${
+                        allAvailable ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' :
+                        hasOrdered ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' :
                         'bg-destructive/10 border-destructive/30 text-destructive'
                       }`}>
-                        {isAvailable ? <CheckCircle2 className="h-5 w-5 mb-1" /> :
-                         isOrdered ? <Clock className="h-5 w-5 mb-1" /> :
+                        {allAvailable ? <CheckCircle2 className="h-5 w-5 mb-1" /> :
+                         hasOrdered ? <Clock className="h-5 w-5 mb-1" /> :
                          <AlertCircle className="h-5 w-5 mb-1" />}
                         <span className="text-xs font-medium text-center leading-tight">
-                          {component.name}
+                          Components from File
+                        </span>
+                        <span className="text-[10px] mt-0.5">
+                          {available}/{total} available
                         </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{component.name}: {isAvailable ? 'Available' : isOrdered ? 'Ordered' : 'Not Ordered'}</p>
+                      <p>{available} available, {ordered} ordered, {notOrdered} not ordered</p>
                     </TooltipContent>
                   </Tooltip>
                 );
-              })}
+              })()}
             </TooltipProvider>
           </div>
           <div className="flex flex-wrap items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
@@ -974,262 +993,6 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Windows Profile */}
-              <AccordionItem value="order-windows-profile">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.windows_profile_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.windows_profile_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Windows Profile</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.windows_profile_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.windows_profile_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        windows_profile_status: value,
-                        windows_profile_order_date: value === 'ordered' ? order.windows_profile_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.windows_profile_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.windows_profile_order_date || ''}
-                        onChange={e => updateOrderComponent({ windows_profile_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Glass */}
-              <AccordionItem value="order-glass">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.glass_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.glass_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Glass</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.glass_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.glass_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        glass_status: value,
-                        glass_order_date: value === 'ordered' ? order.glass_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.glass_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.glass_order_date || ''}
-                        onChange={e => updateOrderComponent({ glass_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                  )}
-                  {(order.glass_status === 'ordered' || order.glass_status === 'available') && (
-                    <div className="space-y-2">
-                      <Label>Delivery Date</Label>
-                      <Input
-                        type="date"
-                        value={order.glass_delivery_date || ''}
-                        onChange={e => updateOrderComponent({ glass_delivery_date: e.target.value })}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Screens - only show if screen_type was selected (sold to customer) */}
-              {order.screen_type && (
-                <AccordionItem value="order-screens">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      {order.screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                       order.screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                       <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>Screens</span>
-                      <Badge variant="outline" className="ml-2 capitalize">
-                        {(order.screens_status || 'not_ordered').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={order.screens_status || 'not_ordered'}
-                        onChange={value => updateOrderComponent({
-                          screens_status: value,
-                          screens_order_date: value === 'ordered' ? order.screens_order_date || new Date().toISOString().split('T')[0] : null
-                        })}
-                        options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                    {order.screens_status === 'ordered' && (
-                      <div className="space-y-2">
-                        <Label>Order Date</Label>
-                        <Input
-                          type="date"
-                          value={order.screens_order_date || ''}
-                          onChange={e => updateOrderComponent({ screens_order_date: e.target.value })}
-                          disabled={!canUpdateOrdering || isSeller}
-                        />
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* Plisse Screens - only show if has_plisse_screens is true (sold to customer) */}
-              {order.has_plisse_screens && (
-                <AccordionItem value="order-plisse-screens">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      {order.plisse_screens_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                       order.plisse_screens_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                       <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>Plisse Screens</span>
-                      <Badge variant="outline" className="ml-2 capitalize">
-                        {(order.plisse_screens_status || 'not_ordered').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={order.plisse_screens_status || 'not_ordered'}
-                        onChange={value => updateOrderComponent({
-                          plisse_screens_status: value,
-                          plisse_screens_order_date: value === 'ordered' ? order.plisse_screens_order_date || new Date().toISOString().split('T')[0] : null
-                        })}
-                        options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                    {order.plisse_screens_status === 'ordered' && (
-                      <div className="space-y-2">
-                        <Label>Order Date</Label>
-                        <Input
-                          type="date"
-                          value={order.plisse_screens_order_date || ''}
-                          onChange={e => updateOrderComponent({ plisse_screens_order_date: e.target.value })}
-                          disabled={!canUpdateOrdering || isSeller}
-                        />
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* Nail Fins - only show if has_nailing_flanges is true (sold to customer) */}
-              {order.has_nailing_flanges && (
-                <AccordionItem value="order-nail-fins">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      {order.nail_fins_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                       order.nail_fins_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                       <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>Nail Fins</span>
-                      <Badge variant="outline" className="ml-2 capitalize">
-                        {(order.nail_fins_status || 'not_ordered').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={order.nail_fins_status || 'not_ordered'}
-                        onChange={value => updateOrderComponent({
-                          nail_fins_status: value,
-                          nail_fins_order_date: value === 'ordered' ? order.nail_fins_order_date || new Date().toISOString().split('T')[0] : null
-                        })}
-                        options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                    {order.nail_fins_status === 'ordered' && (
-                      <div className="space-y-2">
-                        <Label>Order Date</Label>
-                        <Input
-                          type="date"
-                          value={order.nail_fins_order_date || ''}
-                          onChange={e => updateOrderComponent({ nail_fins_order_date: e.target.value })}
-                          disabled={!canUpdateOrdering || isSeller}
-                        />
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* Hardware */}
-              <AccordionItem value="order-hardware">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    {order.hardware_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                     order.hardware_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                     <AlertCircle className="h-4 w-4 text-destructive" />}
-                    <span>Hardware</span>
-                    <Badge variant="outline" className="ml-2 capitalize">
-                      {(order.hardware_status || 'not_ordered').replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <Label>Status</Label>
-                    <StatusButtonGroup
-                      value={order.hardware_status || 'not_ordered'}
-                      onChange={value => updateOrderComponent({
-                        hardware_status: value,
-                        hardware_order_date: value === 'ordered' ? order.hardware_order_date || new Date().toISOString().split('T')[0] : null
-                      })}
-                      options={orderingStatusOptions}
-                      disabled={!canUpdateOrdering || isSeller}
-                    />
-                  </div>
-                  {order.hardware_status === 'ordered' && (
-                    <div className="space-y-2">
-                      <Label>Order Date</Label>
-                      <Input
-                        type="date"
-                        value={order.hardware_order_date || ''}
-                        onChange={e => updateOrderComponent({ hardware_order_date: e.target.value })}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
 
               {/* Aggregated Components from Constructions */}
               {aggregatedComponents.length > 0 && (
