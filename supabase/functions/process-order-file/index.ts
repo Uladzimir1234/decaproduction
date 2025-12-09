@@ -108,11 +108,27 @@ const extractionTool = {
   }
 };
 
-// Simplified system prompt
-const SYSTEM_PROMPT = `Extract window/door order data from IT Okna exports.
-Each "Construction" = one window or door with specs (dimensions, colors, glass, hardware).
-Types: "Window" = window, "Entrance/Door" = door, "Sliding/PSK/Lift" = sliding_door.
-Include components needing ordering: glass, blinds, screens, hardware, nailing_fins, coupling_profile.`;
+// Enhanced system prompt for complete component extraction
+const SYSTEM_PROMPT = `You are extracting window/door order data from IT Okna software exports.
+
+CRITICAL INSTRUCTIONS:
+1. Each "Construction" = one window or door with specs (dimensions, colors, glass, hardware)
+2. Types mapping: "Window" = window, "Entrance/Door" = door, "Sliding/PSK/Lift" = sliding_door
+3. Extract glass_type exactly as shown in file (e.g. "3M Triple Pane Low-E Argon")
+4. Extract blinds_color if blinds are mentioned (e.g. "Cream", "White", "Gray")
+5. Extract screen_type: look for "flex screen" or "DECA aluminum" or "deca screen"
+6. Extract handle_type with color (e.g. "Std. black", "Premium white")
+7. Extract color_exterior and color_interior exactly as shown
+
+FOR EACH CONSTRUCTION, you MUST populate the "components" array with items that need ordering:
+- If glass_type is set: add component {component_type: "glass", component_name: "<glass_type value>", quantity: 1}
+- If has_blinds is true: add component {component_type: "blinds", component_name: "<blinds_color value>", quantity: 1}
+- If screen_type is set: add component {component_type: "screens", component_name: "<exact screen type>", quantity: 1}
+- If handle_type is set: add component {component_type: "hardware", component_name: "<handle_type value>", quantity: 1}
+- If nailing fins/flanges mentioned: add component {component_type: "nailing_fins", component_name: null, quantity: 1}
+- If coupling profile mentioned: add component {component_type: "coupling_profile", component_name: null, quantity: 1}
+
+This components array is CRITICAL for tracking what materials need to be ordered for manufacturing.`;
 
 function processExtractedData(extracted: any): ParsedOrder {
   const constructions = (extracted.constructions || []).map((c: any, index: number) => ({
