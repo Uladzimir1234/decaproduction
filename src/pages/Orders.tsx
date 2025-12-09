@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle } from "lucide-react";
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -112,6 +112,7 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
+  production_status: string;
 }
 export default function Orders() {
   const { toast } = useToast();
@@ -449,6 +450,41 @@ export default function Orders() {
     return components;
   };
 
+  const handleProductionStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      const { error } = await supabase
+        .from("orders")
+        .update({ production_status: newStatus })
+        .eq("id", orderId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, production_status: newStatus } : o
+      ));
+      
+      await createAuditLog({
+        action: 'order_updated',
+        description: `Changed production status from "${order?.production_status || 'hold'}" to "${newStatus}" on order #${order?.order_number}`,
+        entityType: 'order',
+        entityId: orderId,
+      });
+      
+      toast({
+        title: "Status updated",
+        description: newStatus === 'production_ready' ? "Order is now ready for production" : "Order placed on hold",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleComponentStatusChange = async (orderId: string, field: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -539,6 +575,8 @@ export default function Orders() {
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === "all") return matchesSearch;
+    if (statusFilter === "on_hold") return matchesSearch && order.production_status === 'hold';
+    if (statusFilter === "production_ready") return matchesSearch && order.production_status === 'production_ready';
     if (statusFilter === "complete") return matchesSearch && order.fulfillment_percentage >= 90;
     if (statusFilter === "in_progress") return matchesSearch && order.fulfillment_percentage >= 20 && order.fulfillment_percentage < 90;
     if (statusFilter === "not_started") return matchesSearch && order.fulfillment_percentage < 20;
@@ -581,6 +619,8 @@ export default function Orders() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Orders</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="production_ready">Production Ready</SelectItem>
                 <SelectItem value="not_started">Not Started</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="complete">Complete</SelectItem>
@@ -621,6 +661,43 @@ export default function Orders() {
                           <span className="font-medium truncate">
                             {order.customer_name}
                           </span>
+                          {/* Production Status Badge */}
+                          {(isAdmin || isManager) ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleProductionStatusChange(
+                                  order.id,
+                                  order.production_status === 'hold' ? 'production_ready' : 'hold'
+                                );
+                              }}
+                              className="shrink-0"
+                            >
+                              {order.production_status === 'hold' ? (
+                                <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer transition-colors">
+                                  <Pause className="h-3 w-3" />
+                                  On Hold
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success hover:bg-success/10 cursor-pointer transition-colors">
+                                  <PlayCircle className="h-3 w-3" />
+                                  Production Ready
+                                </Badge>
+                              )}
+                            </button>
+                          ) : (
+                            order.production_status === 'hold' ? (
+                              <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 shrink-0">
+                                <Pause className="h-3 w-3" />
+                                On Hold
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
+                                <PlayCircle className="h-3 w-3" />
+                                Production Ready
+                              </Badge>
+                            )
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className={fulfillments[order.id]?.glass_status === 'complete' ? 'text-success font-medium' : 'text-destructive font-medium'}>

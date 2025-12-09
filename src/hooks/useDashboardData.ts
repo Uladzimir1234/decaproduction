@@ -14,6 +14,7 @@ export interface OrderWithFulfillment {
   has_sliding_doors: boolean;
   screen_type: string | null;
   delivery_complete: boolean;
+  production_status: string;
   // Component status
   reinforcement_status: string | null;
   windows_profile_status: string | null;
@@ -87,6 +88,8 @@ export interface DashboardMetrics {
   avgDaysToDelivery: number;
   readyToShip: number;
   pendingDeliveries: number;
+  onHoldCount: number;
+  productionReadyCount: number;
 }
 
 const COMPONENT_FIELDS = [
@@ -339,6 +342,8 @@ export function useDashboardData() {
     avgDaysToDelivery: 0,
     readyToShip: 0,
     pendingDeliveries: 0,
+    onHoldCount: 0,
+    productionReadyCount: 0,
   });
   const [componentSummary, setComponentSummary] = useState<ComponentSummary[]>([]);
   const [manufacturingWorkload, setManufacturingWorkload] = useState<ManufacturingWorkload[]>([]);
@@ -378,6 +383,7 @@ export function useDashboardData() {
             has_sliding_doors: order.has_sliding_doors || false,
             screen_type: order.screen_type,
             delivery_complete: order.delivery_complete || false,
+            production_status: order.production_status || 'hold',
             reinforcement_status: order.reinforcement_status,
             windows_profile_status: order.windows_profile_status,
             glass_status: order.glass_status,
@@ -432,6 +438,10 @@ export function useDashboardData() {
         o.manufacturingProgress >= 90 && o.deliveryProgress.deliveredCount < o.deliveryProgress.totalItems
       ).length;
 
+      // Calculate production status counts
+      const onHoldCount = processedOrders.filter(o => o.production_status === 'hold').length;
+      const productionReadyCount = processedOrders.filter(o => o.production_status === 'production_ready').length;
+
       setMetrics({
         totalActive: processedOrders.length,
         criticalCount: critical,
@@ -441,6 +451,8 @@ export function useDashboardData() {
         avgDaysToDelivery: avgDays,
         readyToShip,
         pendingDeliveries,
+        onHoldCount,
+        productionReadyCount,
       });
 
       // Calculate component summary
