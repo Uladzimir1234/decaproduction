@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Plus, X } from "lucide-react";
 import { createAuditLog } from "@/lib/auditLog";
 import { useRole } from "@/hooks/useRole";
+import { FileUploadZone, ParsedOrderData } from "@/components/order/FileUploadZone";
+import { ConstructionsPreview } from "@/components/order/ConstructionsPreview";
 
 interface SlidingDoorEntry {
   type: string;
@@ -100,6 +102,10 @@ export default function OrderCreate() {
   const [hardwareOrderDate, setHardwareOrderDate] = useState("");
   const [hiddenHingesCount, setHiddenHingesCount] = useState(0);
   const [visibleHingesCount, setVisibleHingesCount] = useState(0);
+  
+  // Parsed file data
+  const [parsedOrderData, setParsedOrderData] = useState<ParsedOrderData | null>(null);
+  
   useEffect(() => {
     fetchCustomers();
     fetchSellers();
@@ -155,6 +161,25 @@ export default function OrderCreate() {
         setCustomerName(customer.name);
       }
     }
+  };
+
+  const handleFileParsed = (data: ParsedOrderData) => {
+    setParsedOrderData(data);
+    // Auto-fill from parsed data
+    if (data.quote_number) setOrderNumber(data.quote_number);
+    if (data.customer_name) {
+      setIsNewCustomer(true);
+      setCustomerName(data.customer_name);
+    }
+    setWindowsCount(data.windows_count);
+    setDoorsCount(data.doors_count);
+    if (data.sliding_doors_count > 0) {
+      setHasSlidingDoors(true);
+    }
+  };
+
+  const handleClearFile = () => {
+    setParsedOrderData(null);
   };
   const validateStep = () => {
     if (step === 1) {

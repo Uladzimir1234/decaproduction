@@ -187,6 +187,192 @@ export type Database = {
           },
         ]
       }
+      construction_components: {
+        Row: {
+          component_name: string | null
+          component_type: string
+          construction_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          order_date: string | null
+          quantity: number
+          status: string
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_email: string | null
+        }
+        Insert: {
+          component_name?: string | null
+          component_type: string
+          construction_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_date?: string | null
+          quantity?: number
+          status?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Update: {
+          component_name?: string | null
+          component_type?: string
+          construction_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_date?: string | null
+          quantity?: number
+          status?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_components_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_delivery: {
+        Row: {
+          construction_id: string
+          created_at: string
+          delivery_batch_id: string | null
+          id: string
+          is_delivered: boolean
+          is_prepared: boolean
+          notes: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          construction_id: string
+          created_at?: string
+          delivery_batch_id?: string | null
+          id?: string
+          is_delivered?: boolean
+          is_prepared?: boolean
+          notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          construction_id?: string
+          created_at?: string
+          delivery_batch_id?: string | null
+          id?: string
+          is_delivered?: boolean
+          is_prepared?: boolean
+          notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_delivery_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_delivery_delivery_batch_id_fkey"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_manufacturing: {
+        Row: {
+          construction_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          stage: string
+          status: string
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_email: string | null
+        }
+        Insert: {
+          construction_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          stage: string
+          status?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Update: {
+          construction_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          stage?: string
+          status?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_manufacturing_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_notes: {
+        Row: {
+          construction_id: string
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          note_text: string
+          note_type: string
+        }
+        Insert: {
+          construction_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          note_text: string
+          note_type?: string
+        }
+        Update: {
+          construction_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          note_text?: string
+          note_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_notes_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_delivery_items: {
         Row: {
           created_at: string
@@ -368,6 +554,101 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "delivery_batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_constructions: {
+        Row: {
+          blinds_color: string | null
+          center_seal: boolean | null
+          color_exterior: string | null
+          color_interior: string | null
+          comments: string | null
+          construction_number: string
+          construction_type: string
+          created_at: string
+          glass_type: string | null
+          handle_type: string | null
+          has_blinds: boolean | null
+          height_inches: number | null
+          height_mm: number | null
+          id: string
+          location: string | null
+          model: string | null
+          opening_type: string | null
+          order_id: string
+          position_index: number
+          quantity: number
+          raw_data: Json | null
+          rough_opening: string | null
+          screen_type: string | null
+          updated_at: string
+          width_inches: number | null
+          width_mm: number | null
+        }
+        Insert: {
+          blinds_color?: string | null
+          center_seal?: boolean | null
+          color_exterior?: string | null
+          color_interior?: string | null
+          comments?: string | null
+          construction_number: string
+          construction_type?: string
+          created_at?: string
+          glass_type?: string | null
+          handle_type?: string | null
+          has_blinds?: boolean | null
+          height_inches?: number | null
+          height_mm?: number | null
+          id?: string
+          location?: string | null
+          model?: string | null
+          opening_type?: string | null
+          order_id: string
+          position_index?: number
+          quantity?: number
+          raw_data?: Json | null
+          rough_opening?: string | null
+          screen_type?: string | null
+          updated_at?: string
+          width_inches?: number | null
+          width_mm?: number | null
+        }
+        Update: {
+          blinds_color?: string | null
+          center_seal?: boolean | null
+          color_exterior?: string | null
+          color_interior?: string | null
+          comments?: string | null
+          construction_number?: string
+          construction_type?: string
+          created_at?: string
+          glass_type?: string | null
+          handle_type?: string | null
+          has_blinds?: boolean | null
+          height_inches?: number | null
+          height_mm?: number | null
+          id?: string
+          location?: string | null
+          model?: string | null
+          opening_type?: string | null
+          order_id?: string
+          position_index?: number
+          quantity?: number
+          raw_data?: Json | null
+          rough_opening?: string | null
+          screen_type?: string | null
+          updated_at?: string
+          width_inches?: number | null
+          width_mm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_constructions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
