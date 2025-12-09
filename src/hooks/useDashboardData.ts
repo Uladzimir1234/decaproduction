@@ -12,6 +12,8 @@ export interface OrderWithFulfillment {
   doors_count: number;
   sliding_doors_count: number;
   has_sliding_doors: boolean;
+  has_plisse_screens: boolean;
+  has_nailing_flanges: boolean;
   screen_type: string | null;
   delivery_complete: boolean;
   production_status: string;
@@ -103,6 +105,14 @@ const COMPONENT_FIELDS = [
   { name: 'Hardware', field: 'hardware_status' },
 ] as const;
 
+// Helper to check if a component is applicable to an order
+const isComponentApplicable = (order: OrderWithFulfillment, field: string): boolean => {
+  if (field === 'screens_status') return !!order.screen_type;
+  if (field === 'plisse_screens_status') return !!order.has_plisse_screens;
+  if (field === 'nail_fins_status') return !!order.has_nailing_flanges;
+  return true;
+};
+
 const MANUFACTURING_STAGES = [
   { name: 'Reinforcement Cutting', field: 'reinforcement_cutting' },
   { name: 'Profile Cutting', field: 'profile_cutting' },
@@ -155,10 +165,13 @@ const getManufacturingStatus = (order: OrderWithFulfillment, field: string): str
 
 const calculateComponentReadiness = (order: OrderWithFulfillment): number => {
   let available = 0;
+  let applicable = 0;
   COMPONENT_FIELDS.forEach(({ field }) => {
+    if (!isComponentApplicable(order, field)) return;
+    applicable++;
     if (getComponentStatus(order, field) === 'available') available++;
   });
-  return Math.round((available / COMPONENT_FIELDS.length) * 100);
+  return applicable > 0 ? Math.round((available / applicable) * 100) : 100;
 };
 
 const calculateManufacturingProgress = (order: OrderWithFulfillment): number => {
@@ -184,16 +197,18 @@ const calculateManufacturingProgress = (order: OrderWithFulfillment): number => 
 const getBlockers = (order: OrderWithFulfillment): string[] => {
   const blockers: string[] = [];
   
-  // Check for components not ordered
+  // Check for components not ordered (only applicable ones)
   COMPONENT_FIELDS.forEach(({ name, field }) => {
+    if (!isComponentApplicable(order, field)) return;
     const status = getComponentStatus(order, field);
     if (status === 'not_ordered') {
       blockers.push(`${name} not ordered`);
     }
   });
   
-  // Check for components ordered but not available
+  // Check for components ordered but not available (only applicable ones)
   COMPONENT_FIELDS.forEach(({ name, field }) => {
+    if (!isComponentApplicable(order, field)) return;
     const status = getComponentStatus(order, field);
     if (status === 'ordered') {
       blockers.push(`Waiting for ${name}`);
@@ -243,15 +258,17 @@ const calculateDeliveryProgress = (order: OrderWithFulfillment): { deliveredCoun
 };
 
 const getNextAction = (order: OrderWithFulfillment): string => {
-  // Priority: order components first
+  // Priority: order components first (only applicable ones)
   for (const { name, field } of COMPONENT_FIELDS) {
+    if (!isComponentApplicable(order, field)) continue;
     if (getComponentStatus(order, field) === 'not_ordered') {
       return `Order ${name}`;
     }
   }
   
-  // Then check for waiting components
+  // Then check for waiting components (only applicable ones)
   for (const { name, field } of COMPONENT_FIELDS) {
+    if (!isComponentApplicable(order, field)) continue;
     if (getComponentStatus(order, field) === 'ordered') {
       return `Follow up on ${name}`;
     }
@@ -382,6 +399,8 @@ export function useDashboardData() {
             doors_count: order.doors_count || 0,
             sliding_doors_count: order.sliding_doors_count || 0,
             has_sliding_doors: order.has_sliding_doors || false,
+            has_plisse_screens: order.has_plisse_screens || false,
+            has_nailing_flanges: order.has_nailing_flanges || false,
             screen_type: order.screen_type,
             delivery_complete: order.delivery_complete || false,
             production_status: order.production_status || 'hold',
@@ -426,6 +445,7 @@ export function useDashboardData() {
       let pendingComponents = 0;
       processedOrders.forEach(order => {
         COMPONENT_FIELDS.forEach(({ field }) => {
+          if (!isComponentApplicable(order, field)) return;
           const status = getComponentStatus(order, field);
           if (status !== 'available') pendingComponents++;
         });
@@ -469,6 +489,9 @@ export function useDashboardData() {
         };
 
         processedOrders.forEach(order => {
+          // Skip components not applicable to this order
+          if (!isComponentApplicable(order, field)) return;
+          
           const status = getComponentStatus(order, field);
           if (status === 'not_ordered') {
             result.notOrdered++;
