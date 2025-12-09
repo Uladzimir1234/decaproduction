@@ -507,13 +507,18 @@ export default function OrderCreate() {
     }
   };
   return <>
-    {/* Extraction Confirmation Dialog */}
+    {/* Extraction Confirmation Dialog - Creates order directly */}
     <ExtractionConfirmationDialog
       open={showConfirmationDialog}
       onOpenChange={setShowConfirmationDialog}
       parsedData={pendingParsedData}
-      onConfirm={handleConfirmExtraction}
+      onOrderCreated={() => {
+        setShowConfirmationDialog(false);
+        setPendingParsedData(null);
+      }}
       onCancel={handleCancelExtraction}
+      sellers={sellers}
+      isSeller={isSeller}
     />
     
     <div className="max-w-2xl mx-auto animate-fade-in">
