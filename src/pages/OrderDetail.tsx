@@ -191,7 +191,7 @@ export default function OrderDetail() {
   useEffect(() => {
     if (!id) return;
 
-    const channel = supabase
+    const orderChannel = supabase
       .channel(`order-${id}`)
       .on(
         'postgres_changes',
@@ -214,8 +214,54 @@ export default function OrderDetail() {
       )
       .subscribe();
 
+    // Real-time subscription for fulfillment changes (manufacturing stages)
+    const fulfillmentChannel = supabase
+      .channel(`fulfillment-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_fulfillment',
+          filter: `order_id=eq.${id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            setFulfillment(prev => prev ? { ...prev, ...payload.new } : payload.new as OrderFulfillment);
+          }
+        }
+      )
+      .subscribe();
+
+    // Real-time subscription for custom steps changes
+    const customStepsChannel = supabase
+      .channel(`customsteps-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'custom_steps',
+          filter: `order_id=eq.${id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setCustomSteps(prev => [...prev, payload.new as CustomStep]);
+          } else if (payload.eventType === 'UPDATE') {
+            setCustomSteps(prev => prev.map(step => 
+              step.id === payload.new.id ? { ...step, ...payload.new } : step
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setCustomSteps(prev => prev.filter(step => step.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(orderChannel);
+      supabase.removeChannel(fulfillmentChannel);
+      supabase.removeChannel(customStepsChannel);
     };
   }, [id, toast]);
 
