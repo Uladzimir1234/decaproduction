@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -14,20 +15,31 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, X, FileText, AlertCircle, Sparkles } from "lucide-react";
+import { Check, X, FileText, AlertCircle, Sparkles, Loader2 } from "lucide-react";
 import { ParsedOrderData } from "./FileUploadZone";
+import { supabase } from "@/integrations/supabase/client";
+import { createAuditLog } from "@/lib/auditLog";
+import { useToast } from "@/hooks/use-toast";
 
 interface SlidingDoorEntry {
   type: string;
   count: number;
 }
 
+interface Seller {
+  id: string;
+  email: string;
+  full_name: string | null;
+}
+
 interface ExtractionConfirmationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   parsedData: ParsedOrderData | null;
-  onConfirm: (confirmedData: ConfirmedExtractionData) => void;
+  onOrderCreated: () => void;
   onCancel: () => void;
+  sellers: Seller[];
+  isSeller: boolean;
 }
 
 export interface ConfirmedExtractionData {
@@ -71,9 +83,13 @@ export function ExtractionConfirmationDialog({
   open,
   onOpenChange,
   parsedData,
-  onConfirm,
+  onOrderCreated,
   onCancel,
+  sellers,
+  isSeller,
 }: ExtractionConfirmationDialogProps) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   // Initialize state from parsed data
   const [customerName, setCustomerName] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
@@ -91,6 +107,11 @@ export function ExtractionConfirmationDialog({
   const [colorExterior, setColorExterior] = useState("");
   const [colorInterior, setColorInterior] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  
+  // New fields for order creation
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [assignedSellerId, setAssignedSellerId] = useState("");
   
   // Track what was detected from file
   const [detectedFields, setDetectedFields] = useState<Set<string>>(new Set());
@@ -249,27 +270,219 @@ export function ExtractionConfirmationDialog({
     onOpenChange(newOpen);
   };
 
-  const handleConfirm = () => {
+  const handleCreateOrder = async () => {
     if (!parsedData) return;
-
-    onConfirm({
-      customerName,
-      orderNumber,
-      orderDate,
-      windowsCount,
-      doorsCount,
-      hasSlidingDoors,
-      slidingDoorEntries: hasSlidingDoors ? slidingDoorEntries.filter(e => e.type) : [],
-      screenType,
-      hasPlisseScreens,
-      hasNailingFlanges,
-      hasBlinds,
-      blindsColor,
-      profileType,
-      colorExterior,
-      colorInterior,
-      parsedOrderData: parsedData,
-    });
+    
+    // Validation
+    if (!customerName.trim()) {
+      toast({ title: "Missing customer name", variant: "destructive" });
+      return;
+    }
+    if (!orderNumber.trim()) {
+      toast({ title: "Missing order number", variant: "destructive" });
+      return;
+    }
+    if (!deliveryDate) {
+      toast({ title: "Missing delivery date", variant: "destructive" });
+      return;
+    }
+    if (!isSeller && !assignedSellerId) {
+      toast({ title: "Please assign this order to a seller", variant: "destructive" });
+      return;
+    }
+    
+    setIsCreating(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      
+      const finalSellerId = isSeller ? user.id : assignedSellerId;
+      
+      // Create customer
+      const { data: newCustomer, error: customerError } = await supabase
+        .from("customers")
+        .insert({ user_id: finalSellerId, name: customerName.trim() })
+        .select()
+        .single();
+      
+      if (customerError) throw customerError;
+      
+      // Create order
+      const slidingDoorsTotal = hasSlidingDoors 
+        ? slidingDoorEntries.reduce((sum, e) => sum + e.count, 0) 
+        : 0;
+      
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          user_id: finalSellerId,
+          created_by: user.id,
+          customer_id: newCustomer.id,
+          customer_name: customerName.trim(),
+          order_number: orderNumber,
+          order_date: orderDate,
+          delivery_date: deliveryDate,
+          windows_count: windowsCount,
+          doors_count: doorsCount,
+          has_sliding_doors: hasSlidingDoors,
+          sliding_doors_count: slidingDoorsTotal,
+          sliding_door_type: hasSlidingDoors ? JSON.stringify(slidingDoorEntries.filter(e => e.type)) : null,
+          has_plisse_screens: hasPlisseScreens,
+          screen_type: screenType || null,
+          has_nailing_flanges: hasNailingFlanges,
+          windows_profile_type: profileType || null,
+          fulfillment_percentage: 0,
+        })
+        .select()
+        .single();
+      
+      if (orderError) throw orderError;
+      
+      // Save constructions
+      const constructionsToInsert = parsedData.constructions.map((c, index) => ({
+        order_id: orderData.id,
+        construction_number: c.construction_number,
+        construction_type: c.construction_type,
+        width_inches: c.width_inches,
+        height_inches: c.height_inches,
+        width_mm: c.width_mm,
+        height_mm: c.height_mm,
+        rough_opening: c.rough_opening,
+        location: c.location,
+        model: c.model,
+        opening_type: c.opening_type,
+        color_exterior: colorExterior || c.color_exterior,
+        color_interior: colorInterior || c.color_interior,
+        glass_type: c.glass_type,
+        screen_type: c.screen_type,
+        handle_type: c.handle_type,
+        has_blinds: hasBlinds || c.has_blinds,
+        blinds_color: blindsColor || c.blinds_color,
+        center_seal: c.center_seal,
+        comments: c.comments,
+        quantity: c.quantity,
+        position_index: index,
+      }));
+      
+      const { data: insertedConstructions, error: constructionsError } = await supabase
+        .from('order_constructions')
+        .insert(constructionsToInsert)
+        .select('id, construction_number');
+      
+      if (constructionsError) throw constructionsError;
+      
+      if (insertedConstructions) {
+        const componentsToInsert: {
+          construction_id: string;
+          component_type: string;
+          component_name: string | null;
+          quantity: number;
+          status: string;
+        }[] = [];
+        
+        const deliveryEntriesToInsert: {
+          construction_id: string;
+          is_prepared: boolean;
+          is_delivered: boolean;
+        }[] = [];
+        
+        for (const construction of parsedData.constructions) {
+          const insertedConstruction = insertedConstructions.find(
+            ic => ic.construction_number === construction.construction_number
+          );
+          
+          if (!insertedConstruction) continue;
+          
+          deliveryEntriesToInsert.push({
+            construction_id: insertedConstruction.id,
+            is_prepared: false,
+            is_delivered: false,
+          });
+          
+          if (construction.components && construction.components.length > 0) {
+            for (const component of construction.components) {
+              componentsToInsert.push({
+                construction_id: insertedConstruction.id,
+                component_type: component.component_type,
+                component_name: component.component_name,
+                quantity: component.quantity || construction.quantity,
+                status: 'not_ordered',
+              });
+            }
+          } else {
+            if (construction.glass_type) {
+              componentsToInsert.push({
+                construction_id: insertedConstruction.id,
+                component_type: 'glass',
+                component_name: construction.glass_type,
+                quantity: construction.quantity,
+                status: 'not_ordered',
+              });
+            }
+            if (construction.has_blinds || hasBlinds) {
+              componentsToInsert.push({
+                construction_id: insertedConstruction.id,
+                component_type: 'blinds',
+                component_name: blindsColor || construction.blinds_color || null,
+                quantity: construction.quantity,
+                status: 'not_ordered',
+              });
+            }
+            if (construction.screen_type || screenType) {
+              componentsToInsert.push({
+                construction_id: insertedConstruction.id,
+                component_type: 'screens',
+                component_name: construction.screen_type || screenType,
+                quantity: construction.quantity,
+                status: 'not_ordered',
+              });
+            }
+            if (construction.handle_type) {
+              componentsToInsert.push({
+                construction_id: insertedConstruction.id,
+                component_type: 'hardware',
+                component_name: construction.handle_type,
+                quantity: construction.quantity,
+                status: 'not_ordered',
+              });
+            }
+          }
+        }
+        
+        if (componentsToInsert.length > 0) {
+          await supabase.from('construction_components').insert(componentsToInsert);
+        }
+        
+        if (deliveryEntriesToInsert.length > 0) {
+          await supabase.from('construction_delivery').insert(deliveryEntriesToInsert);
+        }
+      }
+      
+      await createAuditLog({
+        action: 'order_created',
+        description: `Created order #${orderNumber} for ${customerName} with ${parsedData.constructions.length} constructions`,
+        entityType: 'order',
+        entityId: orderData.id,
+      });
+      
+      toast({
+        title: "Order created",
+        description: `Order #${orderNumber} created with ${parsedData.constructions.length} constructions`,
+      });
+      
+      onOrderCreated();
+      navigate(`/orders/${orderData.id}`);
+      
+    } catch (error: any) {
+      toast({
+        title: "Error creating order",
+        description: error.message || "Failed to create order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
   
   // Helper to show "Detected from file" badge
@@ -360,7 +573,7 @@ export function ExtractionConfirmationDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Order Date</Label>
                   <Input
@@ -369,6 +582,36 @@ export function ExtractionConfirmationDialog({
                     onChange={(e) => setOrderDate(e.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Delivery Date *</Label>
+                  <Input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    className={!deliveryDate ? "border-destructive" : ""}
+                  />
+                </div>
+              </div>
+
+              {!isSeller && sellers.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Assign to Seller *</Label>
+                  <Select value={assignedSellerId} onValueChange={setAssignedSellerId}>
+                    <SelectTrigger className={!assignedSellerId ? "border-destructive" : ""}>
+                      <SelectValue placeholder="Select a seller" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sellers.map((seller) => (
+                        <SelectItem key={seller.id} value={seller.id}>
+                          {seller.full_name || seller.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Windows Count</Label>
                   <Input
@@ -666,13 +909,17 @@ export function ExtractionConfirmationDialog({
         </ScrollArea>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleCancel}>
+          <Button variant="outline" onClick={handleCancel} disabled={isCreating}>
             <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
-          <Button onClick={handleConfirm}>
-            <Check className="h-4 w-4 mr-2" />
-            Confirm & Continue
+          <Button onClick={handleCreateOrder} disabled={isCreating}>
+            {isCreating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4 mr-2" />
+            )}
+            {isCreating ? "Creating..." : "Confirm & Create Order"}
           </Button>
         </DialogFooter>
       </DialogContent>
