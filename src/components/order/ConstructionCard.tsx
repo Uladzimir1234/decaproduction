@@ -60,13 +60,35 @@ interface ConstructionCardProps {
 }
 
 // Determine status color based on manufacturing progress
-// Priority: orderFulfillment (main badges) is primary, construction_manufacturing only for explicit overrides
+// Priority: per-construction data (when exists) takes precedence, fallback to order-level
 const getStatusColor = (
   manufacturing?: ConstructionManufacturing[],
   constructionType?: string,
   orderFulfillment?: OrderFulfillment | null
 ) => {
-  // First, determine the base status from order_fulfillment (main manufacturing badges)
+  // First check if this construction has its own manufacturing data - if so, use it
+  if (manufacturing && manufacturing.length > 0) {
+    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
+    
+    const hasGlassComplete = statusMap.get('glass_installation') === 'complete';
+    const hasAssemblyComplete = statusMap.get('assembly') === 'complete';
+    const hasWeldingComplete = statusMap.get('welding') === 'complete';
+    
+    // Per-construction status takes precedence
+    if (hasGlassComplete) {
+      return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+    }
+    if (hasAssemblyComplete) {
+      return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+    }
+    if (hasWeldingComplete) {
+      return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+    }
+    // Has manufacturing records but none complete - still not started
+    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+  }
+  
+  // No per-construction data - fall back to order-level fulfillment
   let baseStatus = { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
   
   if (orderFulfillment) {
@@ -83,7 +105,6 @@ const getStatusColor = (
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'door') {
-      // Doors: Blue only when glass installed, Green when assembled (but glass not installed)
       if (orderFulfillment.glass_status === 'complete') {
         baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
       } else if (orderFulfillment.doors_status === 'complete') {
@@ -92,7 +113,6 @@ const getStatusColor = (
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'sliding_door') {
-      // Sliding doors: Blue only when glass installed, Green when assembled
       if (orderFulfillment.glass_status === 'complete') {
         baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
       } else if (orderFulfillment.sliding_doors_status === 'complete') {
@@ -101,45 +121,6 @@ const getStatusColor = (
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     }
-  }
-  
-  // Per-construction override: ONLY allows DOWNGRADING (marking specific item as less complete)
-  // construction_manufacturing should NOT upgrade status beyond what main badges show
-  // This is for fine-tuning when one specific window/door isn't as far along as the order level
-  if (manufacturing && manufacturing.length > 0) {
-    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
-    
-    // Check per-construction stages
-    const hasGlassComplete = statusMap.get('glass_installation') === 'complete';
-    const hasAssemblyComplete = statusMap.get('assembly') === 'complete';
-    const hasWeldingComplete = statusMap.get('welding') === 'complete';
-    
-    // Determine per-construction level (0=not started, 1=welded, 2=assembled, 3=glass)
-    let constructionLevel = 0;
-    if (hasGlassComplete) constructionLevel = 3;
-    else if (hasAssemblyComplete) constructionLevel = 2;
-    else if (hasWeldingComplete) constructionLevel = 1;
-    
-    // Determine base level from orderFulfillment
-    let baseLevel = 0;
-    if (baseStatus.bg === 'bg-blue-500') baseLevel = 3; // glass installed
-    else if (baseStatus.bg === 'bg-green-500') baseLevel = 2; // assembled
-    else if (baseStatus.bg === 'bg-amber-400') baseLevel = 1; // welded/in progress
-    
-    // Only override if construction level is LOWER than base (downgrade only)
-    // This allows marking specific items as "not as far along" as the order level
-    if (constructionLevel < baseLevel) {
-      if (constructionLevel === 0) {
-        return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
-      }
-      if (constructionLevel === 1) {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-      }
-      if (constructionLevel === 2) {
-        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      }
-    }
-    // If construction level >= base level, ignore it and use base status
   }
   
   return baseStatus;
