@@ -725,9 +725,16 @@ export default function Orders() {
       f.screens_cutting === 'complete' || f.screens_cutting === 'partial'
     );
     
-    // Prefer order_fulfillment if it has progress and construction_manufacturing doesn't
-    // This handles cases where user updates legacy workflow even on file-extracted orders
-    const useConstructionMfg = mfgData && mfgData.length > 0 && (mfgHasProgress || !fulfillmentHasProgress);
+    // Check if order_fulfillment has substantial progress (stages marked complete)
+    // This indicates user has been updating via Order Map
+    const fulfillmentHasSubstantialProgress = f && (
+      f.profile_cutting === 'complete' || f.welding_status === 'complete' ||
+      f.assembly_status === 'complete' || f.glass_status === 'complete'
+    );
+    
+    // Prioritize order_fulfillment if it shows substantial progress (user made updates via Order Map)
+    // Otherwise use construction_manufacturing if available and has progress
+    const useConstructionMfg = mfgData && mfgData.length > 0 && mfgHasProgress && !fulfillmentHasSubstantialProgress;
     
     if (useConstructionMfg) {
       // Aggregate construction manufacturing stages
