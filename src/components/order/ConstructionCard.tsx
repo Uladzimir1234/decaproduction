@@ -319,6 +319,7 @@ export function ConstructionCard({
             construction={construction}
             orderId={orderId}
             isProductionReady={isProductionReady}
+            orderFulfillment={orderFulfillment}
             onViewDetails={() => {
               setPopoverOpen(false);
               if (onViewDetails) {

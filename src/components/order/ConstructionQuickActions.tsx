@@ -11,6 +11,14 @@ interface ConstructionManufacturing {
   status: string;
 }
 
+interface OrderFulfillment {
+  welding_status?: string | null;
+  assembly_status?: string | null;
+  glass_status?: string | null;
+  doors_status?: string | null;
+  sliding_doors_status?: string | null;
+}
+
 interface Construction {
   id: string;
   construction_number: string;
@@ -29,6 +37,7 @@ interface ConstructionQuickActionsProps {
   onViewDetails: () => void;
   onClose: () => void;
   onRefresh: () => void;
+  orderFulfillment?: OrderFulfillment | null;
 }
 
 const ISSUE_TYPES = [
@@ -48,13 +57,40 @@ const getTypePrefix = (type: string) => {
   }
 };
 
-const getCurrentGlassStatus = (manufacturing?: ConstructionManufacturing[]) => {
+// Determine glass status: prioritize orderFulfillment, fallback to per-construction
+const getCurrentGlassStatus = (
+  constructionType: string,
+  orderFulfillment?: OrderFulfillment | null,
+  manufacturing?: ConstructionManufacturing[]
+) => {
+  // Order-level glass_status applies to all construction types
+  if (orderFulfillment?.glass_status === 'complete') {
+    return 'complete';
+  }
+  // Fallback to per-construction data
   if (!manufacturing) return 'not_started';
   const glassStage = manufacturing.find(m => m.stage === 'glass_installation');
   return glassStage?.status || 'not_started';
 };
 
-const getCurrentAssemblyStatus = (manufacturing?: ConstructionManufacturing[]) => {
+// Determine assembly status: prioritize orderFulfillment based on type
+const getCurrentAssemblyStatus = (
+  constructionType: string,
+  orderFulfillment?: OrderFulfillment | null,
+  manufacturing?: ConstructionManufacturing[]
+) => {
+  if (orderFulfillment) {
+    if (constructionType === 'window' && orderFulfillment.assembly_status === 'complete') {
+      return 'complete';
+    }
+    if (constructionType === 'door' && orderFulfillment.doors_status === 'complete') {
+      return 'complete';
+    }
+    if (constructionType === 'sliding_door' && orderFulfillment.sliding_doors_status === 'complete') {
+      return 'complete';
+    }
+  }
+  // Fallback to per-construction data
   if (!manufacturing) return 'not_started';
   const assemblyStage = manufacturing.find(m => m.stage === 'assembly');
   return assemblyStage?.status || 'not_started';
@@ -67,6 +103,7 @@ export function ConstructionQuickActions({
   onViewDetails,
   onClose,
   onRefresh,
+  orderFulfillment,
 }: ConstructionQuickActionsProps) {
   const { toast } = useToast();
   const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
@@ -76,8 +113,8 @@ export function ConstructionQuickActions({
   const [savingIssue, setSavingIssue] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
 
-  const glassStatus = getCurrentGlassStatus(construction.manufacturing);
-  const assemblyStatus = getCurrentAssemblyStatus(construction.manufacturing);
+  const glassStatus = getCurrentGlassStatus(construction.construction_type, orderFulfillment, construction.manufacturing);
+  const assemblyStatus = getCurrentAssemblyStatus(construction.construction_type, orderFulfillment, construction.manufacturing);
   const isGlassInstalled = glassStatus === 'complete';
   const isAssembled = assemblyStatus === 'complete';
 
