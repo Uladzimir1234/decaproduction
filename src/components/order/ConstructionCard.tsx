@@ -195,9 +195,9 @@ export function ConstructionCard({
           </div>
         )}
         
-        {/* Quantity indicator */}
+        {/* Quantity indicator - top right */}
         {construction.quantity > 1 && (
-          <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-2.5 w-2.5 flex items-center justify-center text-[6px] font-black border">
+          <div className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground rounded-full h-4 w-4 flex items-center justify-center text-[10px] font-bold border-2 border-background shadow-sm">
             {construction.quantity}
           </div>
         )}
