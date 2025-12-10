@@ -195,11 +195,36 @@ export function ConstructionCard({
           </div>
         )}
         
-        {/* Notes indicator */}
+        {/* Notes indicator with tooltip */}
         {hasNotes && !hasOpenIssues && (
-          <div className="absolute -top-1 -right-1 bg-blue-400 rounded-full h-2.5 w-2.5 flex items-center justify-center">
-            <MessageSquare className="h-1.5 w-1.5 text-white" />
-          </div>
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <div 
+                  className="absolute -top-1 -right-1 bg-blue-400 rounded-full h-2.5 w-2.5 flex items-center justify-center cursor-pointer hover:bg-blue-500 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MessageSquare className="h-1.5 w-1.5 text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs z-[9999]">
+                <div className="space-y-1">
+                  <p className="font-bold text-blue-500">Notes ({construction.notes_count})</p>
+                  {construction.notes && construction.notes.slice(0, 3).map((note, idx) => (
+                    <div key={idx} className="pl-2 border-l-2 border-blue-300">
+                      <p className="break-words text-foreground">{note.note_text}</p>
+                      {note.created_by_email && (
+                        <p className="text-[10px] text-muted-foreground">— {note.created_by_email.split('@')[0]}</p>
+                      )}
+                    </div>
+                  ))}
+                  {construction.notes && construction.notes.length > 3 && (
+                    <p className="text-muted-foreground text-[10px]">+{construction.notes.length - 3} more...</p>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         
         {/* Quantity indicator - top right */}
