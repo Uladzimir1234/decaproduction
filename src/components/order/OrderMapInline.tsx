@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, Grid3X3 } from "lucide-react";
 import { ConstructionCard } from "./ConstructionCard";
 import { ConstructionDetailPanel } from "./ConstructionDetailPanel";
@@ -71,8 +71,115 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
   const [selectedConstruction, setSelectedConstruction] = useState<ConstructionWithExtra | null>(null);
   const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillment | null>(null);
 
+  // Handle optimistic updates from quick actions
+  const handleOptimisticUpdate = useCallback((updatedConstruction?: { id: string; manufacturing: { stage: string; status: string }[] }) => {
+    if (updatedConstruction) {
+      // Optimistic update - instantly update just this construction's manufacturing data
+      setConstructions(prev => prev.map(c => 
+        c.id === updatedConstruction.id 
+          ? { ...c, manufacturing: updatedConstruction.manufacturing }
+          : c
+      ));
+    } else {
+      // Full refresh requested (no optimistic data)
+      fetchConstructions();
+    }
+  }, []);
+
+  const fetchConstructions = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
+    
+    // Run ALL queries in parallel for speed
+    const [fulfillmentResult, constructionsResult] = await Promise.all([
+      supabase
+        .from('order_fulfillment')
+        .select('welding_status, assembly_status, glass_status, doors_status, sliding_doors_status')
+        .eq('order_id', orderId)
+        .maybeSingle(),
+      supabase
+        .from('order_constructions')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('position_index')
+    ]);
+    
+    setOrderFulfillment(fulfillmentResult.data);
+    
+    if (constructionsResult.error) {
+      console.error('Error fetching constructions:', constructionsResult.error);
+      setLoading(false);
+      return;
+    }
+
+    const constructionsData = constructionsResult.data;
+    if (!constructionsData || constructionsData.length === 0) {
+      setConstructions([]);
+      setLoading(false);
+      return;
+    }
+
+    const constructionIds = constructionsData.map(c => c.id);
+
+    // Fetch all related data in parallel
+    const [mfgResult, notesResult, deliveryResult, issuesResult] = await Promise.all([
+      supabase
+        .from('construction_manufacturing')
+        .select('construction_id, stage, status')
+        .in('construction_id', constructionIds),
+      supabase
+        .from('construction_notes')
+        .select('construction_id, note_text, created_by_email, created_at')
+        .in('construction_id', constructionIds)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('construction_delivery')
+        .select('construction_id, is_delivered')
+        .in('construction_id', constructionIds),
+      supabase
+        .from('construction_issues')
+        .select('construction_id, issue_type, description, created_by_email, created_at')
+        .in('construction_id', constructionIds)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+    ]);
+
+    const mfgData = mfgResult.data;
+    const notesData = notesResult.data;
+    const deliveryData = deliveryResult.data;
+    const issuesData = issuesResult.data;
+
+    const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
+      const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
+      const constructionNotes = notesData?.filter(n => n.construction_id === c.id) || [];
+      const constructionIssues = issuesData?.filter(i => i.construction_id === c.id) || [];
+      const deliveryRecord = deliveryData?.find(d => d.construction_id === c.id);
+      
+      return {
+        ...c,
+        manufacturing,
+        notes_count: constructionNotes.length,
+        notes: constructionNotes.map(n => ({
+          note_text: n.note_text,
+          created_by_email: n.created_by_email,
+          created_at: n.created_at,
+        })),
+        is_delivered: deliveryRecord?.is_delivered || false,
+        open_issues_count: constructionIssues.length,
+        issues: constructionIssues.map(i => ({
+          issue_type: i.issue_type,
+          description: i.description,
+          created_by_email: i.created_by_email,
+          created_at: i.created_at,
+        })),
+      };
+    });
+
+    setConstructions(enrichedConstructions);
+    setLoading(false);
+  }, [orderId]);
+
   useEffect(() => {
-    fetchConstructions(true); // Show loading only on initial mount
+    fetchConstructions(true);
     
     const channel = supabase
       .channel(`order-constructions-inline-${orderId}`)
@@ -119,92 +226,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orderId]);
-
-  const fetchConstructions = async (showLoading = false) => {
-    if (showLoading) setLoading(true);
-    
-    // Fetch order_fulfillment for fallback status
-    const { data: fulfillmentData } = await supabase
-      .from('order_fulfillment')
-      .select('welding_status, assembly_status, glass_status, doors_status, sliding_doors_status')
-      .eq('order_id', orderId)
-      .maybeSingle();
-    
-    setOrderFulfillment(fulfillmentData);
-    
-    const { data: constructionsData, error } = await supabase
-      .from('order_constructions')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('position_index');
-
-    if (error) {
-      console.error('Error fetching constructions:', error);
-      setLoading(false);
-      return;
-    }
-
-    if (!constructionsData || constructionsData.length === 0) {
-      setConstructions([]);
-      setLoading(false);
-      return;
-    }
-
-    const constructionIds = constructionsData.map(c => c.id);
-
-    const { data: mfgData } = await supabase
-      .from('construction_manufacturing')
-      .select('construction_id, stage, status')
-      .in('construction_id', constructionIds);
-
-    const { data: notesData } = await supabase
-      .from('construction_notes')
-      .select('construction_id, note_text, created_by_email, created_at')
-      .in('construction_id', constructionIds)
-      .order('created_at', { ascending: false });
-
-    const { data: deliveryData } = await supabase
-      .from('construction_delivery')
-      .select('construction_id, is_delivered')
-      .in('construction_id', constructionIds);
-
-    const { data: issuesData } = await supabase
-      .from('construction_issues')
-      .select('construction_id, issue_type, description, created_by_email, created_at')
-      .in('construction_id', constructionIds)
-      .eq('status', 'open')
-      .order('created_at', { ascending: false });
-
-    const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
-      const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
-      const constructionNotes = notesData?.filter(n => n.construction_id === c.id) || [];
-      const constructionIssues = issuesData?.filter(i => i.construction_id === c.id) || [];
-      const deliveryRecord = deliveryData?.find(d => d.construction_id === c.id);
-      
-      return {
-        ...c,
-        manufacturing,
-        notes_count: constructionNotes.length,
-        notes: constructionNotes.map(n => ({
-          note_text: n.note_text,
-          created_by_email: n.created_by_email,
-          created_at: n.created_at,
-        })),
-        is_delivered: deliveryRecord?.is_delivered || false,
-        open_issues_count: constructionIssues.length,
-        issues: constructionIssues.map(i => ({
-          issue_type: i.issue_type,
-          description: i.description,
-          created_by_email: i.created_by_email,
-          created_at: i.created_at,
-        })),
-      };
-    });
-
-    setConstructions(enrichedConstructions);
-    setLoading(false);
-  };
+  }, [orderId, fetchConstructions]);
 
   if (loading) {
     return (
@@ -247,7 +269,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
             orderFulfillment={orderFulfillment}
             orderId={orderId}
             isProductionReady={isProductionReady}
-            onRefresh={fetchConstructions}
+            onRefresh={handleOptimisticUpdate}
             usePopover={true}
           />
         ))}

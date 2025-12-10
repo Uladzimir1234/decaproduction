@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ interface ConstructionQuickActionsProps {
   isProductionReady: boolean;
   onViewDetails: () => void;
   onClose: () => void;
-  onRefresh: () => void;
+  onRefresh: (updatedConstruction?: { id: string; manufacturing: ConstructionManufacturing[] }) => void;
   orderFulfillment?: OrderFulfillment | null;
 }
 
@@ -57,54 +57,6 @@ const getTypePrefix = (type: string) => {
   }
 };
 
-// Determine glass status: prioritize per-construction data when exists
-const getCurrentGlassStatus = (
-  constructionType: string,
-  orderFulfillment?: OrderFulfillment | null,
-  manufacturing?: ConstructionManufacturing[]
-) => {
-  // Per-construction data takes priority when it exists
-  if (manufacturing && manufacturing.length > 0) {
-    const glassStage = manufacturing.find(m => m.stage === 'glass_installation');
-    if (glassStage) {
-      return glassStage.status;
-    }
-  }
-  // Fallback to order-level
-  if (orderFulfillment?.glass_status === 'complete') {
-    return 'complete';
-  }
-  return 'not_started';
-};
-
-// Determine assembly status: prioritize per-construction data when exists
-const getCurrentAssemblyStatus = (
-  constructionType: string,
-  orderFulfillment?: OrderFulfillment | null,
-  manufacturing?: ConstructionManufacturing[]
-) => {
-  // Per-construction data takes priority when it exists
-  if (manufacturing && manufacturing.length > 0) {
-    const assemblyStage = manufacturing.find(m => m.stage === 'assembly');
-    if (assemblyStage) {
-      return assemblyStage.status;
-    }
-  }
-  // Fallback to order-level based on type
-  if (orderFulfillment) {
-    if (constructionType === 'window' && orderFulfillment.assembly_status === 'complete') {
-      return 'complete';
-    }
-    if (constructionType === 'door' && orderFulfillment.doors_status === 'complete') {
-      return 'complete';
-    }
-    if (constructionType === 'sliding_door' && orderFulfillment.sliding_doors_status === 'complete') {
-      return 'complete';
-    }
-  }
-  return 'not_started';
-};
-
 export function ConstructionQuickActions({
   construction,
   orderId,
@@ -118,60 +70,105 @@ export function ConstructionQuickActions({
   const [selectedIssueType, setSelectedIssueType] = useState<string | null>(null);
   const [issueDescription, setIssueDescription] = useState("");
   const [noteText, setNoteText] = useState("");
-  const [savingStatus, setSavingStatus] = useState(false);
   const [savingIssue, setSavingIssue] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
 
-  const glassStatus = getCurrentGlassStatus(construction.construction_type, orderFulfillment, construction.manufacturing);
-  const assemblyStatus = getCurrentAssemblyStatus(construction.construction_type, orderFulfillment, construction.manufacturing);
-  const isGlassInstalled = glassStatus === 'complete';
-  const isAssembled = assemblyStatus === 'complete';
+  // Optimistic local state for instant feedback
+  const [localGlassStatus, setLocalGlassStatus] = useState<string>('not_started');
+  const [localAssemblyStatus, setLocalAssemblyStatus] = useState<string>('not_started');
 
-  const updateManufacturingStage = async (stage: string, status: string) => {
-    setSavingStatus(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { data: existing } = await supabase
-      .from('construction_manufacturing')
-      .select('id')
-      .eq('construction_id', construction.id)
-      .eq('stage', stage)
-      .maybeSingle();
-
-    if (existing) {
-      const { error } = await supabase
-        .from('construction_manufacturing')
-        .update({
-          status,
-          updated_by: user?.id,
-          updated_by_email: user?.email,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        onRefresh();
-      }
+  // Initialize local state from construction data
+  useEffect(() => {
+    const glassStage = construction.manufacturing?.find(m => m.stage === 'glass_installation');
+    const assemblyStage = construction.manufacturing?.find(m => m.stage === 'assembly');
+    
+    if (glassStage) {
+      setLocalGlassStatus(glassStage.status);
+    } else if (orderFulfillment?.glass_status === 'complete') {
+      setLocalGlassStatus('complete');
     } else {
-      const { error } = await supabase
-        .from('construction_manufacturing')
-        .insert({
-          construction_id: construction.id,
-          stage,
-          status,
-          updated_by: user?.id,
-          updated_by_email: user?.email,
-        });
-
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        onRefresh();
-      }
+      setLocalGlassStatus('not_started');
     }
-    setSavingStatus(false);
+    
+    if (assemblyStage) {
+      setLocalAssemblyStatus(assemblyStage.status);
+    } else if (construction.construction_type === 'window' && orderFulfillment?.assembly_status === 'complete') {
+      setLocalAssemblyStatus('complete');
+    } else if (construction.construction_type === 'door' && orderFulfillment?.doors_status === 'complete') {
+      setLocalAssemblyStatus('complete');
+    } else if (construction.construction_type === 'sliding_door' && orderFulfillment?.sliding_doors_status === 'complete') {
+      setLocalAssemblyStatus('complete');
+    } else {
+      setLocalAssemblyStatus('not_started');
+    }
+  }, [construction, orderFulfillment]);
+
+  const isGlassInstalled = localGlassStatus === 'complete';
+  const isAssembled = localAssemblyStatus === 'complete';
+
+  const updateManufacturingStage = async (stage: string, newStatus: string) => {
+    // Optimistic update - change color INSTANTLY
+    if (stage === 'glass_installation') {
+      setLocalGlassStatus(newStatus);
+    } else if (stage === 'assembly') {
+      setLocalAssemblyStatus(newStatus);
+    }
+
+    // Build optimistic manufacturing array for parent
+    const existingManufacturing = construction.manufacturing || [];
+    const updatedManufacturing = existingManufacturing.filter(m => m.stage !== stage);
+    updatedManufacturing.push({ stage, status: newStatus });
+    
+    // Notify parent immediately for instant card color update
+    onRefresh({ id: construction.id, manufacturing: updatedManufacturing });
+
+    // Now save to database in background
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: existing } = await supabase
+        .from('construction_manufacturing')
+        .select('id')
+        .eq('construction_id', construction.id)
+        .eq('stage', stage)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('construction_manufacturing')
+          .update({
+            status: newStatus,
+            updated_by: user?.id,
+            updated_by_email: user?.email,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('construction_manufacturing')
+          .insert({
+            construction_id: construction.id,
+            stage,
+            status: newStatus,
+            updated_by: user?.id,
+            updated_by_email: user?.email,
+          });
+
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      // Revert optimistic update on error
+      if (stage === 'glass_installation') {
+        setLocalGlassStatus(isGlassInstalled ? 'complete' : 'not_started');
+      } else if (stage === 'assembly') {
+        setLocalAssemblyStatus(isAssembled ? 'complete' : 'not_started');
+      }
+      toast({ title: "Error saving", description: error.message, variant: "destructive" });
+      // Trigger full refresh to restore correct state
+      onRefresh();
+    }
   };
 
   const handleReportIssue = async () => {
@@ -264,26 +261,24 @@ export function ConstructionQuickActions({
           <div className="flex gap-1">
             <button
               onClick={() => updateManufacturingStage('glass_installation', isGlassInstalled ? 'not_started' : 'complete')}
-              disabled={savingStatus}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isGlassInstalled 
                   ? 'bg-blue-500 text-white' 
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
-              {savingStatus ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : isGlassInstalled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+              {isGlassInstalled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
               Glass
             </button>
             <button
               onClick={() => updateManufacturingStage('assembly', isAssembled ? 'not_started' : 'complete')}
-              disabled={savingStatus}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isAssembled 
                   ? 'bg-green-500 text-white' 
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
-              {savingStatus ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : isAssembled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+              {isAssembled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
               Assembled
             </button>
           </div>
