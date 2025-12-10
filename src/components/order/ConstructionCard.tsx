@@ -202,7 +202,7 @@ export function ConstructionCard({
             {CardContent}
           </button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="center" className="p-0 w-auto z-50">
+        <PopoverContent side="top" align="center" className="p-0 w-auto z-[100]" sideOffset={8}>
           <ConstructionQuickActions
             construction={construction}
             orderId={orderId}
