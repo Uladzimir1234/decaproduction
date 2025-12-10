@@ -293,10 +293,11 @@ export function ConstructionCard({
           </button>
         </PopoverTrigger>
         <PopoverContent 
-          side="top" 
-          align="center" 
-          className="p-0 w-auto bg-background border shadow-lg" 
+          side="bottom" 
+          align="start" 
+          className="p-0 w-auto max-w-[90vw] bg-background border shadow-lg" 
           sideOffset={8}
+          collisionPadding={16}
           style={{ zIndex: 9999 }}
         >
           <ConstructionQuickActions
