@@ -202,10 +202,10 @@ export function ConstructionCard({
             <Tooltip delayDuration={100}>
               <TooltipTrigger asChild>
                 <div 
-                  className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2.5 w-2.5 flex items-center justify-center cursor-pointer hover:bg-amber-600 transition-colors"
+                  className="absolute -top-1.5 -right-1.5 bg-amber-500 rounded-full h-4 w-4 flex items-center justify-center cursor-pointer hover:bg-amber-600 transition-colors shadow-sm"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <AlertTriangle className="h-1.5 w-1.5 text-white" />
+                  <AlertTriangle className="h-2.5 w-2.5 text-white" />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs max-w-xs z-[9999]">
