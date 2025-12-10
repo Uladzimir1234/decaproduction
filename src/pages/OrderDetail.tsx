@@ -827,7 +827,7 @@ export default function OrderDetail() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <Button variant="ghost" onClick={() => navigate("/orders")} className="gap-2 mb-2">
+          <Button variant="ghost" onClick={() => navigate(`/orders#order-${id}`)} className="gap-2 mb-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Orders
           </Button>
