@@ -60,74 +60,85 @@ interface ConstructionCardProps {
 }
 
 // Determine status color based on manufacturing progress
+// Priority: orderFulfillment (main badges) is primary, construction_manufacturing only for explicit overrides
 const getStatusColor = (
   manufacturing?: ConstructionManufacturing[],
   constructionType?: string,
   orderFulfillment?: OrderFulfillment | null
 ) => {
-  // If there are any construction_manufacturing records, use them (they take priority over order_fulfillment)
-  if (manufacturing && manufacturing.length > 0) {
-    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
-    
-    // Check stages in order of completion (most complete first)
-    // Blue = glass installed
-    if (statusMap.get('glass_installation') === 'complete') {
-      return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-    }
-    // Green = assembled (but glass not installed)
-    if (statusMap.get('assembly') === 'complete') {
-      return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-    }
-    // Amber = welded
-    if (statusMap.get('welding') === 'complete') {
-      return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-    }
-    
-    // Check for partial progress
-    const hasPartial = manufacturing.some(m => m.status === 'partial');
-    if (hasPartial) {
-      return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
-    }
-    
-    // Has records but all are not_started
-    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
-  }
+  // First, determine the base status from order_fulfillment (main manufacturing badges)
+  let baseStatus = { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
   
-  // Fall back to order_fulfillment data only if no construction_manufacturing records exist
   if (orderFulfillment) {
     if (constructionType === 'window') {
       if (orderFulfillment.glass_status === 'complete') {
-        return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-      }
-      if (orderFulfillment.assembly_status === 'complete') {
-        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      }
-      if (orderFulfillment.welding_status === 'complete') {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-      }
-      if (orderFulfillment.glass_status === 'partial' || 
+        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      } else if (orderFulfillment.assembly_status === 'complete') {
+        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+      } else if (orderFulfillment.welding_status === 'complete') {
+        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+      } else if (orderFulfillment.glass_status === 'partial' || 
           orderFulfillment.assembly_status === 'partial' || 
           orderFulfillment.welding_status === 'partial') {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'door') {
       if (orderFulfillment.doors_status === 'complete') {
-        return { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
-      }
-      if (orderFulfillment.doors_status === 'partial') {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      } else if (orderFulfillment.doors_status === 'partial') {
+        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'sliding_door') {
       if (orderFulfillment.sliding_doors_status === 'complete') {
-        return { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
-      }
-      if (orderFulfillment.sliding_doors_status === 'partial') {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      } else if (orderFulfillment.sliding_doors_status === 'partial') {
+        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     }
   }
   
-  return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+  // Check if there's an explicit per-construction override in construction_manufacturing
+  // Only use this if user has fine-tuned this specific construction differently from the order level
+  if (manufacturing && manufacturing.length > 0) {
+    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
+    
+    // Check if this construction has any meaningful progress set
+    const hasGlassComplete = statusMap.get('glass_installation') === 'complete';
+    const hasAssemblyComplete = statusMap.get('assembly') === 'complete';
+    const hasWeldingComplete = statusMap.get('welding') === 'complete';
+    const hasAnyComplete = hasGlassComplete || hasAssemblyComplete || hasWeldingComplete;
+    const hasPartial = manufacturing.some(m => m.status === 'partial');
+    
+    // Only override if this construction has explicit progress that differs from base
+    // This means user has fine-tuned this specific construction
+    if (hasAnyComplete || hasPartial) {
+      if (hasGlassComplete) {
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      }
+      if (hasAssemblyComplete) {
+        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+      }
+      if (hasWeldingComplete) {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+      }
+      if (hasPartial) {
+        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+      }
+    }
+    
+    // If construction_manufacturing exists but shows "not_started" for all stages,
+    // this could be an explicit override to mark this construction as not started
+    // even when order-level shows progress. Check if ALL stages are not_started.
+    const allNotStarted = manufacturing.every(m => m.status === 'not_started');
+    if (allNotStarted && manufacturing.length > 0) {
+      // Check if base status shows progress - if so, this is an explicit downgrade
+      if (baseStatus.bg !== 'bg-red-500') {
+        return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+      }
+    }
+  }
+  
+  return baseStatus;
 };
 
 // Get type prefix
