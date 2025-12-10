@@ -191,6 +191,17 @@ export default function Orders() {
   });
   const [expandedAvailableComponents, setExpandedAvailableComponents] = useState<Set<string>>(new Set());
   
+  // Sort state with localStorage persistence
+  const [sortBy, setSortBy] = useState<string>(() => {
+    const saved = localStorage.getItem('ordersSortBy');
+    return saved || 'time_left_asc';
+  });
+  
+  // Persist sort preference
+  useEffect(() => {
+    localStorage.setItem('ordersSortBy', sortBy);
+  }, [sortBy]);
+  
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
 
@@ -1303,16 +1314,54 @@ export default function Orders() {
                 </SelectContent>
               </Select>
             )}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <Clock className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="time_left_asc">Time Left (Urgent First)</SelectItem>
+                <SelectItem value="time_left_desc">Time Left (Most Time)</SelectItem>
+                <SelectItem value="order_date_desc">Order Date (Newest)</SelectItem>
+                <SelectItem value="order_date_asc">Order Date (Oldest)</SelectItem>
+                <SelectItem value="fulfillment_asc">Fulfillment (Low to High)</SelectItem>
+                <SelectItem value="fulfillment_desc">Fulfillment (High to Low)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
-          {filteredOrders.length === 0 ? <div className="text-center py-12 text-muted-foreground">
-              <p>No orders found.</p>
-              {orders.length === 0 && <Link to="/orders/new">
-                  <Button variant="link" className="mt-2">Create your first order</Button>
-                </Link>}
-            </div> : <div className="space-y-3">
-              {filteredOrders.map(order => {
+          {(() => {
+            // Apply sorting to filtered orders
+            const sortedOrders = [...filteredOrders].sort((a, b) => {
+              switch (sortBy) {
+                case 'time_left_asc':
+                  return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
+                case 'time_left_desc':
+                  return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
+                case 'order_date_asc':
+                  return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
+                case 'order_date_desc':
+                  return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
+                case 'fulfillment_asc':
+                  return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
+                case 'fulfillment_desc':
+                  return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
+                default:
+                  return 0;
+              }
+            });
+            
+            return sortedOrders.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No orders found.</p>
+                {orders.length === 0 && <Link to="/orders/new">
+                    <Button variant="link" className="mt-2">Create your first order</Button>
+                  </Link>}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sortedOrders.map(order => {
             const daysUntil = getDaysUntilDelivery(order.delivery_date);
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
@@ -1923,7 +1972,9 @@ export default function Orders() {
                     )}
                   </div>;
           })}
-            </div>}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
