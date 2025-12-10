@@ -9,7 +9,7 @@ import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrderEditDialog } from "@/components/OrderEditDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -1323,6 +1323,33 @@ export default function Orders() {
     return { prepared, total: SHIPPING_PREP_ITEMS.length };
   };
 
+  // Helper function to check if order needs a specific component to be ordered
+  const orderNeedsComponent = (order: Order, componentType: string): boolean => {
+    const fileComponents = constructionComponents[order.id];
+    
+    // Check file-extracted components first
+    if (fileComponents && fileComponents.length > 0) {
+      const hasNotOrdered = fileComponents.some(c => 
+        c.component_type.toLowerCase() === componentType.toLowerCase() && 
+        c.status === 'not_ordered'
+      );
+      if (hasNotOrdered) return true;
+    }
+    
+    // Fall back to legacy order-level fields
+    switch(componentType.toLowerCase()) {
+      case 'reinforcement': return order.reinforcement_status === 'not_ordered';
+      case 'glass': return order.glass_status === 'not_ordered';
+      case 'profile': return order.windows_profile_status === 'not_ordered';
+      case 'screens': return !!order.screen_type && order.screens_status === 'not_ordered';
+      case 'hardware': return order.hardware_status === 'not_ordered';
+      case 'nail_fins': return !!order.has_nailing_flanges && order.nail_fins_status === 'not_ordered';
+      case 'plisse': return !!order.has_plisse_screens && order.plisse_screens_status === 'not_ordered';
+      case 'blinds': return fileComponents?.some(c => c.component_type.toLowerCase() === 'blinds' && c.status === 'not_ordered') || false;
+      default: return false;
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || order.customer_name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSeller = sellerFilter === "all" || order.user_id === sellerFilter;
@@ -1332,12 +1359,17 @@ export default function Orders() {
     if (statusFilter === "on_hold") return matchesSearch && order.production_status === 'hold';
     if (statusFilter === "production_ready") return matchesSearch && order.production_status === 'production_ready';
     if (statusFilter === "complete") return matchesSearch && order.fulfillment_percentage >= 90;
-    if (statusFilter === "in_progress") return matchesSearch && order.fulfillment_percentage >= 20 && order.fulfillment_percentage < 90;
-    if (statusFilter === "not_started") return matchesSearch && order.fulfillment_percentage < 20;
-    if (statusFilter === "pending_delivery") {
-      const progress = getDeliveryProgress(order);
-      return matchesSearch && order.fulfillment_percentage >= 90 && progress.delivered < progress.total;
-    }
+    
+    // Component "Needs Ordering" filters
+    if (statusFilter === "needs_reinforcement") return matchesSearch && orderNeedsComponent(order, 'reinforcement');
+    if (statusFilter === "needs_glass") return matchesSearch && orderNeedsComponent(order, 'glass');
+    if (statusFilter === "needs_profile") return matchesSearch && orderNeedsComponent(order, 'profile');
+    if (statusFilter === "needs_screens") return matchesSearch && orderNeedsComponent(order, 'screens');
+    if (statusFilter === "needs_hardware") return matchesSearch && orderNeedsComponent(order, 'hardware');
+    if (statusFilter === "needs_nail_fins") return matchesSearch && orderNeedsComponent(order, 'nail_fins');
+    if (statusFilter === "needs_plisse") return matchesSearch && orderNeedsComponent(order, 'plisse');
+    if (statusFilter === "needs_blinds") return matchesSearch && orderNeedsComponent(order, 'blinds');
+    
     return matchesSearch;
   });
   if (loading) {
@@ -1372,13 +1404,25 @@ export default function Orders() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Orders</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="production_ready">Production Ready</SelectItem>
-                <SelectItem value="not_started">Not Started</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
-                <SelectItem value="pending_delivery">Pending Delivery</SelectItem>
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">Status</SelectLabel>
+                  <SelectItem value="all">All Orders</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="production_ready">Production Ready</SelectItem>
+                  <SelectItem value="complete">Complete</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">Needs Ordering</SelectLabel>
+                  <SelectItem value="needs_reinforcement">Reinforcement</SelectItem>
+                  <SelectItem value="needs_glass">Glass</SelectItem>
+                  <SelectItem value="needs_profile">Profile</SelectItem>
+                  <SelectItem value="needs_screens">Screens</SelectItem>
+                  <SelectItem value="needs_hardware">Hardware</SelectItem>
+                  <SelectItem value="needs_nail_fins">Nail Fins</SelectItem>
+                  <SelectItem value="needs_plisse">Plisse Screens</SelectItem>
+                  <SelectItem value="needs_blinds">Blinds</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
             {(isAdmin || isManager || isWorker) && Object.keys(sellers).length > 0 && (
