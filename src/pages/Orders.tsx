@@ -1614,7 +1614,6 @@ export default function Orders() {
                           {manufacturingStages.map((stage) => {
                             const f = fulfillments[order.id];
                             const trackingInfo = formatTrackingInfo(f?.updated_at, f?.updated_by_email);
-                            const isFileExtracted = hasFileExtractedData && stage.progress;
                             const isLocked = stage.lock?.isLocked && order.production_status !== 'hold';
                             const lockReason = stage.lock?.lockReason;
                             
@@ -1623,7 +1622,7 @@ export default function Orders() {
                                 className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
                                   stage.status === 'complete' ? 'bg-emerald-500' : 
                                   stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' || isLocked ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isFileExtracted && !isLocked ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                                } ${order.production_status === 'hold' || isLocked ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isLocked ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                               >
                                 {stage.name}
                                 {stage.progress && (
@@ -1637,22 +1636,6 @@ export default function Orders() {
                                 )}
                               </span>
                             );
-                            
-                            // File-extracted stages are display-only (editable via Order Map)
-                            if (isFileExtracted) {
-                              return (
-                                <TooltipProvider key={stage.name}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      {badgeContent}
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Edit via Order Map</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            }
                             
                             // Locked stages show tooltip with lock reason
                             if (isLocked) {
