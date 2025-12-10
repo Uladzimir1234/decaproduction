@@ -1,5 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertTriangle, MessageSquare } from "lucide-react";
+import { ConstructionQuickActions } from "./ConstructionQuickActions";
 
 interface ConstructionManufacturing {
   stage: string;
@@ -32,8 +34,13 @@ interface Construction {
 interface ConstructionCardProps {
   construction: Construction;
   onClick: () => void;
+  onViewDetails?: () => void;
   isSelected?: boolean;
   orderFulfillment?: OrderFulfillment | null;
+  orderId?: string;
+  isProductionReady?: boolean;
+  onRefresh?: () => void;
+  usePopover?: boolean;
 }
 
 // Determine status color based on manufacturing progress
@@ -115,59 +122,102 @@ const getTypePrefix = (type: string) => {
   }
 };
 
-export function ConstructionCard({ construction, onClick, isSelected, orderFulfillment }: ConstructionCardProps) {
+export function ConstructionCard({ 
+  construction, 
+  onClick, 
+  onViewDetails,
+  isSelected, 
+  orderFulfillment,
+  orderId,
+  isProductionReady = false,
+  onRefresh,
+  usePopover = false,
+}: ConstructionCardProps) {
   const statusColor = getStatusColor(construction.manufacturing, construction.construction_type, orderFulfillment);
   const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
+  const hasNotes = (construction.notes_count || 0) > 0;
 
   const dimensions = construction.width_inches && construction.height_inches
     ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
     : null;
 
+  const CardContent = (
+    <div
+      className={`
+        relative flex flex-col items-center gap-0.5 cursor-pointer
+        transition-all hover:scale-110
+        ${isSelected ? 'scale-110' : ''}
+      `}
+    >
+      {/* Badge square */}
+      <div
+        className={`
+          relative w-7 h-7 rounded-sm flex items-center justify-center
+          text-[10px] font-black drop-shadow-sm
+          ${statusColor.bg} ${statusColor.text}
+          ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
+          ${construction.is_delivered ? 'opacity-50' : ''}
+        `}
+      >
+        {construction.construction_number}
+        
+        {/* Issue indicator */}
+        {hasOpenIssues && (
+          <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2.5 w-2.5 flex items-center justify-center">
+            <AlertTriangle className="h-1.5 w-1.5 text-white" />
+          </div>
+        )}
+        
+        {/* Notes indicator */}
+        {hasNotes && !hasOpenIssues && (
+          <div className="absolute -top-1 -right-1 bg-blue-400 rounded-full h-2.5 w-2.5 flex items-center justify-center">
+            <MessageSquare className="h-1.5 w-1.5 text-white" />
+          </div>
+        )}
+        
+        {/* Quantity indicator */}
+        {construction.quantity > 1 && (
+          <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-2.5 w-2.5 flex items-center justify-center text-[6px] font-black border">
+            {construction.quantity}
+          </div>
+        )}
+      </div>
+      
+      {/* Type letter below */}
+      <span className="text-[8px] font-medium text-muted-foreground">
+        {typePrefix}
+      </span>
+    </div>
+  );
+
+  // If usePopover is enabled, wrap in Popover instead of just Tooltip
+  if (usePopover && orderId && onRefresh) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button type="button">{CardContent}</button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="center" className="p-0 w-auto">
+          <ConstructionQuickActions
+            construction={construction}
+            orderId={orderId}
+            isProductionReady={isProductionReady}
+            onViewDetails={onViewDetails || onClick}
+            onClose={() => {}}
+            onRefresh={onRefresh}
+          />
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // Default tooltip behavior
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            onClick={onClick}
-            className={`
-              relative flex flex-col items-center gap-0.5 cursor-pointer
-              transition-all hover:scale-110
-              ${isSelected ? 'scale-110' : ''}
-            `}
-          >
-            {/* Badge square */}
-            <div
-              className={`
-                relative w-7 h-7 rounded-sm flex items-center justify-center
-                text-[10px] font-black drop-shadow-sm
-                ${statusColor.bg} ${statusColor.text}
-                ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
-                ${construction.is_delivered ? 'opacity-50' : ''}
-              `}
-            >
-              {construction.construction_number}
-              
-              {/* Issue indicator */}
-              {hasOpenIssues && (
-                <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2 w-2 flex items-center justify-center">
-                  <AlertTriangle className="h-1.5 w-1.5 text-white" />
-                </div>
-              )}
-              
-              {/* Quantity indicator */}
-              {construction.quantity > 1 && (
-                <div className="absolute -bottom-1 -right-1 bg-background text-foreground rounded-full h-2.5 w-2.5 flex items-center justify-center text-[6px] font-black border">
-                  {construction.quantity}
-                </div>
-              )}
-            </div>
-            
-            {/* Type letter below */}
-            <span className="text-[8px] font-medium text-muted-foreground">
-              {typePrefix}
-            </span>
-          </button>
+          <button onClick={onClick}>{CardContent}</button>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
           <div className="space-y-0.5">
@@ -176,7 +226,10 @@ export function ConstructionCard({ construction, onClick, isSelected, orderFulfi
             {construction.location && <p className="text-muted-foreground">{construction.location}</p>}
             <p className="text-muted-foreground">{statusColor.label}</p>
             {hasOpenIssues && (
-              <p className="text-amber-500 font-medium">{construction.open_issues_count} issue{construction.open_issues_count > 1 ? 's' : ''}</p>
+              <p className="text-amber-500 font-medium">{construction.open_issues_count} issue{construction.open_issues_count! > 1 ? 's' : ''}</p>
+            )}
+            {hasNotes && (
+              <p className="text-blue-500 font-medium">{construction.notes_count} note{construction.notes_count! > 1 ? 's' : ''}</p>
             )}
           </div>
         </TooltipContent>
