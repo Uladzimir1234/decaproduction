@@ -60,70 +60,61 @@ interface ConstructionCardProps {
 }
 
 // Determine status color based on manufacturing progress
-// Priority: per-construction data (when exists) takes precedence, fallback to order-level
+// Uses per-construction data when available, falls back to order-level for missing stages
 const getStatusColor = (
   manufacturing?: ConstructionManufacturing[],
   constructionType?: string,
   orderFulfillment?: OrderFulfillment | null
 ) => {
-  // First check if this construction has its own manufacturing data - if so, use it
+  // Build a status map from per-construction data
+  const statusMap = new Map<string, string>();
+  
   if (manufacturing && manufacturing.length > 0) {
-    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
-    
-    const hasGlassComplete = statusMap.get('glass_installation') === 'complete';
-    const hasAssemblyComplete = statusMap.get('assembly') === 'complete';
-    const hasWeldingComplete = statusMap.get('welding') === 'complete';
-    
-    // Per-construction status takes precedence
-    if (hasGlassComplete) {
-      return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-    }
-    if (hasAssemblyComplete) {
-      return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-    }
-    if (hasWeldingComplete) {
-      return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-    }
-    // Has manufacturing records but none complete - still not started
-    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
+    manufacturing.forEach(m => statusMap.set(m.stage, m.status));
   }
   
-  // No per-construction data - fall back to order-level fulfillment
-  let baseStatus = { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
-  
-  if (orderFulfillment) {
-    if (constructionType === 'window') {
-      if (orderFulfillment.glass_status === 'complete') {
-        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-      } else if (orderFulfillment.assembly_status === 'complete') {
-        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      } else if (orderFulfillment.welding_status === 'complete') {
-        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-      } else if (orderFulfillment.glass_status === 'partial' || 
-          orderFulfillment.assembly_status === 'partial' || 
-          orderFulfillment.welding_status === 'partial') {
-        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
-      }
-    } else if (constructionType === 'door') {
-      if (orderFulfillment.glass_status === 'complete') {
-        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-      } else if (orderFulfillment.doors_status === 'complete') {
-        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      } else if (orderFulfillment.doors_status === 'partial') {
-        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
-      }
-    } else if (constructionType === 'sliding_door') {
-      if (orderFulfillment.glass_status === 'complete') {
-        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-      } else if (orderFulfillment.sliding_doors_status === 'complete') {
-        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      } else if (orderFulfillment.sliding_doors_status === 'partial') {
-        baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
-      }
+  // Helper: get stage status, preferring per-construction, falling back to order-level
+  const getStageStatus = (stage: string, orderLevelComplete: boolean): string => {
+    if (statusMap.has(stage)) {
+      return statusMap.get(stage)!;
     }
+    return orderLevelComplete ? 'complete' : 'not_started';
+  };
+  
+  // Determine each status with fallback to order-level
+  const glassStatus = getStageStatus('glass_installation', 
+    orderFulfillment?.glass_status === 'complete');
+  
+  let assemblyOrderComplete = false;
+  if (constructionType === 'window') {
+    assemblyOrderComplete = orderFulfillment?.assembly_status === 'complete';
+  } else if (constructionType === 'door') {
+    assemblyOrderComplete = orderFulfillment?.doors_status === 'complete';
+  } else if (constructionType === 'sliding_door') {
+    assemblyOrderComplete = orderFulfillment?.sliding_doors_status === 'complete';
+  }
+  const assemblyStatus = getStageStatus('assembly', assemblyOrderComplete);
+  
+  const weldingStatus = getStageStatus('welding', 
+    orderFulfillment?.welding_status === 'complete');
+  
+  // Return based on highest completed status
+  if (glassStatus === 'complete') {
+    return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+  }
+  if (assemblyStatus === 'complete') {
+    return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+  }
+  if (weldingStatus === 'complete') {
+    return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
   }
   
-  return baseStatus;
+  // Check for partial states
+  if (glassStatus === 'partial' || assemblyStatus === 'partial' || weldingStatus === 'partial') {
+    return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+  }
+  
+  return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
 };
 
 // Get type prefix
