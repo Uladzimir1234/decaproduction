@@ -189,7 +189,7 @@ export function ConstructionCard({
       </div>
       
       {/* Construction number below */}
-      <span className="text-[8px] font-medium text-muted-foreground">
+      <span className="text-[10px] font-semibold text-muted-foreground">
         {construction.construction_number}
       </span>
     </div>
