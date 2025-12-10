@@ -106,69 +106,59 @@ export function ConstructionQuickActions({
   const isGlassInstalled = localGlassStatus === 'complete';
   const isAssembled = localAssemblyStatus === 'complete';
 
-  const updateManufacturingStage = async (stage: string, newStatus: string) => {
-    // Optimistic update - change color INSTANTLY
-    if (stage === 'glass_installation') {
+  // Update ORDER-LEVEL status so ALL constructions change at once
+  const updateOrderLevelStatus = async (field: string, newStatus: string) => {
+    // Optimistic update - change local state INSTANTLY
+    if (field === 'glass_status') {
       setLocalGlassStatus(newStatus);
-    } else if (stage === 'assembly') {
+    } else if (field === 'assembly_status' || field === 'doors_status' || field === 'sliding_doors_status') {
       setLocalAssemblyStatus(newStatus);
     }
 
-    // Build optimistic manufacturing array for parent
-    const existingManufacturing = construction.manufacturing || [];
-    const updatedManufacturing = existingManufacturing.filter(m => m.stage !== stage);
-    updatedManufacturing.push({ stage, status: newStatus });
-    
-    // Notify parent immediately for instant card color update
-    onRefresh({ id: construction.id, manufacturing: updatedManufacturing });
+    // Notify parent to refresh all constructions (they'll pick up order-level change)
+    onRefresh();
 
-    // Now save to database in background
+    // Save to order_fulfillment (affects ALL constructions)
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data: existing } = await supabase
-        .from('construction_manufacturing')
-        .select('id')
-        .eq('construction_id', construction.id)
-        .eq('stage', stage)
-        .maybeSingle();
+      const { error } = await supabase
+        .from('order_fulfillment')
+        .update({
+          [field]: newStatus,
+          updated_by: user?.id,
+          updated_by_email: user?.email,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('order_id', orderId);
 
-      if (existing) {
-        const { error } = await supabase
-          .from('construction_manufacturing')
-          .update({
-            status: newStatus,
-            updated_by: user?.id,
-            updated_by_email: user?.email,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('construction_manufacturing')
-          .insert({
-            construction_id: construction.id,
-            stage,
-            status: newStatus,
-            updated_by: user?.id,
-            updated_by_email: user?.email,
-          });
-
-        if (error) throw error;
-      }
+      if (error) throw error;
     } catch (error: any) {
-      // Revert optimistic update on error
-      if (stage === 'glass_installation') {
+      // Revert on error
+      if (field === 'glass_status') {
         setLocalGlassStatus(isGlassInstalled ? 'complete' : 'not_started');
-      } else if (stage === 'assembly') {
+      } else {
         setLocalAssemblyStatus(isAssembled ? 'complete' : 'not_started');
       }
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
-      // Trigger full refresh to restore correct state
       onRefresh();
     }
+  };
+
+  const handleGlassToggle = () => {
+    const newStatus = isGlassInstalled ? 'not_started' : 'complete';
+    updateOrderLevelStatus('glass_status', newStatus);
+  };
+
+  const handleAssemblyToggle = () => {
+    const newStatus = isAssembled ? 'not_started' : 'complete';
+    // Use correct field based on construction type
+    const field = construction.construction_type === 'door' 
+      ? 'doors_status' 
+      : construction.construction_type === 'sliding_door' 
+        ? 'sliding_doors_status' 
+        : 'assembly_status';
+    updateOrderLevelStatus(field, newStatus);
   };
 
   const handleReportIssue = async () => {
@@ -260,7 +250,7 @@ export function ConstructionQuickActions({
         <div className="space-y-1.5">
           <div className="flex gap-1">
             <button
-              onClick={() => updateManufacturingStage('glass_installation', isGlassInstalled ? 'not_started' : 'complete')}
+              onClick={handleGlassToggle}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isGlassInstalled 
                   ? 'bg-blue-500 text-white' 
@@ -271,7 +261,7 @@ export function ConstructionQuickActions({
               Glass
             </button>
             <button
-              onClick={() => updateManufacturingStage('assembly', isAssembled ? 'not_started' : 'complete')}
+              onClick={handleAssemblyToggle}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isAssembled 
                   ? 'bg-green-500 text-white' 
