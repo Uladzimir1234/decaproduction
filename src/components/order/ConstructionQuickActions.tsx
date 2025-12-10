@@ -57,28 +57,40 @@ const getTypePrefix = (type: string) => {
   }
 };
 
-// Determine glass status: prioritize orderFulfillment, fallback to per-construction
+// Determine glass status: prioritize per-construction data when exists
 const getCurrentGlassStatus = (
   constructionType: string,
   orderFulfillment?: OrderFulfillment | null,
   manufacturing?: ConstructionManufacturing[]
 ) => {
-  // Order-level glass_status applies to all construction types
+  // Per-construction data takes priority when it exists
+  if (manufacturing && manufacturing.length > 0) {
+    const glassStage = manufacturing.find(m => m.stage === 'glass_installation');
+    if (glassStage) {
+      return glassStage.status;
+    }
+  }
+  // Fallback to order-level
   if (orderFulfillment?.glass_status === 'complete') {
     return 'complete';
   }
-  // Fallback to per-construction data
-  if (!manufacturing) return 'not_started';
-  const glassStage = manufacturing.find(m => m.stage === 'glass_installation');
-  return glassStage?.status || 'not_started';
+  return 'not_started';
 };
 
-// Determine assembly status: prioritize orderFulfillment based on type
+// Determine assembly status: prioritize per-construction data when exists
 const getCurrentAssemblyStatus = (
   constructionType: string,
   orderFulfillment?: OrderFulfillment | null,
   manufacturing?: ConstructionManufacturing[]
 ) => {
+  // Per-construction data takes priority when it exists
+  if (manufacturing && manufacturing.length > 0) {
+    const assemblyStage = manufacturing.find(m => m.stage === 'assembly');
+    if (assemblyStage) {
+      return assemblyStage.status;
+    }
+  }
+  // Fallback to order-level based on type
   if (orderFulfillment) {
     if (constructionType === 'window' && orderFulfillment.assembly_status === 'complete') {
       return 'complete';
@@ -90,10 +102,7 @@ const getCurrentAssemblyStatus = (
       return 'complete';
     }
   }
-  // Fallback to per-construction data
-  if (!manufacturing) return 'not_started';
-  const assemblyStage = manufacturing.find(m => m.stage === 'assembly');
-  return assemblyStage?.status || 'not_started';
+  return 'not_started';
 };
 
 export function ConstructionQuickActions({
