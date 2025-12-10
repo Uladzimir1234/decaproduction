@@ -106,47 +106,8 @@ export function ConstructionQuickActions({
   const isGlassInstalled = localGlassStatus === 'complete';
   const isAssembled = localAssemblyStatus === 'complete';
 
-  // Check if this construction has per-construction overrides
-  const hasPerConstructionGlass = construction.manufacturing?.some(m => m.stage === 'glass_installation');
-  const hasPerConstructionAssembly = construction.manufacturing?.some(m => m.stage === 'assembly');
-
-  // Update ORDER-LEVEL status so ALL constructions change at once
-  const updateOrderLevelStatus = async (field: string, newStatus: string) => {
-    if (field === 'glass_status') {
-      setLocalGlassStatus(newStatus);
-    } else if (field === 'assembly_status' || field === 'doors_status' || field === 'sliding_doors_status') {
-      setLocalAssemblyStatus(newStatus);
-    }
-
-    onRefresh();
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const { error } = await supabase
-        .from('order_fulfillment')
-        .update({
-          [field]: newStatus,
-          updated_by: user?.id,
-          updated_by_email: user?.email,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', orderId);
-
-      if (error) throw error;
-    } catch (error: any) {
-      if (field === 'glass_status') {
-        setLocalGlassStatus(isGlassInstalled ? 'complete' : 'not_started');
-      } else {
-        setLocalAssemblyStatus(isAssembled ? 'complete' : 'not_started');
-      }
-      toast({ title: "Error saving", description: error.message, variant: "destructive" });
-      onRefresh();
-    }
-  };
-
-  // Update PER-CONSTRUCTION status (just this one construction)
-  const updatePerConstructionStatus = async (stage: string, newStatus: string) => {
+  const updateManufacturingStage = async (stage: string, newStatus: string) => {
+    // Optimistic update - change color INSTANTLY
     if (stage === 'glass_installation') {
       setLocalGlassStatus(newStatus);
     } else if (stage === 'assembly') {
@@ -161,6 +122,7 @@ export function ConstructionQuickActions({
     // Notify parent immediately for instant card color update
     onRefresh({ id: construction.id, manufacturing: updatedManufacturing });
 
+    // Now save to database in background
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -197,35 +159,16 @@ export function ConstructionQuickActions({
         if (error) throw error;
       }
     } catch (error: any) {
+      // Revert optimistic update on error
       if (stage === 'glass_installation') {
         setLocalGlassStatus(isGlassInstalled ? 'complete' : 'not_started');
       } else if (stage === 'assembly') {
         setLocalAssemblyStatus(isAssembled ? 'complete' : 'not_started');
       }
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
+      // Trigger full refresh to restore correct state
       onRefresh();
     }
-  };
-
-  const handleGlassToggleAll = () => {
-    updateOrderLevelStatus('glass_status', isGlassInstalled ? 'not_started' : 'complete');
-  };
-
-  const handleAssemblyToggleAll = () => {
-    const field = construction.construction_type === 'door' 
-      ? 'doors_status' 
-      : construction.construction_type === 'sliding_door' 
-        ? 'sliding_doors_status' 
-        : 'assembly_status';
-    updateOrderLevelStatus(field, isAssembled ? 'not_started' : 'complete');
-  };
-
-  const handleGlassToggleThis = () => {
-    updatePerConstructionStatus('glass_installation', isGlassInstalled ? 'not_started' : 'complete');
-  };
-
-  const handleAssemblyToggleThis = () => {
-    updatePerConstructionStatus('assembly', isAssembled ? 'not_started' : 'complete');
   };
 
   const handleReportIssue = async () => {
@@ -315,11 +258,9 @@ export function ConstructionQuickActions({
       {/* Quick Status - Compact Toggle Pills */}
       {isProductionReady && (
         <div className="space-y-1.5">
-          {/* All constructions row */}
-          <div className="text-[9px] text-muted-foreground font-medium">All constructions:</div>
           <div className="flex gap-1">
             <button
-              onClick={handleGlassToggleAll}
+              onClick={() => updateManufacturingStage('glass_installation', isGlassInstalled ? 'not_started' : 'complete')}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isGlassInstalled 
                   ? 'bg-blue-500 text-white' 
@@ -330,42 +271,11 @@ export function ConstructionQuickActions({
               Glass
             </button>
             <button
-              onClick={handleAssemblyToggleAll}
+              onClick={() => updateManufacturingStage('assembly', isAssembled ? 'not_started' : 'complete')}
               className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
                 isAssembled 
                   ? 'bg-green-500 text-white' 
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              {isAssembled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
-              Assembled
-            </button>
-          </div>
-          
-          {/* This construction only row */}
-          <div className="text-[9px] text-muted-foreground font-medium mt-1">This #{construction.construction_number} only:</div>
-          <div className="flex gap-1">
-            <button
-              onClick={handleGlassToggleThis}
-              className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors border ${
-                hasPerConstructionGlass
-                  ? isGlassInstalled 
-                    ? 'bg-blue-500 text-white border-blue-600' 
-                    : 'bg-muted text-muted-foreground border-muted-foreground/30 hover:bg-muted/80'
-                  : 'bg-background text-muted-foreground border-dashed border-muted-foreground/40 hover:bg-muted/50'
-              }`}
-            >
-              {isGlassInstalled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
-              Glass
-            </button>
-            <button
-              onClick={handleAssemblyToggleThis}
-              className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors border ${
-                hasPerConstructionAssembly
-                  ? isAssembled 
-                    ? 'bg-green-500 text-white border-green-600' 
-                    : 'bg-muted text-muted-foreground border-muted-foreground/30 hover:bg-muted/80'
-                  : 'bg-background text-muted-foreground border-dashed border-muted-foreground/40 hover:bg-muted/50'
               }`}
             >
               {isAssembled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
