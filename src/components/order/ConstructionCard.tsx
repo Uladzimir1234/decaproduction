@@ -83,14 +83,20 @@ const getStatusColor = (
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'door') {
-      if (orderFulfillment.doors_status === 'complete') {
-        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      // Doors: Blue only when glass installed, Green when assembled (but glass not installed)
+      if (orderFulfillment.glass_status === 'complete') {
+        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      } else if (orderFulfillment.doors_status === 'complete') {
+        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
       } else if (orderFulfillment.doors_status === 'partial') {
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     } else if (constructionType === 'sliding_door') {
-      if (orderFulfillment.sliding_doors_status === 'complete') {
-        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Complete' };
+      // Sliding doors: Blue only when glass installed, Green when assembled
+      if (orderFulfillment.glass_status === 'complete') {
+        baseStatus = { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
+      } else if (orderFulfillment.sliding_doors_status === 'complete') {
+        baseStatus = { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
       } else if (orderFulfillment.sliding_doors_status === 'partial') {
         baseStatus = { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
