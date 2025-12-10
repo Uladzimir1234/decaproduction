@@ -197,7 +197,7 @@ export function ConstructionCard({
         
         {/* Quantity indicator - top right */}
         {construction.quantity > 1 && (
-          <div className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground rounded-full h-4 w-4 flex items-center justify-center text-[10px] font-bold border-2 border-background shadow-sm">
+          <div className="absolute -top-1.5 -right-1.5 bg-white text-gray-900 rounded-full h-4 w-4 flex items-center justify-center text-[10px] font-bold border border-gray-400 shadow-md">
             {construction.quantity}
           </div>
         )}
