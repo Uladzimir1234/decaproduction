@@ -50,32 +50,35 @@ const getStatusColor = (
   constructionType?: string,
   orderFulfillment?: OrderFulfillment | null
 ) => {
-  // First check if construction_manufacturing has any progress
+  // If there are any construction_manufacturing records, use them (they take priority over order_fulfillment)
   if (manufacturing && manufacturing.length > 0) {
-    const hasProgress = manufacturing.some(m => m.status !== 'not_started');
-    if (hasProgress) {
-      const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
-      
-      // Check stages in reverse order of completion
-      if (statusMap.get('glass_installation') === 'complete') {
-        return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
-      }
-      if (statusMap.get('assembly') === 'complete') {
-        return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
-      }
-      if (statusMap.get('welding') === 'complete') {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
-      }
-      
-      // Has some partial progress
-      const hasPartial = manufacturing.some(m => m.status === 'partial');
-      if (hasPartial) {
-        return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
-      }
+    const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
+    
+    // Check stages in order of completion (most complete first)
+    // Blue = glass installed
+    if (statusMap.get('glass_installation') === 'complete') {
+      return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
     }
+    // Green = assembled (but glass not installed)
+    if (statusMap.get('assembly') === 'complete') {
+      return { bg: 'bg-green-500', text: 'text-white', label: 'Assembled' };
+    }
+    // Amber = welded
+    if (statusMap.get('welding') === 'complete') {
+      return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
+    }
+    
+    // Check for partial progress
+    const hasPartial = manufacturing.some(m => m.status === 'partial');
+    if (hasPartial) {
+      return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
+    }
+    
+    // Has records but all are not_started
+    return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
   }
   
-  // Fall back to order_fulfillment data
+  // Fall back to order_fulfillment data only if no construction_manufacturing records exist
   if (orderFulfillment) {
     if (constructionType === 'window') {
       if (orderFulfillment.glass_status === 'complete') {
@@ -87,7 +90,6 @@ const getStatusColor = (
       if (orderFulfillment.welding_status === 'complete') {
         return { bg: 'bg-amber-400', text: 'text-black', label: 'Welded' };
       }
-      // Check for partial statuses
       if (orderFulfillment.glass_status === 'partial' || 
           orderFulfillment.assembly_status === 'partial' || 
           orderFulfillment.welding_status === 'partial') {
