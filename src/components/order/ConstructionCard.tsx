@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, MessageSquare } from "lucide-react";
@@ -137,10 +137,23 @@ export function ConstructionCard({
   usePopover = false,
 }: ConstructionCardProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [isPulsing, setIsPulsing] = useState(false);
+  const previousStatusRef = useRef<string | null>(null);
+  
   const statusColor = getStatusColor(construction.manufacturing, construction.construction_type, orderFulfillment);
   const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
   const hasNotes = (construction.notes_count || 0) > 0;
+
+  // Detect status changes and trigger pulse animation
+  useEffect(() => {
+    if (previousStatusRef.current !== null && previousStatusRef.current !== statusColor.bg) {
+      setIsPulsing(true);
+      const timer = setTimeout(() => setIsPulsing(false), 500);
+      return () => clearTimeout(timer);
+    }
+    previousStatusRef.current = statusColor.bg;
+  }, [statusColor.bg]);
 
   const dimensions = construction.width_inches && construction.height_inches
     ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
@@ -163,6 +176,7 @@ export function ConstructionCard({
           ${statusColor.bg} ${statusColor.text}
           ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
           ${construction.is_delivered ? 'opacity-50' : ''}
+          ${isPulsing ? 'animate-[pulse-scale_0.5s_ease-out]' : ''}
         `}
       >
         {typePrefix}
