@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -165,6 +165,7 @@ const formatTrackingInfo = (updatedAt: string | null, updatedByEmail: string | n
 export default function Orders() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isWorker, isSeller, isAdmin, isManager, canUpdateOrdering, canUpdateManufacturing } = useRole();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
@@ -201,6 +202,21 @@ export default function Orders() {
   useEffect(() => {
     localStorage.setItem('ordersSortBy', sortBy);
   }, [sortBy]);
+  
+  // Scroll to order when navigating back from order detail
+  useEffect(() => {
+    if (location.hash && !loading) {
+      const elementId = location.hash.slice(1); // Remove the '#'
+      const element = document.getElementById(elementId);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-primary');
+          setTimeout(() => element.classList.remove('ring-2', 'ring-primary'), 2000);
+        }, 100);
+      }
+    }
+  }, [location.hash, loading]);
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
   const initialLoadComplete = useRef(false);
@@ -1504,7 +1520,7 @@ export default function Orders() {
             const showDeliveryBadge = order.fulfillment_percentage >= 50;
             const showShippingBadge = order.fulfillment_percentage >= 50;
             const hasFileExtractedData = ordersWithConstructions.has(order.id);
-            return <div key={order.id} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
+            return <div key={order.id} id={`order-${order.id}`} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
