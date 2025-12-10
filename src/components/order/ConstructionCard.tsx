@@ -23,6 +23,13 @@ interface ConstructionNote {
   created_at: string;
 }
 
+interface ConstructionIssue {
+  issue_type: string;
+  description: string;
+  created_by_email: string | null;
+  created_at: string;
+}
+
 interface Construction {
   id: string;
   construction_number: string;
@@ -37,6 +44,7 @@ interface Construction {
   notes?: ConstructionNote[];
   is_delivered?: boolean;
   open_issues_count?: number;
+  issues?: ConstructionIssue[];
 }
 
 interface ConstructionCardProps {
@@ -188,11 +196,37 @@ export function ConstructionCard({
       >
         {typePrefix}
         
-        {/* Issue indicator */}
+        {/* Issue indicator with tooltip */}
         {hasOpenIssues && (
-          <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2.5 w-2.5 flex items-center justify-center">
-            <AlertTriangle className="h-1.5 w-1.5 text-white" />
-          </div>
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <div 
+                  className="absolute -top-1 -right-1 bg-amber-500 rounded-full h-2.5 w-2.5 flex items-center justify-center cursor-pointer hover:bg-amber-600 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <AlertTriangle className="h-1.5 w-1.5 text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-xs z-[9999]">
+                <div className="space-y-1">
+                  <p className="font-bold text-amber-500">Issues ({construction.open_issues_count})</p>
+                  {construction.issues && construction.issues.slice(0, 3).map((issue, idx) => (
+                    <div key={idx} className="pl-2 border-l-2 border-amber-400">
+                      <p className="font-medium text-foreground capitalize">{issue.issue_type}</p>
+                      <p className="break-words text-muted-foreground">{issue.description}</p>
+                      {issue.created_by_email && (
+                        <p className="text-[10px] text-muted-foreground">— {issue.created_by_email.split('@')[0]}</p>
+                      )}
+                    </div>
+                  ))}
+                  {construction.issues && construction.issues.length > 3 && (
+                    <p className="text-muted-foreground text-[10px]">+{construction.issues.length - 3} more...</p>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         
         {/* Notes indicator with tooltip */}
