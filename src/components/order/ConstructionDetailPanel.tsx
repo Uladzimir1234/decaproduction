@@ -467,44 +467,6 @@ export function ConstructionDetailPanel({
 
           <Separator />
 
-          {/* Manufacturing Stages */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Manufacturing</h3>
-            {!isProductionReady && (
-              <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                Order is on hold - stages are locked
-              </div>
-            )}
-            <div className="space-y-3">
-              {MANUFACTURING_STAGES.map(({ key, label }) => {
-                const stage = manufacturingMap.get(key);
-                const status = stage?.status || 'not_started';
-                
-                return (
-                  <div key={key} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">{label}</span>
-                      {stage?.updated_by_email && (
-                        <span className="text-xs text-muted-foreground">
-                          {stage.updated_by_email?.split('@')[0]}
-                        </span>
-                      )}
-                    </div>
-                    <StatusButtonGroup
-                      value={status}
-                      onChange={(val) => handleStageUpdate(key, val)}
-                      options={manufacturingStatusOptions}
-                      disabled={!canEdit || (!isProductionReady && !isAdmin)}
-                      size="sm"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <Separator />
-
           {/* Delivery Status */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold flex items-center gap-2">
