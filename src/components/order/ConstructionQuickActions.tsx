@@ -115,9 +115,30 @@ export function ConstructionQuickActions({
     }
 
     // Build optimistic manufacturing array for parent
+    // Include BOTH glass and assembly status to ensure card color is correct
+    const updatedManufacturing: { stage: string; status: string }[] = [];
+    
+    // Add glass_installation status
+    if (stage === 'glass_installation') {
+      updatedManufacturing.push({ stage: 'glass_installation', status: newStatus });
+    } else {
+      updatedManufacturing.push({ stage: 'glass_installation', status: localGlassStatus });
+    }
+    
+    // Add assembly status
+    if (stage === 'assembly') {
+      updatedManufacturing.push({ stage: 'assembly', status: newStatus });
+    } else {
+      updatedManufacturing.push({ stage: 'assembly', status: localAssemblyStatus });
+    }
+    
+    // Preserve welding and other stages from existing data
     const existingManufacturing = construction.manufacturing || [];
-    const updatedManufacturing = existingManufacturing.filter(m => m.stage !== stage);
-    updatedManufacturing.push({ stage, status: newStatus });
+    existingManufacturing.forEach(m => {
+      if (m.stage !== 'glass_installation' && m.stage !== 'assembly') {
+        updatedManufacturing.push(m);
+      }
+    });
     
     // Notify parent immediately for instant card color update
     onRefresh({ id: construction.id, manufacturing: updatedManufacturing });
