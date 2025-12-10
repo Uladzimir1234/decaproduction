@@ -98,19 +98,20 @@ const getStatusColor = (
   }
   
   // Check if there's an explicit per-construction override in construction_manufacturing
-  // Only use this if user has fine-tuned this specific construction differently from the order level
+  // Only use this if user has EXPLICITLY fine-tuned this specific construction
+  // with progress (complete/partial) that differs from order level
   if (manufacturing && manufacturing.length > 0) {
     const statusMap = new Map(manufacturing.map(m => [m.stage, m.status]));
     
-    // Check if this construction has any meaningful progress set
+    // Check if this construction has any meaningful progress set (complete or partial)
+    // NOT "not_started" - those are auto-created defaults, not explicit overrides
     const hasGlassComplete = statusMap.get('glass_installation') === 'complete';
     const hasAssemblyComplete = statusMap.get('assembly') === 'complete';
     const hasWeldingComplete = statusMap.get('welding') === 'complete';
     const hasAnyComplete = hasGlassComplete || hasAssemblyComplete || hasWeldingComplete;
     const hasPartial = manufacturing.some(m => m.status === 'partial');
     
-    // Only override if this construction has explicit progress that differs from base
-    // This means user has fine-tuned this specific construction
+    // Only override base status if user has set explicit progress on this construction
     if (hasAnyComplete || hasPartial) {
       if (hasGlassComplete) {
         return { bg: 'bg-blue-500', text: 'text-white', label: 'Glass installed' };
@@ -125,17 +126,8 @@ const getStatusColor = (
         return { bg: 'bg-amber-400', text: 'text-black', label: 'In progress' };
       }
     }
-    
-    // If construction_manufacturing exists but shows "not_started" for all stages,
-    // this could be an explicit override to mark this construction as not started
-    // even when order-level shows progress. Check if ALL stages are not_started.
-    const allNotStarted = manufacturing.every(m => m.status === 'not_started');
-    if (allNotStarted && manufacturing.length > 0) {
-      // Check if base status shows progress - if so, this is an explicit downgrade
-      if (baseStatus.bg !== 'bg-red-500') {
-        return { bg: 'bg-red-500', text: 'text-white', label: 'Not started' };
-      }
-    }
+    // If all stages are "not_started", this is NOT an explicit override
+    // Fall through to use the base status from orderFulfillment
   }
   
   return baseStatus;
