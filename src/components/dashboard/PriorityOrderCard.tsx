@@ -2,7 +2,15 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { ProgressCircle } from '@/components/ui/progress-circle';
 import { AlertTriangle, Clock, CheckCircle2, Ban, ArrowRight, Calendar, Pause, PlayCircle } from 'lucide-react';
-import type { PriorityOrder } from '@/hooks/useDashboardData';
+import type { PriorityOrder, OrderWithFulfillment } from '@/hooks/useDashboardData';
+
+interface FileComponent {
+  id: string;
+  component_type: string;
+  component_name: string | null;
+  quantity: number;
+  status: string;
+}
 
 interface PriorityOrderCardProps {
   order: PriorityOrder;
@@ -53,15 +61,42 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
 
   const daysOnHold = getDaysOnHold();
 
+  // Helper to get actual component status (file components first, then legacy)
+  const getActualComponentStatus = (field: string): string => {
+    if (order.fileComponents && order.fileComponents.length > 0) {
+      const typeMap: Record<string, string> = {
+        reinforcement_status: 'reinforcement',
+        windows_profile_status: 'profile',
+        glass_status: 'glass',
+        screens_status: 'screens',
+        plisse_screens_status: 'plisse',
+        nail_fins_status: 'nail_fins',
+        hardware_status: 'hardware',
+      };
+      const componentType = typeMap[field];
+      if (componentType) {
+        const matching = order.fileComponents.filter(c => 
+          c.component_type.toLowerCase() === componentType.toLowerCase()
+        );
+        if (matching.length > 0) {
+          if (matching.some(c => c.status === 'not_ordered')) return 'not_ordered';
+          if (matching.some(c => c.status === 'ordered')) return 'ordered';
+          return 'available';
+        }
+      }
+    }
+    return (order as any)[field] || 'not_ordered';
+  };
+
   // Component status dots - only show components that were actually sold
   const componentStatuses = [
-    { name: 'Reinforcement', status: order.reinforcement_status },
-    { name: 'Profile', status: order.windows_profile_status },
-    { name: 'Glass', status: order.glass_status },
-    ...(order.screen_type ? [{ name: 'Screens', status: order.screens_status }] : []),
-    ...(order.has_plisse_screens ? [{ name: 'Plisse', status: order.plisse_screens_status }] : []),
-    ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: order.nail_fins_status }] : []),
-    { name: 'Hardware', status: order.hardware_status },
+    { name: 'Reinforcement', status: getActualComponentStatus('reinforcement_status') },
+    { name: 'Profile', status: getActualComponentStatus('windows_profile_status') },
+    { name: 'Glass', status: getActualComponentStatus('glass_status') },
+    ...(order.screen_type ? [{ name: 'Screens', status: getActualComponentStatus('screens_status') }] : []),
+    ...(order.has_plisse_screens ? [{ name: 'Plisse', status: getActualComponentStatus('plisse_screens_status') }] : []),
+    ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: getActualComponentStatus('nail_fins_status') }] : []),
+    { name: 'Hardware', status: getActualComponentStatus('hardware_status') },
   ];
 
   return (
@@ -98,7 +133,7 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
           {/* Priority Score Circle */}
           <div className="flex items-center gap-2">
             <ProgressCircle
-              value={order.manufacturingProgress}
+              value={order.fulfillment_percentage || order.manufacturingProgress}
               size="sm"
               colorVariant="gradient"
             />
