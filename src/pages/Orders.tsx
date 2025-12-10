@@ -753,43 +753,171 @@ export default function Orders() {
       
       const stages: { name: string; status: StageStatus; hasNotes: boolean; field: string; progress?: string; lock?: LockInfo }[] = [];
       
-      // Define stage display order - match OrderDetail page names
-      const stageOrder = ['frame_cutting', 'welding', 'assembly', 'glass_installation'];
-      const stageDisplayNames: Record<string, string> = {
-        'frame_cutting': 'Profile Cutting',
-        'welding': 'Frames/Sashes Welded',
-        'assembly': 'Frame & Sash Assembled',
-        'glass_installation': 'Glass Installed'
+      // Helper function to get status from order_fulfillment
+      const getStatus = (value: string | null | undefined): StageStatus => {
+        if (value === 'complete') return 'complete';
+        if (value === 'partial') return 'partial';
+        return 'not_started';
       };
       
-      // Define lock dependencies for each stage (matching OrderDetail page)
-      const stageLockDependencies: Record<string, { types: string[]; name: string }> = {
-        'frame_cutting': { types: ['profile', 'window_profile'], name: 'Profile' },
-        'welding': { types: ['profile', 'window_profile'], name: 'Profile' },
-        'assembly': { types: ['hardware', 'handle'], name: 'Hardware' },
-        'glass_installation': { types: ['glass'], name: 'Glass' }
-      };
-      
-      stageOrder.forEach(stageName => {
-        const agg = stageAggregation.get(stageName);
-        if (agg) {
-          let status: StageStatus = 'not_started';
-          if (agg.complete === agg.total) status = 'complete';
-          else if (agg.complete > 0 || agg.partial > 0) status = 'partial';
-          
-          const lockDep = stageLockDependencies[stageName];
-          const lock = lockDep ? getComponentLockStatus(lockDep.types, lockDep.name) : { isLocked: false };
-          
-          stages.push({
-            name: stageDisplayNames[stageName] || stageName,
-            status,
-            hasNotes: false,
-            field: stageName,
-            progress: `${agg.complete}/${agg.total}`,
-            lock
-          });
+      // getLockStatus for stages that need component checking
+      const getLockStatus = (componentTypes: string[], legacyStatus: string | null | undefined, componentName: string): LockInfo => {
+        if (components.length > 0) {
+          const matchingComponents = components.filter(c => 
+            componentTypes.some(type => c.component_type.toLowerCase().includes(type.toLowerCase()))
+          );
+          if (matchingComponents.length > 0) {
+            const anyAvailable = matchingComponents.some(c => c.status === 'available');
+            if (anyAvailable) return { isLocked: false };
+            const anyOrdered = matchingComponents.some(c => c.status === 'ordered');
+            const statusText = anyOrdered ? 'Ordered' : 'Not Ordered';
+            return { isLocked: true, lockReason: `${componentName} ${statusText}` };
+          }
         }
+        if (legacyStatus === 'available') {
+          return { isLocked: false };
+        }
+        const statusText = legacyStatus === 'ordered' ? 'Ordered' : 'Not Ordered';
+        return { isLocked: true, lockReason: `${componentName} ${statusText}` };
+      };
+      
+      // Reinforcement Cutting - always from order_fulfillment
+      stages.push({ 
+        name: 'Reinforcement Cutting', 
+        status: getStatus(f?.reinforcement_cutting), 
+        hasNotes: false, 
+        field: 'reinforcement_cutting',
+        lock: getLockStatus(['reinforcement'], order.reinforcement_status, '')
       });
+      
+      // Profile Cutting - from construction_manufacturing if available, else order_fulfillment
+      const profileAgg = stageAggregation.get('frame_cutting');
+      if (profileAgg) {
+        let status: StageStatus = 'not_started';
+        if (profileAgg.complete === profileAgg.total) status = 'complete';
+        else if (profileAgg.complete > 0 || profileAgg.partial > 0) status = 'partial';
+        stages.push({
+          name: 'Profile Cutting',
+          status,
+          hasNotes: false,
+          field: 'profile_cutting',
+          progress: `${profileAgg.complete}/${profileAgg.total}`,
+          lock: getComponentLockStatus(['profile', 'window_profile'], 'Profile')
+        });
+      } else {
+        stages.push({ 
+          name: 'Profile Cutting', 
+          status: getStatus(f?.profile_cutting), 
+          hasNotes: false, 
+          field: 'profile_cutting',
+          lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, '')
+        });
+      }
+      
+      // Frames/Sashes Welded - from construction_manufacturing if available
+      const weldingAgg = stageAggregation.get('welding');
+      if (weldingAgg) {
+        let status: StageStatus = 'not_started';
+        if (weldingAgg.complete === weldingAgg.total) status = 'complete';
+        else if (weldingAgg.complete > 0 || weldingAgg.partial > 0) status = 'partial';
+        stages.push({
+          name: 'Frames/Sashes Welded',
+          status,
+          hasNotes: !!(f?.welding_notes),
+          field: 'welding_status',
+          progress: `${weldingAgg.complete}/${weldingAgg.total}`,
+          lock: getComponentLockStatus(['profile', 'window_profile'], 'Profile')
+        });
+      } else {
+        stages.push({ 
+          name: 'Frames/Sashes Welded', 
+          status: getStatus(f?.welding_status), 
+          hasNotes: !!(f?.welding_notes), 
+          field: 'welding_status',
+          lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, 'Profile')
+        });
+      }
+      
+      // Doors Assembled - conditional, from order_fulfillment
+      if (order.doors_count && order.doors_count > 0) {
+        stages.push({ 
+          name: 'Doors Assembled', 
+          status: getStatus(f?.doors_status), 
+          hasNotes: !!(f?.doors_notes), 
+          field: 'doors_status',
+          lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+        });
+      }
+      
+      // Sliding Doors Assembled - conditional, from order_fulfillment
+      if (order.has_sliding_doors) {
+        stages.push({ 
+          name: 'Sliding Doors Assembled', 
+          status: getStatus(f?.sliding_doors_status), 
+          hasNotes: !!(f?.sliding_doors_notes), 
+          field: 'sliding_doors_status',
+          lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+        });
+      }
+      
+      // Frame & Sash Assembled - from construction_manufacturing if available
+      const assemblyAgg = stageAggregation.get('assembly');
+      if (assemblyAgg) {
+        let status: StageStatus = 'not_started';
+        if (assemblyAgg.complete === assemblyAgg.total) status = 'complete';
+        else if (assemblyAgg.complete > 0 || assemblyAgg.partial > 0) status = 'partial';
+        stages.push({
+          name: 'Frame & Sash Assembled',
+          status,
+          hasNotes: !!(f?.assembly_notes),
+          field: 'assembly_status',
+          progress: `${assemblyAgg.complete}/${assemblyAgg.total}`,
+          lock: getComponentLockStatus(['hardware', 'handle'], 'Hardware')
+        });
+      } else {
+        stages.push({ 
+          name: 'Frame & Sash Assembled', 
+          status: getStatus(f?.assembly_status), 
+          hasNotes: !!(f?.assembly_notes), 
+          field: 'assembly_status',
+          lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+        });
+      }
+      
+      // Glass Installed - from construction_manufacturing if available
+      const glassAgg = stageAggregation.get('glass_installation');
+      if (glassAgg) {
+        let status: StageStatus = 'not_started';
+        if (glassAgg.complete === glassAgg.total) status = 'complete';
+        else if (glassAgg.complete > 0 || glassAgg.partial > 0) status = 'partial';
+        stages.push({
+          name: 'Glass Installed',
+          status,
+          hasNotes: !!(f?.glass_notes),
+          field: 'glass_status',
+          progress: `${glassAgg.complete}/${glassAgg.total}`,
+          lock: getComponentLockStatus(['glass'], 'Glass')
+        });
+      } else {
+        stages.push({ 
+          name: 'Glass Installed', 
+          status: getStatus(f?.glass_status), 
+          hasNotes: !!(f?.glass_notes), 
+          field: 'glass_status',
+          lock: getLockStatus(['glass'], order.glass_status, 'Glass')
+        });
+      }
+      
+      // Made Screens - conditional, from order_fulfillment
+      if (order.screen_type) {
+        stages.push({ 
+          name: 'Made Screens', 
+          status: getStatus(f?.screens_cutting), 
+          hasNotes: !!(f?.screens_notes), 
+          field: 'screens_cutting',
+          lock: getLockStatus(['screen'], order.screens_status, 'Screens')
+        });
+      }
       
       return stages;
     }
