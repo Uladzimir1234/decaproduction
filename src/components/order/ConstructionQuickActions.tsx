@@ -190,7 +190,7 @@ export function ConstructionQuickActions({
     : null;
 
   return (
-    <div className="w-72 p-3 space-y-3">
+    <div className="w-72 p-3 space-y-3 max-h-[70vh] overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
