@@ -695,6 +695,27 @@ export default function OrderDetail() {
         throw fulfillmentError;
       }
 
+      // When Glass Installed is set to complete, update ALL constructions to glass_installation = complete
+      if (key === 'glass_status' && value === 'complete') {
+        const { data: constructions } = await supabase
+          .from("order_constructions")
+          .select("id")
+          .eq("order_id", order.id);
+        
+        if (constructions && constructions.length > 0) {
+          const constructionIds = constructions.map(c => c.id);
+          const upsertData = constructionIds.map(cid => ({
+            construction_id: cid,
+            stage: 'glass_installation',
+            status: 'complete'
+          }));
+          
+          await supabase
+            .from("construction_manufacturing")
+            .upsert(upsertData, { onConflict: 'construction_id,stage' });
+        }
+      }
+
       const { error: orderError } = await supabase
         .from("orders")
         .update({ fulfillment_percentage: newPercentage })
