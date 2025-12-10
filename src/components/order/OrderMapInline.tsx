@@ -35,12 +35,20 @@ interface ConstructionNote {
   created_at: string;
 }
 
+interface ConstructionIssue {
+  issue_type: string;
+  description: string;
+  created_by_email: string | null;
+  created_at: string;
+}
+
 interface ConstructionWithExtra extends Construction {
   manufacturing?: { stage: string; status: string }[];
   notes_count?: number;
   notes?: ConstructionNote[];
   is_delivered?: boolean;
   open_issues_count?: number;
+  issues?: ConstructionIssue[];
 }
 
 interface OrderFulfillment {
@@ -163,15 +171,16 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
 
     const { data: issuesData } = await supabase
       .from('construction_issues')
-      .select('construction_id')
+      .select('construction_id, issue_type, description, created_by_email, created_at')
       .in('construction_id', constructionIds)
-      .eq('status', 'open');
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
 
     const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
       const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
       const constructionNotes = notesData?.filter(n => n.construction_id === c.id) || [];
+      const constructionIssues = issuesData?.filter(i => i.construction_id === c.id) || [];
       const deliveryRecord = deliveryData?.find(d => d.construction_id === c.id);
-      const open_issues_count = issuesData?.filter(i => i.construction_id === c.id).length || 0;
       
       return {
         ...c,
@@ -183,7 +192,13 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
           created_at: n.created_at,
         })),
         is_delivered: deliveryRecord?.is_delivered || false,
-        open_issues_count,
+        open_issues_count: constructionIssues.length,
+        issues: constructionIssues.map(i => ({
+          issue_type: i.issue_type,
+          description: i.description,
+          created_by_email: i.created_by_email,
+          created_at: i.created_at,
+        })),
       };
     });
 
