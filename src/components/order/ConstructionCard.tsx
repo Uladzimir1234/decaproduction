@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, MessageSquare } from "lucide-react";
@@ -133,6 +134,7 @@ export function ConstructionCard({
   onRefresh,
   usePopover = false,
 }: ConstructionCardProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const statusColor = getStatusColor(construction.manufacturing, construction.construction_type, orderFulfillment);
   const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
@@ -194,17 +196,26 @@ export function ConstructionCard({
   // If usePopover is enabled, wrap in Popover instead of just Tooltip
   if (usePopover && orderId && onRefresh) {
     return (
-      <Popover>
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
-          <button type="button">{CardContent}</button>
+          <button type="button" className="focus:outline-none">
+            {CardContent}
+          </button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="center" className="p-0 w-auto">
+        <PopoverContent side="top" align="center" className="p-0 w-auto z-50">
           <ConstructionQuickActions
             construction={construction}
             orderId={orderId}
             isProductionReady={isProductionReady}
-            onViewDetails={onViewDetails || onClick}
-            onClose={() => {}}
+            onViewDetails={() => {
+              setPopoverOpen(false);
+              if (onViewDetails) {
+                onViewDetails();
+              } else {
+                onClick();
+              }
+            }}
+            onClose={() => setPopoverOpen(false)}
             onRefresh={onRefresh}
           />
         </PopoverContent>
