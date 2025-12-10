@@ -29,9 +29,16 @@ interface Construction {
   position_index: number;
 }
 
+interface ConstructionNote {
+  note_text: string;
+  created_by_email: string | null;
+  created_at: string;
+}
+
 interface ConstructionWithExtra extends Construction {
   manufacturing?: { stage: string; status: string }[];
   notes_count?: number;
+  notes?: ConstructionNote[];
   is_delivered?: boolean;
   open_issues_count?: number;
 }
@@ -145,8 +152,9 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
 
     const { data: notesData } = await supabase
       .from('construction_notes')
-      .select('construction_id')
-      .in('construction_id', constructionIds);
+      .select('construction_id, note_text, created_by_email, created_at')
+      .in('construction_id', constructionIds)
+      .order('created_at', { ascending: false });
 
     const { data: deliveryData } = await supabase
       .from('construction_delivery')
@@ -161,14 +169,19 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
 
     const enrichedConstructions: ConstructionWithExtra[] = constructionsData.map(c => {
       const manufacturing = mfgData?.filter(m => m.construction_id === c.id) || [];
-      const notes_count = notesData?.filter(n => n.construction_id === c.id).length || 0;
+      const constructionNotes = notesData?.filter(n => n.construction_id === c.id) || [];
       const deliveryRecord = deliveryData?.find(d => d.construction_id === c.id);
       const open_issues_count = issuesData?.filter(i => i.construction_id === c.id).length || 0;
       
       return {
         ...c,
         manufacturing,
-        notes_count,
+        notes_count: constructionNotes.length,
+        notes: constructionNotes.map(n => ({
+          note_text: n.note_text,
+          created_by_email: n.created_by_email,
+          created_at: n.created_at,
+        })),
         is_delivered: deliveryRecord?.is_delivered || false,
         open_issues_count,
       };

@@ -17,6 +17,12 @@ interface OrderFulfillment {
   sliding_doors_status?: string | null;
 }
 
+interface ConstructionNote {
+  note_text: string;
+  created_by_email: string | null;
+  created_at: string;
+}
+
 interface Construction {
   id: string;
   construction_number: string;
@@ -28,6 +34,7 @@ interface Construction {
   quantity: number;
   manufacturing?: ConstructionManufacturing[];
   notes_count?: number;
+  notes?: ConstructionNote[];
   is_delivered?: boolean;
   open_issues_count?: number;
 }
@@ -260,8 +267,8 @@ export function ConstructionCard({
         <TooltipTrigger asChild>
           <button onClick={onClick}>{CardContent}</button>
         </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          <div className="space-y-0.5">
+        <TooltipContent side="top" className="text-xs max-w-xs">
+          <div className="space-y-1">
             <p className="font-bold">{typePrefix}-{construction.construction_number}</p>
             {dimensions && <p>{dimensions}</p>}
             {construction.location && <p className="text-muted-foreground">{construction.location}</p>}
@@ -269,8 +276,22 @@ export function ConstructionCard({
             {hasOpenIssues && (
               <p className="text-amber-500 font-medium">{construction.open_issues_count} issue{construction.open_issues_count! > 1 ? 's' : ''}</p>
             )}
-            {hasNotes && (
-              <p className="text-blue-500 font-medium">{construction.notes_count} note{construction.notes_count! > 1 ? 's' : ''}</p>
+            {/* Display actual notes */}
+            {construction.notes && construction.notes.length > 0 && (
+              <div className="border-t pt-1 mt-1 space-y-1">
+                <p className="text-blue-500 font-medium">Notes:</p>
+                {construction.notes.slice(0, 3).map((note, idx) => (
+                  <div key={idx} className="text-muted-foreground pl-2 border-l-2 border-blue-300">
+                    <p className="break-words">{note.note_text}</p>
+                    {note.created_by_email && (
+                      <p className="text-[10px] opacity-70">— {note.created_by_email.split('@')[0]}</p>
+                    )}
+                  </div>
+                ))}
+                {construction.notes.length > 3 && (
+                  <p className="text-muted-foreground text-[10px]">+{construction.notes.length - 3} more...</p>
+                )}
+              </div>
             )}
           </div>
         </TooltipContent>
