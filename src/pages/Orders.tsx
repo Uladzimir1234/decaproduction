@@ -184,8 +184,11 @@ export default function Orders() {
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
   
-  // Per-order toggle states for Order Map and Available Components
-  const [expandedOrderMaps, setExpandedOrderMaps] = useState<Set<string>>(new Set());
+  // Per-order toggle states - store COLLAPSED order maps (inverted: open by default)
+  const [collapsedOrderMaps, setCollapsedOrderMaps] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('collapsedOrderMaps');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const [expandedAvailableComponents, setExpandedAvailableComponents] = useState<Set<string>>(new Set());
   
   // Ref to track if initial data has been loaded (to avoid toast on first load)
@@ -194,13 +197,14 @@ export default function Orders() {
   // Toggle handlers for per-order visibility
   const toggleOrderMap = (orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedOrderMaps(prev => {
+    setCollapsedOrderMaps(prev => {
       const newSet = new Set(prev);
       if (newSet.has(orderId)) {
         newSet.delete(orderId);
       } else {
         newSet.add(orderId);
       }
+      localStorage.setItem('collapsedOrderMaps', JSON.stringify([...newSet]));
       return newSet;
     });
   };
@@ -1862,7 +1866,7 @@ export default function Orders() {
                                     className="h-7 w-7"
                                     onClick={(e) => toggleOrderMap(order.id, e)}
                                   >
-                                    <Grid3X3 className={`h-4 w-4 ${expandedOrderMaps.has(order.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                                    <Grid3X3 className={`h-4 w-4 ${!collapsedOrderMaps.has(order.id) ? 'text-primary' : 'text-muted-foreground'}`} />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Toggle Order Map</TooltipContent>
@@ -1908,7 +1912,7 @@ export default function Orders() {
                     </div>
 
                     {/* Inline Order Map - per-order toggle */}
-                    {expandedOrderMaps.has(order.id) && ordersWithConstructions.has(order.id) && (
+                    {!collapsedOrderMaps.has(order.id) && ordersWithConstructions.has(order.id) && (
                       <div className="mt-3 pt-3 border-t border-border">
                         <OrderMapInline
                           orderId={order.id}
