@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,19 +32,19 @@ interface ConstructionQuickActionsProps {
 }
 
 const ISSUE_TYPES = [
-  { value: 'hardware', label: 'Hardware', color: 'bg-orange-100 text-orange-700 hover:bg-orange-200' },
-  { value: 'glass', label: 'Glass', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
-  { value: 'screen', label: 'Screen', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
-  { value: 'damage', label: 'Damage', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
-  { value: 'other', label: 'Other', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
+  { value: 'hardware', label: 'HW' },
+  { value: 'glass', label: 'Glass' },
+  { value: 'screen', label: 'Scr' },
+  { value: 'damage', label: 'Dmg' },
+  { value: 'other', label: '...' },
 ];
 
-const getTypeLabel = (type: string) => {
+const getTypePrefix = (type: string) => {
   switch (type) {
-    case 'window': return 'Window';
-    case 'door': return 'Door';
-    case 'sliding_door': return 'Sliding Door';
-    default: return 'Construction';
+    case 'window': return 'W';
+    case 'door': return 'D';
+    case 'sliding_door': return 'S';
+    default: return 'C';
   }
 };
 
@@ -86,7 +85,6 @@ export function ConstructionQuickActions({
     setSavingStatus(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Check if record exists
     const { data: existing } = await supabase
       .from('construction_manufacturing')
       .select('id')
@@ -108,7 +106,6 @@ export function ConstructionQuickActions({
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Status updated", description: `${stage === 'glass_installation' ? 'Glass' : 'Assembly'} marked as ${status === 'complete' ? 'installed' : 'not installed'}` });
         onRefresh();
       }
     } else {
@@ -125,7 +122,6 @@ export function ConstructionQuickActions({
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Status updated" });
         onRefresh();
       }
     }
@@ -133,7 +129,7 @@ export function ConstructionQuickActions({
   };
 
   const handleReportIssue = async () => {
-    if (!selectedIssueType || !issueDescription.trim()) return;
+    if (!selectedIssueType) return;
 
     setSavingIssue(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -143,7 +139,7 @@ export function ConstructionQuickActions({
       .insert({
         construction_id: construction.id,
         issue_type: selectedIssueType,
-        description: issueDescription.trim(),
+        description: issueDescription.trim() || `${selectedIssueType} issue`,
         created_by: user?.id,
         created_by_email: user?.email,
       });
@@ -151,7 +147,7 @@ export function ConstructionQuickActions({
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Issue reported", description: `${selectedIssueType} issue logged` });
+      toast({ title: "Issue reported" });
       setSelectedIssueType(null);
       setIssueDescription("");
       onRefresh();
@@ -178,7 +174,6 @@ export function ConstructionQuickActions({
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Note added" });
       setNoteText("");
       onRefresh();
     }
@@ -186,176 +181,143 @@ export function ConstructionQuickActions({
   };
 
   const dimensions = construction.width_inches && construction.height_inches
-    ? `${construction.width_inches.toFixed(1)}×${construction.height_inches.toFixed(1)}"`
+    ? `${construction.width_inches.toFixed(0)}×${construction.height_inches.toFixed(0)}"`
     : null;
 
   return (
-    <div className="w-72 p-3 space-y-3 max-h-[70vh] overflow-y-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg">#{construction.construction_number}</span>
-            <Badge variant="outline" className="text-xs">
-              {getTypeLabel(construction.construction_type)}
-            </Badge>
-          </div>
+    <div className="w-56 p-2 space-y-2 max-h-[60vh] overflow-y-auto">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between pb-1 border-b">
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-sm">
+            {getTypePrefix(construction.construction_type)}{construction.construction_number}
+          </span>
           {dimensions && (
-            <p className="text-xs text-muted-foreground">{dimensions}</p>
+            <span className="text-[10px] text-muted-foreground">{dimensions}</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {(construction.open_issues_count || 0) > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" />
+            <Badge variant="destructive" className="text-[10px] h-4 px-1">
+              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
               {construction.open_issues_count}
             </Badge>
           )}
           {(construction.notes_count || 0) > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              <MessageSquare className="h-3 w-3 mr-1" />
+            <Badge variant="secondary" className="text-[10px] h-4 px-1">
+              <MessageSquare className="h-2.5 w-2.5 mr-0.5" />
               {construction.notes_count}
             </Badge>
           )}
         </div>
       </div>
 
-      <Separator />
-
-      {/* Quick Status Toggles */}
+      {/* Quick Status - Compact Toggle Pills */}
       {isProductionReady && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Quick Status</p>
-          
-          {/* Glass Installation */}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isGlassInstalled ? "default" : "outline"}
-              className={`flex-1 text-xs ${isGlassInstalled ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
-              onClick={() => updateManufacturingStage('glass_installation', 'complete')}
+        <div className="space-y-1.5">
+          <div className="flex gap-1">
+            <button
+              onClick={() => updateManufacturingStage('glass_installation', isGlassInstalled ? 'not_started' : 'complete')}
               disabled={savingStatus}
+              className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
+                isGlassInstalled 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
             >
-              {savingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
-              Glass Installed
-            </Button>
-            <Button
-              size="sm"
-              variant={!isGlassInstalled ? "default" : "outline"}
-              className={`flex-1 text-xs ${!isGlassInstalled ? 'bg-green-500 hover:bg-green-600' : ''}`}
-              onClick={() => updateManufacturingStage('glass_installation', 'not_started')}
+              {savingStatus ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : isGlassInstalled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+              Glass
+            </button>
+            <button
+              onClick={() => updateManufacturingStage('assembly', isAssembled ? 'not_started' : 'complete')}
               disabled={savingStatus}
+              className={`flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors ${
+                isAssembled 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
             >
-              <X className="h-3 w-3 mr-1" />
-              Not Installed
-            </Button>
-          </div>
-
-          {/* Assembly Status */}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isAssembled ? "default" : "outline"}
-              className={`flex-1 text-xs ${isAssembled ? 'bg-green-500 hover:bg-green-600' : ''}`}
-              onClick={() => updateManufacturingStage('assembly', 'complete')}
-              disabled={savingStatus}
-            >
-              {savingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+              {savingStatus ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : isAssembled ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
               Assembled
-            </Button>
-            <Button
-              size="sm"
-              variant={!isAssembled ? "default" : "outline"}
-              className={`flex-1 text-xs ${!isAssembled ? 'bg-amber-400 hover:bg-amber-500 text-black' : ''}`}
-              onClick={() => updateManufacturingStage('assembly', 'not_started')}
-              disabled={savingStatus}
-            >
-              <X className="h-3 w-3 mr-1" />
-              Not Assembled
-            </Button>
+            </button>
           </div>
         </div>
       )}
 
-      <Separator />
-
-      {/* Quick Issue Report */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Report Issue</p>
-        <div className="flex flex-wrap gap-1">
+      {/* Issue Quick Buttons - Single Row */}
+      <div className="space-y-1">
+        <div className="flex gap-0.5">
           {ISSUE_TYPES.map(type => (
-            <Button
+            <button
               key={type.value}
-              size="sm"
-              variant="ghost"
-              className={`text-xs h-7 px-2 ${selectedIssueType === type.value ? type.color + ' ring-1 ring-offset-1' : ''}`}
-              onClick={() => setSelectedIssueType(selectedIssueType === type.value ? null : type.value)}
+              onClick={() => {
+                if (selectedIssueType === type.value) {
+                  setSelectedIssueType(null);
+                } else {
+                  setSelectedIssueType(type.value);
+                }
+              }}
+              className={`flex-1 h-5 rounded text-[9px] font-medium transition-colors ${
+                selectedIssueType === type.value 
+                  ? 'bg-amber-400 text-black' 
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
             >
               {type.label}
-            </Button>
+            </button>
           ))}
         </div>
         {selectedIssueType && (
-          <div className="space-y-2">
-            <Textarea
-              placeholder="Describe the issue..."
+          <div className="flex gap-1">
+            <Input
+              placeholder="Details (optional)"
               value={issueDescription}
               onChange={(e) => setIssueDescription(e.target.value)}
-              rows={2}
-              className="text-xs"
+              className="h-6 text-[10px] flex-1"
             />
             <Button
               size="sm"
-              className="w-full text-xs"
+              className="h-6 px-2 text-[10px]"
               onClick={handleReportIssue}
-              disabled={!issueDescription.trim() || savingIssue}
+              disabled={savingIssue}
             >
-              {savingIssue ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <AlertTriangle className="h-3 w-3 mr-1" />}
-              Report Issue
+              {savingIssue ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <AlertTriangle className="h-2.5 w-2.5" />}
             </Button>
           </div>
         )}
       </div>
 
-      <Separator />
-
-      {/* Quick Note */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Leave Note</p>
-        <div className="flex gap-2">
-          <Textarea
-            placeholder="Type a note..."
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            rows={1}
-            className="text-xs flex-1"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSendNote}
-            disabled={!noteText.trim() || savingNote}
-          >
-            {savingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
-          </Button>
-        </div>
+      {/* Note Input - Inline */}
+      <div className="flex gap-1">
+        <Input
+          placeholder="Add note..."
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          className="h-6 text-[10px] flex-1"
+          onKeyDown={(e) => e.key === 'Enter' && handleSendNote()}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 w-6 p-0"
+          onClick={handleSendNote}
+          disabled={!noteText.trim() || savingNote}
+        >
+          {savingNote ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
+        </Button>
       </div>
 
-      <Separator />
-
-      {/* View Full Details */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full text-xs justify-between"
+      {/* View Details Link */}
+      <button
         onClick={() => {
           onClose();
           onViewDetails();
         }}
+        className="w-full h-6 flex items-center justify-between text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1 border-t pt-1.5"
       >
-        View Full Details
-        <ChevronRight className="h-4 w-4" />
-      </Button>
+        <span>Full Details</span>
+        <ChevronRight className="h-3 w-3" />
+      </button>
     </div>
   );
 }
