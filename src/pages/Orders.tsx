@@ -981,13 +981,21 @@ export default function Orders() {
     'Hardware': 'hardware_status',
   };
 
-  const getNotOrderedComponents = (order: Order) => {
+  type ComponentInfo = { 
+    name: string; 
+    field: string; 
+    isFileExtracted: boolean;
+    componentType?: string;
+    componentName?: string | null;
+  };
+
+  const getNotOrderedComponents = (order: Order): ComponentInfo[] => {
     // Check if order has file-extracted components
     const fileComponents = constructionComponents[order.id];
     
     if (fileComponents && fileComponents.length > 0) {
       // Aggregate file-extracted components by type+name and filter by status
-      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string; componentName: string | null }>();
       fileComponents.filter(c => c.status === 'not_ordered').forEach(c => {
         const key = `${c.component_type}-${c.component_name || ''}`;
         const displayName = c.component_name 
@@ -996,26 +1004,32 @@ export default function Orders() {
         if (aggregated.has(key)) {
           aggregated.get(key)!.quantity += c.quantity;
         } else {
-          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type, componentName: c.component_name });
         }
       });
       
       // Always add Reinforcement from legacy if not_ordered (not file-extracted)
-      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      const components: ComponentInfo[] = [];
       if (order.reinforcement_status === 'not_ordered') {
         components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
       }
       
       // Add file-extracted components
       aggregated.forEach((value) => {
-        components.push({ name: value.name, field: '', isFileExtracted: true });
+        components.push({ 
+          name: value.name, 
+          field: '', 
+          isFileExtracted: true,
+          componentType: value.componentType,
+          componentName: value.componentName
+        });
       });
       
       return components;
     }
     
     // Fall back to legacy order-level fields
-    const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+    const components: ComponentInfo[] = [];
     if (order.reinforcement_status === 'not_ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
     if (order.windows_profile_status === 'not_ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status', isFileExtracted: false });
     if (order.glass_status === 'not_ordered') components.push({ name: 'Glass', field: 'glass_status', isFileExtracted: false });
@@ -1026,13 +1040,13 @@ export default function Orders() {
     return components;
   };
 
-  const getOrderedComponents = (order: Order) => {
+  const getOrderedComponents = (order: Order): ComponentInfo[] => {
     // Check if order has file-extracted components
     const fileComponents = constructionComponents[order.id];
     
     if (fileComponents && fileComponents.length > 0) {
       // Aggregate file-extracted components by type+name and filter by status
-      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string; componentName: string | null }>();
       fileComponents.filter(c => c.status === 'ordered').forEach(c => {
         const key = `${c.component_type}-${c.component_name || ''}`;
         const displayName = c.component_name 
@@ -1041,26 +1055,32 @@ export default function Orders() {
         if (aggregated.has(key)) {
           aggregated.get(key)!.quantity += c.quantity;
         } else {
-          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type, componentName: c.component_name });
         }
       });
       
       // Always add Reinforcement from legacy if ordered (not file-extracted)
-      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      const components: ComponentInfo[] = [];
       if (order.reinforcement_status === 'ordered') {
         components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
       }
       
       // Add file-extracted components
       aggregated.forEach((value) => {
-        components.push({ name: value.name, field: '', isFileExtracted: true });
+        components.push({ 
+          name: value.name, 
+          field: '', 
+          isFileExtracted: true,
+          componentType: value.componentType,
+          componentName: value.componentName
+        });
       });
       
       return components;
     }
     
     // Fall back to legacy order-level fields
-    const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+    const components: ComponentInfo[] = [];
     if (order.reinforcement_status === 'ordered') components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
     if (order.windows_profile_status === 'ordered') components.push({ name: 'Windows Profile', field: 'windows_profile_status', isFileExtracted: false });
     if (order.glass_status === 'ordered') components.push({ name: 'Glass', field: 'glass_status', isFileExtracted: false });
@@ -1071,13 +1091,13 @@ export default function Orders() {
     return components;
   };
 
-  const getAvailableComponents = (order: Order) => {
+  const getAvailableComponents = (order: Order): ComponentInfo[] => {
     // Check if order has file-extracted components
     const fileComponents = constructionComponents[order.id];
     
     if (fileComponents && fileComponents.length > 0) {
       // Aggregate file-extracted components by type+name and filter by status
-      const aggregated = new Map<string, { name: string; quantity: number; componentType: string }>();
+      const aggregated = new Map<string, { name: string; quantity: number; componentType: string; componentName: string | null }>();
       fileComponents.filter(c => c.status === 'available').forEach(c => {
         const key = `${c.component_type}-${c.component_name || ''}`;
         const displayName = c.component_name 
@@ -1086,19 +1106,25 @@ export default function Orders() {
         if (aggregated.has(key)) {
           aggregated.get(key)!.quantity += c.quantity;
         } else {
-          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type });
+          aggregated.set(key, { name: displayName, quantity: c.quantity, componentType: c.component_type, componentName: c.component_name });
         }
       });
       
       // Always add Reinforcement from legacy if available (not file-extracted)
-      const components: { name: string; field: string; isFileExtracted: boolean }[] = [];
+      const components: ComponentInfo[] = [];
       if (order.reinforcement_status === 'available') {
         components.push({ name: 'Reinforcement', field: 'reinforcement_status', isFileExtracted: false });
       }
       
       // Add file-extracted components
       aggregated.forEach((value) => {
-        components.push({ name: value.name, field: '', isFileExtracted: true });
+        components.push({ 
+          name: value.name, 
+          field: '', 
+          isFileExtracted: true,
+          componentType: value.componentType,
+          componentName: value.componentName
+        });
       });
       
       return components;
@@ -1173,6 +1199,62 @@ export default function Orders() {
       toast({
         title: "Status updated",
         description: `Component updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileComponentStatusChange = async (
+    orderId: string, 
+    componentType: string, 
+    componentName: string | null, 
+    newStatus: string
+  ) => {
+    try {
+      // Get all construction IDs for this order
+      const { data: constructions } = await supabase
+        .from("order_constructions")
+        .select("id")
+        .eq("order_id", orderId);
+      
+      if (!constructions || constructions.length === 0) {
+        toast({
+          title: "Error",
+          description: "No constructions found for this order",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const constructionIds = constructions.map(c => c.id);
+      
+      // Update all matching components
+      let updateQuery = supabase
+        .from("construction_components")
+        .update({ status: newStatus })
+        .in("construction_id", constructionIds)
+        .eq("component_type", componentType);
+      
+      if (componentName) {
+        updateQuery = updateQuery.eq("component_name", componentName);
+      } else {
+        updateQuery = updateQuery.is("component_name", null);
+      }
+      
+      const { error } = await updateQuery;
+      if (error) throw error;
+      
+      // Refresh construction components to update UI
+      await fetchConstructionComponents();
+      
+      toast({
+        title: "Status updated",
+        description: `${componentType} updated to ${newStatus.replace('_', ' ')}`,
       });
     } catch (error: any) {
       toast({
@@ -1458,9 +1540,26 @@ export default function Orders() {
                             {notOrderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              // File-extracted components are display-only
+                              // File-extracted components - editable with popover
                               if (component.isFileExtracted) {
-                                return (
+                                return (canUpdateOrdering && !isSeller) ? (
+                                  <Popover key={component.name}>
+                                    <PopoverTrigger asChild>
+                                      <button onClick={(e) => e.stopPropagation()} type="button">
+                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                          {component.name}
+                                        </Badge>
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-36 p-0" align="start">
+                                      <StatusPopoverButtons
+                                        currentValue="not_ordered"
+                                        options={orderingPopoverOptions}
+                                        onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : (
                                   <Badge key={component.name} variant="destructive" className="text-xs py-0 px-1.5">
                                     {component.name}
                                   </Badge>
@@ -1521,9 +1620,26 @@ export default function Orders() {
                             {orderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              // File-extracted components are display-only
+                              // File-extracted components - editable with popover
                               if (component.isFileExtracted) {
-                                return (
+                                return (canUpdateOrdering && !isSeller) ? (
+                                  <Popover key={component.name}>
+                                    <PopoverTrigger asChild>
+                                      <button onClick={(e) => e.stopPropagation()} type="button">
+                                        <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400 cursor-pointer hover:opacity-80 transition-opacity">
+                                          {component.name}
+                                        </Badge>
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-36 p-0" align="start">
+                                      <StatusPopoverButtons
+                                        currentValue="ordered"
+                                        options={orderingPopoverOptions}
+                                        onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : (
                                   <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
                                     {component.name}
                                   </Badge>
@@ -1582,11 +1698,39 @@ export default function Orders() {
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
                             <span className="text-xs text-success font-medium mr-1">Available:</span>
-                            {availableComponents.map((component) => (
-                              <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-success/50 text-success">
-                                {component.name}
-                              </Badge>
-                            ))}
+                            {availableComponents.map((component) => {
+                              // File-extracted components - editable with popover
+                              if (component.isFileExtracted) {
+                                return (canUpdateOrdering && !isSeller) ? (
+                                  <Popover key={component.name}>
+                                    <PopoverTrigger asChild>
+                                      <button onClick={(e) => e.stopPropagation()} type="button">
+                                        <Badge variant="outline" className="text-xs py-0 px-1.5 border-success/50 text-success cursor-pointer hover:opacity-80 transition-opacity">
+                                          {component.name}
+                                        </Badge>
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-36 p-0" align="start">
+                                      <StatusPopoverButtons
+                                        currentValue="available"
+                                        options={orderingPopoverOptions}
+                                        onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : (
+                                  <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-success/50 text-success">
+                                    {component.name}
+                                  </Badge>
+                                );
+                              }
+                              // Legacy components
+                              return (
+                                <Badge key={component.name} variant="outline" className="text-xs py-0 px-1.5 border-success/50 text-success">
+                                  {component.name}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-1.5 mt-2">
