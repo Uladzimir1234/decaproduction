@@ -399,40 +399,40 @@ export default function OrderDetail() {
 
   // Helper functions to check component availability - considers both legacy order fields AND file-extracted components
   const isProfileAvailable = () => {
-    // Check if any file-extracted profile components are available
-    const profileComponent = aggregatedComponents.find(c => c.component_type === 'profile');
-    if (profileComponent) {
-      return profileComponent.status === 'available';
+    // Check if ANY file-extracted profile component is available (not all)
+    const profileComponents = aggregatedComponents.filter(c => c.component_type === 'profile');
+    if (profileComponents.length > 0) {
+      return profileComponents.some(c => c.status === 'available');
     }
     // Fall back to legacy order field
     return order?.windows_profile_status === 'available';
   };
 
   const isGlassAvailable = () => {
-    // Check if any file-extracted glass components are available
-    const glassComponent = aggregatedComponents.find(c => c.component_type === 'glass');
-    if (glassComponent) {
-      return glassComponent.status === 'available';
+    // Check if ANY file-extracted glass component is available (not all)
+    const glassComponents = aggregatedComponents.filter(c => c.component_type === 'glass');
+    if (glassComponents.length > 0) {
+      return glassComponents.some(c => c.status === 'available');
     }
     // Fall back to legacy order field
     return order?.glass_status === 'available';
   };
 
   const isHardwareAvailable = () => {
-    // Check if any file-extracted hardware components are available
-    const hardwareComponent = aggregatedComponents.find(c => c.component_type === 'hardware');
-    if (hardwareComponent) {
-      return hardwareComponent.status === 'available';
+    // Check if ANY file-extracted hardware component is available (not all)
+    const hardwareComponents = aggregatedComponents.filter(c => c.component_type === 'hardware');
+    if (hardwareComponents.length > 0) {
+      return hardwareComponents.some(c => c.status === 'available');
     }
     // Fall back to legacy order field
     return order?.hardware_status === 'available';
   };
 
   const isScreensAvailable = () => {
-    // Check if any file-extracted screens components are available
-    const screensComponent = aggregatedComponents.find(c => c.component_type === 'screens');
-    if (screensComponent) {
-      return screensComponent.status === 'available';
+    // Check if ANY file-extracted screens component is available (not all)
+    const screensComponents = aggregatedComponents.filter(c => c.component_type === 'screens');
+    if (screensComponents.length > 0) {
+      return screensComponents.some(c => c.status === 'available');
     }
     // Fall back to legacy order field
     return order?.screens_status === 'available';

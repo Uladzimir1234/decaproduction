@@ -699,8 +699,9 @@ export default function Orders() {
       );
       if (matchingComponents.length === 0) return { isLocked: false }; // No such component needed
       
-      const allAvailable = matchingComponents.every(c => c.status === 'available');
-      if (allAvailable) return { isLocked: false };
+      // Changed from allAvailable (every) to anyAvailable (some) - unlock if ANY component is available
+      const anyAvailable = matchingComponents.some(c => c.status === 'available');
+      if (anyAvailable) return { isLocked: false };
       
       const anyOrdered = matchingComponents.some(c => c.status === 'ordered');
       const statusText = anyOrdered ? 'Ordered' : 'Not Ordered';
@@ -804,8 +805,9 @@ export default function Orders() {
           componentTypes.some(type => c.component_type.toLowerCase().includes(type.toLowerCase()))
         );
         if (matchingComponents.length > 0) {
-          const allAvailable = matchingComponents.every(c => c.status === 'available');
-          if (allAvailable) return { isLocked: false };
+          // Changed from allAvailable (every) to anyAvailable (some) - unlock if ANY component is available
+          const anyAvailable = matchingComponents.some(c => c.status === 'available');
+          if (anyAvailable) return { isLocked: false };
           const anyOrdered = matchingComponents.some(c => c.status === 'ordered');
           const statusText = anyOrdered ? 'Ordered' : 'Not Ordered';
           return { isLocked: true, lockReason: `${componentName} ${statusText}` };
