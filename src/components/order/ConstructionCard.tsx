@@ -159,6 +159,7 @@ export function ConstructionCard({
         className={`
           relative w-7 h-7 rounded-sm flex items-center justify-center
           text-sm font-black drop-shadow-sm
+          transition-all duration-300 ease-out
           ${statusColor.bg} ${statusColor.text}
           ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
           ${construction.is_delivered ? 'opacity-50' : ''}
