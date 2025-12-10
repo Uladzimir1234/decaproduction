@@ -55,7 +55,7 @@ interface ConstructionCardProps {
   orderFulfillment?: OrderFulfillment | null;
   orderId?: string;
   isProductionReady?: boolean;
-  onRefresh?: () => void;
+  onRefresh?: (updatedConstruction?: { id: string; manufacturing: { stage: string; status: string }[] }) => void;
   usePopover?: boolean;
 }
 
