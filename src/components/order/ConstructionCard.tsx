@@ -198,11 +198,24 @@ export function ConstructionCard({
     return (
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="focus:outline-none">
+          <button 
+            type="button" 
+            className="focus:outline-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPopoverOpen(true);
+            }}
+          >
             {CardContent}
           </button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="center" className="p-0 w-auto z-[100]" sideOffset={8}>
+        <PopoverContent 
+          side="top" 
+          align="center" 
+          className="p-0 w-auto bg-background border shadow-lg" 
+          sideOffset={8}
+          style={{ zIndex: 9999 }}
+        >
           <ConstructionQuickActions
             construction={construction}
             orderId={orderId}
