@@ -57,7 +57,7 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
   const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillment | null>(null);
 
   useEffect(() => {
-    fetchConstructions();
+    fetchConstructions(true); // Show loading only on initial mount
     
     const channel = supabase
       .channel(`order-constructions-inline-${orderId}`)
@@ -106,8 +106,8 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
     };
   }, [orderId]);
 
-  const fetchConstructions = async () => {
-    setLoading(true);
+  const fetchConstructions = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     
     // Fetch order_fulfillment for fallback status
     const { data: fulfillmentData } = await supabase
