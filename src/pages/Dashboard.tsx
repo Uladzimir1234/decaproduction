@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,9 @@ import {
   Package,
   TrendingUp,
   LayoutGrid,
-  Pause
+  Pause,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { MetricsStrip } from "@/components/dashboard/MetricsStrip";
@@ -22,6 +25,15 @@ import { PendingDeliveries, type PendingDeliveryOrder } from "@/components/dashb
 
 export default function Dashboard() {
   const { orders, metrics, componentSummary, manufacturingWorkload, loading } = useDashboardData();
+  
+  // Expanded states for each section
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+  
+  const isExpanded = (section: string) => expandedSections[section] || false;
 
   if (loading) {
     return (
@@ -37,7 +49,6 @@ export default function Dashboard() {
   const readyToShip = orders.filter(o => o.manufacturingProgress >= 90 && o.healthStatus !== 'critical');
   const onHoldOrders = orders.filter(o => o.production_status === 'hold');
   const productionReadyOrders = orders.filter(o => o.production_status === 'production_ready');
-  const topPriorityOrders = productionReadyOrders.slice(0, 6); // Only show production-ready in priority queue
   
   // Pending deliveries - orders with 90%+ manufacturing but items still to deliver
   const pendingDeliveryOrders: PendingDeliveryOrder[] = orders
@@ -52,6 +63,31 @@ export default function Dashboard() {
       pendingItems: o.deliveryProgress.pendingItems,
       manufacturingProgress: o.manufacturingProgress,
     }));
+  
+  // Helper to render expand/collapse button
+  const ExpandButton = ({ section, totalCount, visibleCount }: { section: string; totalCount: number; visibleCount: number }) => {
+    if (totalCount <= visibleCount) return null;
+    
+    const expanded = isExpanded(section);
+    return (
+      <button
+        onClick={() => toggleSection(section)}
+        className="w-full flex items-center justify-center gap-2 py-2 text-sm text-primary hover:text-primary/80 transition-colors mt-3"
+      >
+        {expanded ? (
+          <>
+            <ChevronUp className="h-4 w-4" />
+            Show less
+          </>
+        ) : (
+          <>
+            <ChevronDown className="h-4 w-4" />
+            View all {totalCount} orders
+          </>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -126,15 +162,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {onHoldOrders.slice(0, 6).map((order) => (
+              {(isExpanded('onHold') ? onHoldOrders : onHoldOrders.slice(0, 6)).map((order) => (
                 <PriorityOrderCard key={order.id} order={order} showDetails={false} />
               ))}
             </div>
-            {onHoldOrders.length > 6 && (
-              <Link to="/orders?status=on_hold" className="block text-center py-2 text-sm text-primary hover:underline mt-3">
-                View all {onHoldOrders.length} on hold orders
-              </Link>
-            )}
+            <ExpandButton section="onHold" totalCount={onHoldOrders.length} visibleCount={6} />
           </CardContent>
         </Card>
       )}
@@ -158,7 +190,7 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {topPriorityOrders.length === 0 ? (
+              {productionReadyOrders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No production-ready orders</p>
@@ -167,15 +199,11 @@ export default function Dashboard() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                  {topPriorityOrders.map((order) => (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {(isExpanded('productionReady') ? productionReadyOrders : productionReadyOrders.slice(0, 6)).map((order) => (
                     <PriorityOrderCard key={order.id} order={order} />
                   ))}
-                  {productionReadyOrders.length > 6 && (
-                    <Link to="/orders?status=production_ready" className="block text-center py-2 text-sm text-primary hover:underline">
-                      View all {productionReadyOrders.length} production-ready orders
-                    </Link>
-                  )}
+                  <ExpandButton section="productionReady" totalCount={productionReadyOrders.length} visibleCount={6} />
                 </div>
               )}
             </CardContent>
@@ -215,7 +243,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {readyToShip.slice(0, 3).map((order) => (
+                  {(isExpanded('readyToShip') ? readyToShip : readyToShip.slice(0, 3)).map((order) => (
                     <Link
                       key={order.id}
                       to={`/orders/${order.id}`}
@@ -233,11 +261,7 @@ export default function Dashboard() {
                       </Badge>
                     </Link>
                   ))}
-                  {readyToShip.length > 3 && (
-                    <Link to="/orders" className="block text-center py-2 text-sm text-primary hover:underline">
-                      +{readyToShip.length - 3} more ready
-                    </Link>
-                  )}
+                  <ExpandButton section="readyToShip" totalCount={readyToShip.length} visibleCount={3} />
                 </div>
               </CardContent>
             </Card>
@@ -264,10 +288,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {atRiskOrders.slice(0, 6).map((order) => (
+              {(isExpanded('atRisk') ? atRiskOrders : atRiskOrders.slice(0, 6)).map((order) => (
                 <PriorityOrderCard key={order.id} order={order} showDetails={false} />
               ))}
             </div>
+            <ExpandButton section="atRisk" totalCount={atRiskOrders.length} visibleCount={6} />
           </CardContent>
         </Card>
       )}
