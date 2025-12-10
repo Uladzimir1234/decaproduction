@@ -896,6 +896,30 @@ export default function Orders() {
         throw error;
       }
       
+      // When Glass Installed is set to complete, update ALL constructions to glass_installation = complete
+      if (field === 'glass_status' && newStatus === 'complete') {
+        // Get all constructions for this order
+        const { data: constructions } = await supabase
+          .from("order_constructions")
+          .select("id")
+          .eq("order_id", orderId);
+        
+        if (constructions && constructions.length > 0) {
+          const constructionIds = constructions.map(c => c.id);
+          
+          // Upsert glass_installation = complete for all constructions
+          const upsertData = constructionIds.map(cid => ({
+            construction_id: cid,
+            stage: 'glass_installation',
+            status: 'complete'
+          }));
+          
+          await supabase
+            .from("construction_manufacturing")
+            .upsert(upsertData, { onConflict: 'construction_id,stage' });
+        }
+      }
+      
       // Update local state
       setFulfillments(prev => ({
         ...prev,
