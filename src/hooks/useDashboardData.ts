@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface ConstructionComponent {
+  id: string;
+  component_type: string;
+  component_name: string | null;
+  quantity: number;
+  status: string;
+}
+
 export interface OrderWithFulfillment {
   id: string;
   order_number: string;
@@ -26,6 +34,8 @@ export interface OrderWithFulfillment {
   plisse_screens_status: string | null;
   nail_fins_status: string | null;
   hardware_status: string | null;
+  // File-extracted components
+  fileComponents?: ConstructionComponent[];
   // Fulfillment data
   fulfillment?: {
     reinforcement_cutting: string | null;
@@ -131,6 +141,34 @@ const getDaysUntilDelivery = (deliveryDate: string) => {
 };
 
 const getComponentStatus = (order: OrderWithFulfillment, field: string): string => {
+  // Check file-extracted components first
+  if (order.fileComponents && order.fileComponents.length > 0) {
+    const typeMap: Record<string, string> = {
+      reinforcement_status: 'reinforcement',
+      windows_profile_status: 'profile',
+      glass_status: 'glass',
+      screens_status: 'screens',
+      plisse_screens_status: 'plisse',
+      nail_fins_status: 'nail_fins',
+      hardware_status: 'hardware',
+    };
+    const componentType = typeMap[field];
+    if (componentType) {
+      const matchingComponents = order.fileComponents.filter(c => 
+        c.component_type.toLowerCase() === componentType.toLowerCase()
+      );
+      if (matchingComponents.length > 0) {
+        // If any matching component is not_ordered, return not_ordered
+        if (matchingComponents.some(c => c.status === 'not_ordered')) return 'not_ordered';
+        // If any matching component is ordered, return ordered
+        if (matchingComponents.some(c => c.status === 'ordered')) return 'ordered';
+        // All are available
+        return 'available';
+      }
+    }
+  }
+  
+  // Fall back to legacy order-level fields
   const fieldMap: Record<string, keyof OrderWithFulfillment> = {
     reinforcement_status: 'reinforcement_status',
     windows_profile_status: 'windows_profile_status',
@@ -384,6 +422,39 @@ export function useDashboardData() {
 
       if (ordersError) throw ordersError;
 
+      // Fetch construction components for all orders
+      const orderIds = (ordersData || []).map(o => o.id);
+      let componentsMap: Record<string, ConstructionComponent[]> = {};
+      
+      if (orderIds.length > 0) {
+        const { data: componentsData } = await supabase
+          .from('construction_components')
+          .select(`
+            id,
+            component_type,
+            component_name,
+            quantity,
+            status,
+            construction:order_constructions!inner(order_id)
+          `)
+          .in('construction.order_id', orderIds);
+        
+        // Group components by order_id
+        (componentsData || []).forEach((comp: any) => {
+          const orderId = comp.construction?.order_id;
+          if (orderId) {
+            if (!componentsMap[orderId]) componentsMap[orderId] = [];
+            componentsMap[orderId].push({
+              id: comp.id,
+              component_type: comp.component_type,
+              component_name: comp.component_name,
+              quantity: comp.quantity,
+              status: comp.status,
+            });
+          }
+        });
+      }
+
       // Process orders
       const processedOrders: PriorityOrder[] = (ordersData || [])
         .filter(order => (order.fulfillment_percentage || 0) < 100 && !order.delivery_complete)
@@ -412,6 +483,7 @@ export function useDashboardData() {
             plisse_screens_status: order.plisse_screens_status,
             nail_fins_status: order.nail_fins_status,
             hardware_status: order.hardware_status,
+            fileComponents: componentsMap[order.id] || [],
             fulfillment: order.fulfillment?.[0] || null,
           };
 
