@@ -214,8 +214,13 @@ export function OrderMapInline({ orderId, orderNumber, isProductionReady }: Orde
             key={construction.id}
             construction={construction}
             onClick={() => setSelectedConstruction(construction)}
+            onViewDetails={() => setSelectedConstruction(construction)}
             isSelected={selectedConstruction?.id === construction.id}
             orderFulfillment={orderFulfillment}
+            orderId={orderId}
+            isProductionReady={isProductionReady}
+            onRefresh={fetchConstructions}
+            usePopover={true}
           />
         ))}
       </div>
