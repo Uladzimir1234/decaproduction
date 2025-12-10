@@ -154,17 +154,17 @@ export function ConstructionCard({
         ${isSelected ? 'scale-110' : ''}
       `}
     >
-      {/* Badge square */}
+      {/* Badge square - now shows type letter */}
       <div
         className={`
           relative w-7 h-7 rounded-sm flex items-center justify-center
-          text-[10px] font-black drop-shadow-sm
+          text-sm font-black drop-shadow-sm
           ${statusColor.bg} ${statusColor.text}
           ${isSelected ? 'ring-1 ring-offset-1 ring-primary' : ''}
           ${construction.is_delivered ? 'opacity-50' : ''}
         `}
       >
-        {construction.construction_number}
+        {typePrefix}
         
         {/* Issue indicator */}
         {hasOpenIssues && (
@@ -188,9 +188,9 @@ export function ConstructionCard({
         )}
       </div>
       
-      {/* Type letter below */}
+      {/* Construction number below */}
       <span className="text-[8px] font-medium text-muted-foreground">
-        {typePrefix}
+        {construction.construction_number}
       </span>
     </div>
   );
