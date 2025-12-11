@@ -1565,7 +1565,7 @@ export default function Orders() {
             return <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     {/* Priority triangle indicator */}
                     {order.is_priority && (
-                      <div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-destructive rounded-tr-lg" />
+                      <div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />
                     )}
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
@@ -1580,7 +1580,7 @@ export default function Orders() {
                               className="shrink-0 hover:scale-110 transition-transform"
                               title={order.is_priority ? "Remove priority" : "Set as priority"}
                             >
-                              <Star className={`h-5 w-5 ${order.is_priority ? 'fill-destructive text-destructive' : 'text-muted-foreground hover:text-destructive'}`} />
+                              <Star className={`h-5 w-5 ${order.is_priority ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
                             </button>
                           )}
                           <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
