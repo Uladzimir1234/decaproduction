@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star } from "lucide-react";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -142,6 +142,7 @@ interface Order {
   hardware_order_date: string | null;
   production_status: string;
   hold_started_at: string | null;
+  is_priority: boolean | null;
   // Ordering tracking fields
   ordering_updated_at: string | null;
   ordering_updated_by: string | null;
@@ -1189,6 +1190,42 @@ export default function Orders() {
     }
   };
 
+  const handlePriorityToggle = async (orderId: string, isPriority: boolean) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      
+      const { error } = await supabase
+        .from("orders")
+        .update({ is_priority: isPriority })
+        .eq("id", orderId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, is_priority: isPriority } : o
+      ));
+      
+      await createAuditLog({
+        action: 'order_updated',
+        description: `${isPriority ? 'Set' : 'Removed'} priority on order #${order?.order_number}`,
+        entityType: 'order',
+        entityId: orderId,
+      });
+      
+      toast({
+        title: isPriority ? "Priority set" : "Priority removed",
+        description: isPriority ? "Order will appear at the top of the list" : "Order priority removed",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update priority",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getDaysOnHold = (holdStartedAt: string | null): number => {
     if (!holdStartedAt) return 0;
     const holdDate = new Date(holdStartedAt);
@@ -1476,6 +1513,11 @@ export default function Orders() {
           {(() => {
             // Apply sorting to filtered orders
             const sortedOrders = [...filteredOrders].sort((a, b) => {
+              // Priority orders always come first
+              if (a.is_priority && !b.is_priority) return -1;
+              if (!a.is_priority && b.is_priority) return 1;
+              
+              // Then apply the selected sort
               switch (sortBy) {
                 case 'time_left_asc':
                   return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
@@ -1520,10 +1562,27 @@ export default function Orders() {
             const showDeliveryBadge = order.fulfillment_percentage >= 50;
             const showShippingBadge = order.fulfillment_percentage >= 50;
             const hasFileExtractedData = ordersWithConstructions.has(order.id);
-            return <div key={order.id} id={`order-${order.id}`} className={`block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
+            return <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
+                    {/* Priority triangle indicator */}
+                    {order.is_priority && (
+                      <div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-destructive rounded-tr-lg" />
+                    )}
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
+                          {/* Priority toggle button */}
+                          {(isAdmin || isManager) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePriorityToggle(order.id, !order.is_priority);
+                              }}
+                              className="shrink-0 hover:scale-110 transition-transform"
+                              title={order.is_priority ? "Remove priority" : "Set as priority"}
+                            >
+                              <Star className={`h-5 w-5 ${order.is_priority ? 'fill-destructive text-destructive' : 'text-muted-foreground hover:text-destructive'}`} />
+                            </button>
+                          )}
                           <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
                             #{order.order_number}
                           </span>
