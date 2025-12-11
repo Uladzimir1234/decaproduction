@@ -974,6 +974,7 @@ export type Database = {
           hidden_hinges_count: number | null
           hold_started_at: string | null
           id: string
+          is_priority: boolean | null
           nail_fins_order_date: string | null
           nail_fins_status: string | null
           order_date: string
@@ -1026,6 +1027,7 @@ export type Database = {
           hidden_hinges_count?: number | null
           hold_started_at?: string | null
           id?: string
+          is_priority?: boolean | null
           nail_fins_order_date?: string | null
           nail_fins_status?: string | null
           order_date: string
@@ -1078,6 +1080,7 @@ export type Database = {
           hidden_hinges_count?: number | null
           hold_started_at?: string | null
           id?: string
+          is_priority?: boolean | null
           nail_fins_order_date?: string | null
           nail_fins_status?: string | null
           order_date?: string
