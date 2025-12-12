@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { PopoverClose } from "@/components/ui/popover";
+import { ShoppingCart } from "lucide-react";
 
 interface StatusOption {
   value: string;
@@ -11,12 +12,16 @@ interface StatusPopoverButtonsProps {
   currentValue: string;
   options: StatusOption[];
   onChange: (value: string) => void;
+  onAddToCart?: () => void;
+  isInCart?: boolean;
 }
 
 export function StatusPopoverButtons({ 
   currentValue, 
   options, 
-  onChange
+  onChange,
+  onAddToCart,
+  isInCart
 }: StatusPopoverButtonsProps) {
   const getButtonStyle = (optionValue: string) => {
     const isComplete = optionValue === 'complete' || optionValue === 'available';
@@ -47,6 +52,26 @@ export function StatusPopoverButtons({
           {option.label}
         </PopoverClose>
       ))}
+      {onAddToCart && (
+        <>
+          <div className="border-t border-border my-1" />
+          <PopoverClose
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart();
+            }}
+            className={cn(
+              "w-full text-left px-3 py-2 text-sm rounded-md font-medium transition-all flex items-center gap-2",
+              isInCart 
+                ? "bg-yellow-200 text-yellow-800 cursor-default" 
+                : "bg-yellow-300 text-black hover:bg-yellow-400"
+            )}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {isInCart ? "In Cart" : "To Order"}
+          </PopoverClose>
+        </>
+      )}
     </div>
   );
 }
