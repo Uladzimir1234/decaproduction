@@ -2193,13 +2193,18 @@ export default function Orders() {
                           colorVariant="gradient"
                           label="Fulfillment"
                         />
-                        <ProgressCircle
-                          value={Math.max(0, timeLeft)}
-                          size="sm"
-                          colorVariant="gradient"
-                          customValue={daysUntil < 0 ? `${Math.abs(daysUntil)}d` : `${daysUntil}d`}
-                          label={daysUntil < 0 ? "Overdue" : "Time Left"}
-                        />
+                        <div className="flex flex-col items-center">
+                          <ProgressCircle
+                            value={Math.max(0, timeLeft)}
+                            size="sm"
+                            colorVariant="gradient"
+                            customValue={daysUntil < 0 ? `${Math.abs(daysUntil)}d` : `${daysUntil}d`}
+                            label={daysUntil < 0 ? "Overdue" : "Time Left"}
+                          />
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(order.delivery_date), "MMM d, yyyy")}
+                          </span>
+                        </div>
                         {!isWorker && (
                           <Button
                             variant="ghost"
