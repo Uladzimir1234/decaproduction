@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart } from "lucide-react";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -1684,13 +1684,23 @@ export default function Orders() {
                                   });
                                 };
                                 
+                                // Badge styling based on cart status
+                                const badgeContent = inCart ? (
+                                  <Badge className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-300 flex items-center gap-1">
+                                    <ShoppingCart className="h-3 w-3" />
+                                    {component.name}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                    {component.name}
+                                  </Badge>
+                                );
+                                
                                 return (canUpdateOrdering && !isSeller) ? (
                                   <Popover key={component.name}>
                                     <PopoverTrigger asChild>
                                       <button onClick={(e) => e.stopPropagation()} type="button">
-                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                          {component.name}
-                                        </Badge>
+                                        {badgeContent}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-36 p-0" align="start">
@@ -1707,9 +1717,7 @@ export default function Orders() {
                                   <Popover key={component.name}>
                                     <PopoverTrigger asChild>
                                       <button onClick={(e) => e.stopPropagation()} type="button">
-                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                          {component.name}
-                                        </Badge>
+                                        {badgeContent}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-36 p-0" align="start">
@@ -1745,6 +1753,18 @@ export default function Orders() {
                                 });
                               };
                               
+                              // Badge styling based on cart status for legacy components
+                              const legacyBadgeContent = inCart ? (
+                                <Badge className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity bg-yellow-400 text-black border-yellow-500 hover:bg-yellow-300 flex items-center gap-1">
+                                  <ShoppingCart className="h-3 w-3" />
+                                  {component.name}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                  {component.name}
+                                </Badge>
+                              );
+                              
                               return (canUpdateOrdering && !isSeller && component.field) ? (
                                 <Popover key={component.name}>
                                   <TooltipProvider>
@@ -1752,9 +1772,7 @@ export default function Orders() {
                                       <PopoverTrigger asChild>
                                         <TooltipTrigger asChild>
                                           <button onClick={(e) => e.stopPropagation()} type="button">
-                                            <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                              {component.name}
-                                            </Badge>
+                                            {legacyBadgeContent}
                                           </button>
                                         </TooltipTrigger>
                                       </PopoverTrigger>
@@ -1779,9 +1797,7 @@ export default function Orders() {
                                 <Popover key={component.name}>
                                   <PopoverTrigger asChild>
                                     <button onClick={(e) => e.stopPropagation()} type="button">
-                                      <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                        {component.name}
-                                      </Badge>
+                                      {legacyBadgeContent}
                                     </button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-36 p-0" align="start">
