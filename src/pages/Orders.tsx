@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star } from "lucide-react";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +19,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useProcurementCart } from "@/contexts/ProcurementCartContext";
-import { ComponentBadgeWithCart } from "@/components/order/ComponentBadgeWithCart";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -1663,112 +1661,139 @@ export default function Orders() {
                             {notOrderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              // File-extracted components - editable with popover + right-click cart
+                              // File-extracted components - editable with popover + cart option
                               if (component.isFileExtracted) {
+                                const componentType = component.componentType || 'unknown';
+                                const componentDisplayName = component.componentName ?? null;
+                                const inCart = isInCart(order.id, componentType, componentDisplayName);
+                                
+                                const handleAddToCartClick = () => {
+                                  if (inCart) return;
+                                  addToCart({
+                                    orderId: order.id,
+                                    orderNumber: order.order_number,
+                                    customerName: order.customer_name,
+                                    componentType,
+                                    componentName: componentDisplayName,
+                                    quantity: 1,
+                                    isFileExtracted: true,
+                                  });
+                                  toast({
+                                    title: "Added to cart",
+                                    description: `${component.name} from order ${order.order_number} added to procurement cart`,
+                                  });
+                                };
+                                
                                 return (canUpdateOrdering && !isSeller) ? (
-                                  <ComponentBadgeWithCart
-                                    key={component.name}
-                                    orderId={order.id}
-                                    orderNumber={order.order_number}
-                                    customerName={order.customer_name}
-                                    componentName={component.name}
-                                    componentType={component.componentType || 'unknown'}
-                                    componentDisplayName={component.componentName ?? null}
-                                    quantity={1}
-                                    isFileExtracted={true}
-                                  >
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <button onClick={(e) => e.stopPropagation()} type="button">
-                                          <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                            {component.name}
-                                          </Badge>
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-36 p-0" align="start">
-                                        <StatusPopoverButtons
-                                          currentValue="not_ordered"
-                                          options={orderingPopoverOptions}
-                                          onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                  </ComponentBadgeWithCart>
-                                ) : (
-                                  <ComponentBadgeWithCart
-                                    key={component.name}
-                                    orderId={order.id}
-                                    orderNumber={order.order_number}
-                                    customerName={order.customer_name}
-                                    componentName={component.name}
-                                    componentType={component.componentType || 'unknown'}
-                                    componentDisplayName={component.componentName ?? null}
-                                    quantity={1}
-                                    isFileExtracted={true}
-                                  >
-                                    <Badge variant="destructive" className="text-xs py-0 px-1.5">
-                                      {component.name}
-                                    </Badge>
-                                  </ComponentBadgeWithCart>
-                                );
-                              }
-                              
-                              return (canUpdateOrdering && !isSeller && component.field) ? (
-                                <ComponentBadgeWithCart
-                                  key={component.name}
-                                  orderId={order.id}
-                                  orderNumber={order.order_number}
-                                  customerName={order.customer_name}
-                                  componentName={component.name}
-                                  componentType={component.field?.replace('_status', '') || 'unknown'}
-                                  componentDisplayName={null}
-                                  quantity={1}
-                                  isFileExtracted={false}
-                                >
-                                  <Popover>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <PopoverTrigger asChild>
-                                          <TooltipTrigger asChild>
-                                            <button onClick={(e) => e.stopPropagation()} type="button">
-                                              <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                                {component.name}
-                                              </Badge>
-                                            </button>
-                                          </TooltipTrigger>
-                                        </PopoverTrigger>
-                                        {orderingTrackingInfo && (
-                                          <TooltipContent className="whitespace-pre-line">
-                                            <p>{orderingTrackingInfo}</p>
-                                          </TooltipContent>
-                                        )}
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                  <Popover key={component.name}>
+                                    <PopoverTrigger asChild>
+                                      <button onClick={(e) => e.stopPropagation()} type="button">
+                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                          {component.name}
+                                        </Badge>
+                                      </button>
+                                    </PopoverTrigger>
                                     <PopoverContent className="w-36 p-0" align="start">
                                       <StatusPopoverButtons
                                         currentValue="not_ordered"
                                         options={orderingPopoverOptions}
-                                        onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                        onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
+                                        onAddToCart={handleAddToCartClick}
+                                        isInCart={inCart}
                                       />
                                     </PopoverContent>
                                   </Popover>
-                                </ComponentBadgeWithCart>
+                                ) : (
+                                  <Popover key={component.name}>
+                                    <PopoverTrigger asChild>
+                                      <button onClick={(e) => e.stopPropagation()} type="button">
+                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                          {component.name}
+                                        </Badge>
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-36 p-0" align="start">
+                                      <StatusPopoverButtons
+                                        currentValue="not_ordered"
+                                        options={orderingPopoverOptions}
+                                        onChange={() => {}}
+                                        onAddToCart={handleAddToCartClick}
+                                        isInCart={inCart}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                );
+                              }
+                              
+                              const componentType = component.field?.replace('_status', '') || 'unknown';
+                              const inCart = isInCart(order.id, componentType, null);
+                              
+                              const handleAddToCartClick = () => {
+                                if (inCart) return;
+                                addToCart({
+                                  orderId: order.id,
+                                  orderNumber: order.order_number,
+                                  customerName: order.customer_name,
+                                  componentType,
+                                  componentName: null,
+                                  quantity: 1,
+                                  isFileExtracted: false,
+                                });
+                                toast({
+                                  title: "Added to cart",
+                                  description: `${component.name} from order ${order.order_number} added to procurement cart`,
+                                });
+                              };
+                              
+                              return (canUpdateOrdering && !isSeller && component.field) ? (
+                                <Popover key={component.name}>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <PopoverTrigger asChild>
+                                        <TooltipTrigger asChild>
+                                          <button onClick={(e) => e.stopPropagation()} type="button">
+                                            <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                              {component.name}
+                                            </Badge>
+                                          </button>
+                                        </TooltipTrigger>
+                                      </PopoverTrigger>
+                                      {orderingTrackingInfo && (
+                                        <TooltipContent className="whitespace-pre-line">
+                                          <p>{orderingTrackingInfo}</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <PopoverContent className="w-36 p-0" align="start">
+                                    <StatusPopoverButtons
+                                      currentValue="not_ordered"
+                                      options={orderingPopoverOptions}
+                                      onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                      onAddToCart={handleAddToCartClick}
+                                      isInCart={inCart}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
                               ) : (
-                                <ComponentBadgeWithCart
-                                  key={component.name}
-                                  orderId={order.id}
-                                  orderNumber={order.order_number}
-                                  customerName={order.customer_name}
-                                  componentName={component.name}
-                                  componentType={component.field?.replace('_status', '') || 'unknown'}
-                                  componentDisplayName={null}
-                                  quantity={1}
-                                  isFileExtracted={false}
-                                >
-                                  <Badge variant="destructive" className="text-xs py-0 px-1.5">
-                                    {component.name}
-                                  </Badge>
-                                </ComponentBadgeWithCart>
+                                <Popover key={component.name}>
+                                  <PopoverTrigger asChild>
+                                    <button onClick={(e) => e.stopPropagation()} type="button">
+                                      <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                        {component.name}
+                                      </Badge>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-36 p-0" align="start">
+                                    <StatusPopoverButtons
+                                      currentValue="not_ordered"
+                                      options={orderingPopoverOptions}
+                                      onChange={() => {}}
+                                      onAddToCart={handleAddToCartClick}
+                                      isInCart={inCart}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
                               );
                             })}
                           </div>
