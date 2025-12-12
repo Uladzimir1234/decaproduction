@@ -169,7 +169,7 @@ export default function Orders() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isWorker, isSeller, isAdmin, isManager, canUpdateOrdering, canUpdateManufacturing } = useRole();
-  const { addToCart, isInCart } = useProcurementCart();
+  const { addToCart, isInCart, cartItems } = useProcurementCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [sellers, setSellers] = useState<Record<string, { email: string; full_name: string | null }>>({});
