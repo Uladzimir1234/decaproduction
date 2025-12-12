@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart } from "lucide-react";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,9 @@ import { createAuditLog } from "@/lib/auditLog";
 import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
 import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { useProcurementCart } from "@/contexts/ProcurementCartContext";
+import { ComponentBadgeWithCart } from "@/components/order/ComponentBadgeWithCart";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -168,6 +171,7 @@ export default function Orders() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isWorker, isSeller, isAdmin, isManager, canUpdateOrdering, canUpdateManufacturing } = useRole();
+  const { addToCart, isInCart } = useProcurementCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [sellers, setSellers] = useState<Record<string, { email: string; full_name: string | null }>>({});
@@ -1659,75 +1663,112 @@ export default function Orders() {
                             {notOrderedComponents.map((component) => {
                               const orderingTrackingInfo = formatTrackingInfo(order.ordering_updated_at, order.ordering_updated_by_email);
                               
-                              // File-extracted components - editable with popover
+                              // File-extracted components - editable with popover + right-click cart
                               if (component.isFileExtracted) {
                                 return (canUpdateOrdering && !isSeller) ? (
-                                  <Popover key={component.name}>
-                                    <PopoverTrigger asChild>
-                                      <button onClick={(e) => e.stopPropagation()} type="button">
-                                        <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                          {component.name}
-                                        </Badge>
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-36 p-0" align="start">
-                                      <StatusPopoverButtons
-                                        currentValue="not_ordered"
-                                        options={orderingPopoverOptions}
-                                        onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
+                                  <ComponentBadgeWithCart
+                                    key={component.name}
+                                    orderId={order.id}
+                                    orderNumber={order.order_number}
+                                    customerName={order.customer_name}
+                                    componentName={component.name}
+                                    componentType={component.componentType || 'unknown'}
+                                    componentDisplayName={component.componentName ?? null}
+                                    quantity={1}
+                                    isFileExtracted={true}
+                                  >
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <button onClick={(e) => e.stopPropagation()} type="button">
+                                          <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                            {component.name}
+                                          </Badge>
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-36 p-0" align="start">
+                                        <StatusPopoverButtons
+                                          currentValue="not_ordered"
+                                          options={orderingPopoverOptions}
+                                          onChange={(value) => handleFileComponentStatusChange(order.id, component.componentType!, component.componentName ?? null, value)}
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </ComponentBadgeWithCart>
                                 ) : (
-                                  <Badge key={component.name} variant="destructive" className="text-xs py-0 px-1.5">
-                                    {component.name}
-                                  </Badge>
+                                  <ComponentBadgeWithCart
+                                    key={component.name}
+                                    orderId={order.id}
+                                    orderNumber={order.order_number}
+                                    customerName={order.customer_name}
+                                    componentName={component.name}
+                                    componentType={component.componentType || 'unknown'}
+                                    componentDisplayName={component.componentName ?? null}
+                                    quantity={1}
+                                    isFileExtracted={true}
+                                  >
+                                    <Badge variant="destructive" className="text-xs py-0 px-1.5">
+                                      {component.name}
+                                    </Badge>
+                                  </ComponentBadgeWithCart>
                                 );
                               }
                               
                               return (canUpdateOrdering && !isSeller && component.field) ? (
-                                <Popover key={component.name}>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <PopoverTrigger asChild>
-                                        <TooltipTrigger asChild>
-                                          <button onClick={(e) => e.stopPropagation()} type="button">
-                                            <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
-                                              {component.name}
-                                            </Badge>
-                                          </button>
-                                        </TooltipTrigger>
-                                      </PopoverTrigger>
-                                      {orderingTrackingInfo && (
-                                        <TooltipContent className="whitespace-pre-line">
-                                          <p>{orderingTrackingInfo}</p>
-                                        </TooltipContent>
-                                      )}
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                  <PopoverContent className="w-36 p-0" align="start">
-                                    <StatusPopoverButtons
-                                      currentValue="not_ordered"
-                                      options={orderingPopoverOptions}
-                                      onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
-                                    />
-                                  </PopoverContent>
-                                </Popover>
+                                <ComponentBadgeWithCart
+                                  key={component.name}
+                                  orderId={order.id}
+                                  orderNumber={order.order_number}
+                                  customerName={order.customer_name}
+                                  componentName={component.name}
+                                  componentType={component.field?.replace('_status', '') || 'unknown'}
+                                  componentDisplayName={null}
+                                  quantity={1}
+                                  isFileExtracted={false}
+                                >
+                                  <Popover>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <PopoverTrigger asChild>
+                                          <TooltipTrigger asChild>
+                                            <button onClick={(e) => e.stopPropagation()} type="button">
+                                              <Badge variant="destructive" className="text-xs py-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                                                {component.name}
+                                              </Badge>
+                                            </button>
+                                          </TooltipTrigger>
+                                        </PopoverTrigger>
+                                        {orderingTrackingInfo && (
+                                          <TooltipContent className="whitespace-pre-line">
+                                            <p>{orderingTrackingInfo}</p>
+                                          </TooltipContent>
+                                        )}
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <PopoverContent className="w-36 p-0" align="start">
+                                      <StatusPopoverButtons
+                                        currentValue="not_ordered"
+                                        options={orderingPopoverOptions}
+                                        onChange={(value) => handleComponentStatusChange(order.id, component.field, value)}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                </ComponentBadgeWithCart>
                               ) : (
-                                <TooltipProvider key={component.name}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Badge variant="destructive" className="text-xs py-0 px-1.5">
-                                        {component.name}
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    {orderingTrackingInfo && (
-                                      <TooltipContent className="whitespace-pre-line">
-                                        <p>{orderingTrackingInfo}</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <ComponentBadgeWithCart
+                                  key={component.name}
+                                  orderId={order.id}
+                                  orderNumber={order.order_number}
+                                  customerName={order.customer_name}
+                                  componentName={component.name}
+                                  componentType={component.field?.replace('_status', '') || 'unknown'}
+                                  componentDisplayName={null}
+                                  quantity={1}
+                                  isFileExtracted={false}
+                                >
+                                  <Badge variant="destructive" className="text-xs py-0 px-1.5">
+                                    {component.name}
+                                  </Badge>
+                                </ComponentBadgeWithCart>
                               );
                             })}
                           </div>

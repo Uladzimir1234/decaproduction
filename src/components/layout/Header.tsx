@@ -1,20 +1,24 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardList, LogOut, Menu, X, FileText, Users } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, Menu, X, FileText, Users, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
+import { useProcurementCart } from "@/contexts/ProcurementCartContext";
+import { Badge } from "@/components/ui/badge";
 import logo from "@/assets/logo.png";
 
 export function Header() {
   const location = useLocation();
   const { toast } = useToast();
   const { isAdmin, isManager, loading: roleLoading } = useRole();
+  const { getCartCount } = useProcurementCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const canViewLogs = isAdmin || isManager;
+  const cartCount = getCartCount();
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -66,6 +70,26 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link to="/procurement" className="relative hidden md:flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "relative",
+                location.pathname === "/procurement" && "bg-sky-200 text-black"
+              )}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartCount > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-xs flex items-center justify-center"
+                >
+                  {cartCount}
+                </Badge>
+              )}
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="sm"
