@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ProcurementCartProvider } from "@/contexts/ProcurementCartContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -14,6 +15,7 @@ import OrderCreate from "./pages/OrderCreate";
 import OrderDetail from "./pages/OrderDetail";
 import Logs from "./pages/Logs";
 import UserManagement from "./pages/UserManagement";
+import Procurement from "./pages/Procurement";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -52,31 +54,34 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/new" element={<OrderCreate />} />
-            <Route path="/orders/:id" element={<OrderDetail />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/users" element={<UserManagement />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ProcurementCartProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/orders/new" element={<OrderCreate />} />
+              <Route path="/orders/:id" element={<OrderDetail />} />
+              <Route path="/logs" element={<Logs />} />
+              <Route path="/users" element={<UserManagement />} />
+              <Route path="/procurement" element={<Procurement />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ProcurementCartProvider>
   </QueryClientProvider>
 );
 
