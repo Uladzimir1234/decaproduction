@@ -150,7 +150,7 @@ export function ProcurementCartProvider({ children }: { children: React.ReactNod
         return;
       }
 
-      const { error } = await supabase.from("procurement_cart").insert({
+      const { data, error } = await supabase.from("procurement_cart").insert({
         order_id: item.orderId,
         order_number: item.orderNumber,
         customer_name: item.customerName,
@@ -160,15 +160,36 @@ export function ProcurementCartProvider({ children }: { children: React.ReactNod
         is_file_extracted: item.isFileExtracted,
         added_by: userData.user.id,
         added_by_email: userData.user.email,
-      });
+      }).select().single();
 
       if (error) {
         if (error.code === "23505") {
-          // Already in cart (unique constraint)
+          // Already in cart - re-fetch to sync state
+          await fetchCartItems();
           toast({ title: "Already in cart", variant: "default" });
           return;
         }
         throw error;
+      }
+
+      // Optimistically add to local state immediately
+      if (data) {
+        setCartItems((prev) => {
+          // Check if already exists to prevent duplicates
+          if (prev.some((i) => i.id === data.id)) return prev;
+          return [{
+            id: data.id,
+            orderId: data.order_id,
+            orderNumber: data.order_number,
+            customerName: data.customer_name,
+            componentType: data.component_type,
+            componentName: data.component_name,
+            quantity: data.quantity,
+            isFileExtracted: data.is_file_extracted,
+            addedAt: data.created_at,
+            addedByEmail: data.added_by_email || undefined,
+          }, ...prev];
+        });
       }
 
       toast({ title: "Added to cart" });
@@ -176,7 +197,7 @@ export function ProcurementCartProvider({ children }: { children: React.ReactNod
       console.error("Error adding to cart:", error);
       toast({ title: "Failed to add to cart", variant: "destructive" });
     }
-  }, [toast]);
+  }, [toast, fetchCartItems]);
 
   const removeFromCart = useCallback(async (id: string) => {
     try {
