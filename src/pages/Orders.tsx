@@ -1667,9 +1667,9 @@ export default function Orders() {
                                 const componentDisplayName = component.componentName ?? null;
                                 const inCart = isInCart(order.id, componentType, componentDisplayName);
                                 
-                                const handleAddToCartClick = () => {
+                                const handleAddToCartClick = async () => {
                                   if (inCart) return;
-                                  addToCart({
+                                  await addToCart({
                                     orderId: order.id,
                                     orderNumber: order.order_number,
                                     customerName: order.customer_name,
@@ -1677,10 +1677,6 @@ export default function Orders() {
                                     componentName: componentDisplayName,
                                     quantity: 1,
                                     isFileExtracted: true,
-                                  });
-                                  toast({
-                                    title: "Added to cart",
-                                    description: `${component.name} from order ${order.order_number} added to procurement cart`,
                                   });
                                 };
                                 
@@ -1736,9 +1732,9 @@ export default function Orders() {
                               const componentType = component.field?.replace('_status', '') || 'unknown';
                               const inCart = isInCart(order.id, componentType, null);
                               
-                              const handleAddToCartClick = () => {
+                              const handleAddToCartClick = async () => {
                                 if (inCart) return;
-                                addToCart({
+                                await addToCart({
                                   orderId: order.id,
                                   orderNumber: order.order_number,
                                   customerName: order.customer_name,
@@ -1746,10 +1742,6 @@ export default function Orders() {
                                   componentName: null,
                                   quantity: 1,
                                   isFileExtracted: false,
-                                });
-                                toast({
-                                  title: "Added to cart",
-                                  description: `${component.name} from order ${order.order_number} added to procurement cart`,
                                 });
                               };
                               
