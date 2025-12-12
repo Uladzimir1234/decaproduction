@@ -1121,6 +1121,56 @@ export type Database = {
           },
         ]
       }
+      procurement_cart: {
+        Row: {
+          added_by: string
+          added_by_email: string | null
+          component_name: string | null
+          component_type: string
+          created_at: string
+          customer_name: string
+          id: string
+          is_file_extracted: boolean
+          order_id: string
+          order_number: string
+          quantity: number
+        }
+        Insert: {
+          added_by: string
+          added_by_email?: string | null
+          component_name?: string | null
+          component_type: string
+          created_at?: string
+          customer_name: string
+          id?: string
+          is_file_extracted?: boolean
+          order_id: string
+          order_number: string
+          quantity?: number
+        }
+        Update: {
+          added_by?: string
+          added_by_email?: string | null
+          component_name?: string | null
+          component_type?: string
+          created_at?: string
+          customer_name?: string
+          id?: string
+          is_file_extracted?: boolean
+          order_id?: string
+          order_number?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procurement_cart_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_invitations: {
         Row: {
           accepted_at: string | null
