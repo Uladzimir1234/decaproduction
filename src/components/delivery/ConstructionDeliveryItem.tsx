@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Lock, MessageSquare, AlertTriangle } from "lucide-react";
 
 interface Construction {
   id: string;
@@ -25,9 +23,12 @@ interface Construction {
   quantity: number;
 }
 
-interface ManufacturingStatus {
-  glass_installation?: string;
+export interface ManufacturingStatus {
+  welding?: string;
   frames_sashes_assembled?: string;
+  doors_assembly?: string;
+  sliding_doors_assembly?: string;
+  glass_installation?: string;
 }
 
 interface ConstructionDeliveryItemProps {
@@ -46,6 +47,8 @@ interface ConstructionDeliveryItemProps {
   onHardwareChange: (include: boolean) => void;
   onNotesChange: (notes: string) => void;
   disabled?: boolean;
+  isDeliverable: boolean;
+  deliveryBlockReason?: string;
 }
 
 export function ConstructionDeliveryItem({
@@ -64,6 +67,8 @@ export function ConstructionDeliveryItem({
   onHardwareChange,
   onNotesChange,
   disabled = false,
+  isDeliverable,
+  deliveryBlockReason,
 }: ConstructionDeliveryItemProps) {
   const [showNotes, setShowNotes] = useState(!!notes);
 
@@ -73,15 +78,6 @@ export function ConstructionDeliveryItem({
       case 'door': return 'D';
       case 'sliding_door': return 'S';
       default: return type.charAt(0).toUpperCase();
-    }
-  };
-
-  const getTypeName = (type: string) => {
-    switch (type) {
-      case 'window': return 'Window';
-      case 'door': return 'Door';
-      case 'sliding_door': return 'Sliding Door';
-      default: return type;
     }
   };
 
@@ -95,18 +91,36 @@ export function ConstructionDeliveryItem({
     return null;
   };
 
-  const getStatusColor = () => {
-    if (manufacturingStatus?.glass_installation === 'complete') return 'bg-blue-500';
-    if (manufacturingStatus?.frames_sashes_assembled === 'complete') return 'bg-green-500';
-    return 'bg-amber-500';
+  // Full status determination based on manufacturing stages
+  const getFullStatus = () => {
+    const type = construction.construction_type;
+    
+    // Check glass installation first (highest priority)
+    if (manufacturingStatus?.glass_installation === 'complete') {
+      return { color: 'bg-blue-500', label: 'Glass Installed', level: 4 };
+    }
+    
+    // Check assembly based on type
+    if (type === 'door' && manufacturingStatus?.doors_assembly === 'complete') {
+      return { color: 'bg-green-500', label: 'Assembled', level: 3 };
+    }
+    if (type === 'sliding_door' && manufacturingStatus?.sliding_doors_assembly === 'complete') {
+      return { color: 'bg-green-500', label: 'Assembled', level: 3 };
+    }
+    if (type === 'window' && manufacturingStatus?.frames_sashes_assembled === 'complete') {
+      return { color: 'bg-green-500', label: 'Assembled', level: 3 };
+    }
+    
+    // Check welding
+    if (manufacturingStatus?.welding === 'complete') {
+      return { color: 'bg-amber-500', label: 'Welded', level: 2 };
+    }
+    
+    // Not started
+    return { color: 'bg-red-500', label: 'Not Assembled', level: 1 };
   };
 
-  const getStatusLabel = () => {
-    if (manufacturingStatus?.glass_installation === 'complete') return 'Glass Installed';
-    if (manufacturingStatus?.frames_sashes_assembled === 'complete') return 'Assembled';
-    return 'In Progress';
-  };
-
+  const status = getFullStatus();
   const hasScreens = !!construction.screen_type;
   const hasBlinds = construction.has_blinds;
   const hasHardware = !!construction.handle_type;
@@ -115,19 +129,37 @@ export function ConstructionDeliveryItem({
     ? `${construction.color_exterior}/${construction.color_interior}` 
     : construction.color_exterior || construction.color_interior;
 
+  const isGlassInstalled = manufacturingStatus?.glass_installation === 'complete';
+  const actuallyDisabled = disabled || !isDeliverable;
+
   return (
     <div className={`border rounded-lg p-3 transition-all ${
-      selected 
-        ? 'border-primary/50 bg-primary/5' 
-        : 'border-border bg-muted/30 opacity-60'
+      !isDeliverable
+        ? 'border-destructive/30 bg-destructive/5 opacity-60'
+        : selected 
+          ? 'border-primary/50 bg-primary/5' 
+          : 'border-border bg-muted/30 opacity-60'
     }`}>
       <div className="flex items-start gap-3">
-        <Checkbox
-          checked={selected}
-          onCheckedChange={(checked) => onSelectedChange(checked as boolean)}
-          disabled={disabled}
-          className="mt-1"
-        />
+        {isDeliverable ? (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(checked) => onSelectedChange(checked as boolean)}
+            disabled={disabled}
+            className="mt-1"
+          />
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="mt-1 h-4 w-4 flex items-center justify-center text-destructive">
+                <Lock className="h-3.5 w-3.5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-[200px]">
+              <p className="text-xs">{deliveryBlockReason || "Not ready for delivery"}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
         
         <div className="flex-1 min-w-0 space-y-2">
           {/* Header row */}
@@ -142,7 +174,20 @@ export function ConstructionDeliveryItem({
               )}
             </div>
             
-            <div className={`h-2 w-2 rounded-full ${getStatusColor()}`} title={getStatusLabel()} />
+            {/* Manufacturing Status Badge */}
+            <Badge 
+              variant="outline" 
+              className={`text-[10px] px-1.5 py-0 h-5 ${
+                status.level >= 3 
+                  ? 'border-green-500/50 text-green-600 bg-green-500/10' 
+                  : status.level === 2 
+                    ? 'border-amber-500/50 text-amber-600 bg-amber-500/10'
+                    : 'border-red-500/50 text-red-600 bg-red-500/10'
+              }`}
+            >
+              <div className={`h-1.5 w-1.5 rounded-full mr-1 ${status.color}`} />
+              {status.label}
+            </Badge>
             
             {dimensions && (
               <span className="text-xs text-muted-foreground">{dimensions}</span>
@@ -152,8 +197,16 @@ export function ConstructionDeliveryItem({
             )}
           </div>
 
-          {/* Accessory toggles */}
-          {selected && (
+          {/* Warning for non-deliverable items */}
+          {!isDeliverable && (
+            <div className="flex items-center gap-1.5 text-xs text-destructive">
+              <AlertTriangle className="h-3 w-3" />
+              <span>{deliveryBlockReason || "Cannot ship - not assembled"}</span>
+            </div>
+          )}
+
+          {/* Accessory toggles - only show if deliverable and selected */}
+          {isDeliverable && selected && (
             <div className="flex flex-wrap gap-3 text-xs">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <Checkbox
@@ -162,7 +215,14 @@ export function ConstructionDeliveryItem({
                   disabled={disabled}
                   className="h-3.5 w-3.5"
                 />
-                <span className={includeGlass ? 'text-foreground' : 'text-muted-foreground'}>Glass</span>
+                <span className={includeGlass ? 'text-foreground' : 'text-muted-foreground'}>
+                  Glass
+                </span>
+                {!isGlassInstalled && (
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-500/50 text-amber-600">
+                    Not installed
+                  </Badge>
+                )}
               </label>
               
               {hasScreens && (
@@ -214,7 +274,7 @@ export function ConstructionDeliveryItem({
           )}
 
           {/* Notes input */}
-          {selected && showNotes && (
+          {isDeliverable && selected && showNotes && (
             <Textarea
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
