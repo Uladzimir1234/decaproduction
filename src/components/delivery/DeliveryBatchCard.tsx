@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +11,7 @@ import { Truck, Package, BoxIcon, Plus, Trash2, ChevronDown, ChevronUp, Calendar
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BatchConstructionCard } from "./BatchConstructionCard";
 
 interface DeliveryBatch {
   id: string;
@@ -30,14 +30,6 @@ interface BatchShippingItem {
   is_complete: boolean;
 }
 
-interface BatchDeliveryItem {
-  id: string;
-  batch_id: string;
-  item_type: string;
-  quantity: number;
-  is_delivered: boolean;
-}
-
 interface BatchCustomShippingItem {
   id: string;
   batch_id: string;
@@ -46,20 +38,38 @@ interface BatchCustomShippingItem {
   is_complete: boolean;
 }
 
-interface BatchCustomDeliveryItem {
+interface BatchConstructionItem {
   id: string;
   batch_id: string;
-  name: string;
-  quantity: number;
+  construction_id: string;
+  include_glass: boolean;
+  include_screens: boolean;
+  include_blinds: boolean;
+  include_hardware: boolean;
   is_delivered: boolean;
+  delivery_notes: string | null;
+}
+
+interface Construction {
+  id: string;
+  construction_number: string;
+  construction_type: string;
+  width_inches: number | null;
+  height_inches: number | null;
+  color_exterior: string | null;
+  color_interior: string | null;
+  glass_type: string | null;
+  screen_type: string | null;
+  has_blinds: boolean | null;
+  handle_type: string | null;
+  quantity: number;
 }
 
 interface DeliveryBatchCardProps {
   batch: DeliveryBatch;
   shippingItems: BatchShippingItem[];
-  deliveryItems: BatchDeliveryItem[];
   customShippingItems: BatchCustomShippingItem[];
-  customDeliveryItems: BatchCustomDeliveryItem[];
+  constructionItems: BatchConstructionItem[];
   canEdit: boolean;
   isAdmin: boolean;
   onRefresh: () => void;
@@ -76,23 +86,11 @@ const SHIPPING_ITEM_TYPES = [
   { key: 'brackets', label: 'Brackets Packed' },
 ];
 
-const DELIVERY_ITEM_TYPES = [
-  { key: 'windows', label: 'Windows' },
-  { key: 'doors', label: 'Doors' },
-  { key: 'sliding_doors', label: 'Sliding Doors' },
-  { key: 'glass', label: 'Glass' },
-  { key: 'screens', label: 'Screens' },
-  { key: 'handles', label: 'Handles' },
-  { key: 'nailing_fins', label: 'Nailing Fins' },
-  { key: 'brackets', label: 'Installation Brackets' },
-];
-
 export function DeliveryBatchCard({
   batch,
   shippingItems,
-  deliveryItems,
   customShippingItems,
-  customDeliveryItems,
+  constructionItems,
   canEdit,
   isAdmin,
   onRefresh,
@@ -101,25 +99,44 @@ export function DeliveryBatchCard({
 }: DeliveryBatchCardProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
+  const [constructions, setConstructions] = useState<Record<string, Construction>>({});
   const [customShippingDialogOpen, setCustomShippingDialogOpen] = useState(false);
-  const [customDeliveryDialogOpen, setCustomDeliveryDialogOpen] = useState(false);
   const [newCustomName, setNewCustomName] = useState("");
   const [newCustomQty, setNewCustomQty] = useState(1);
   const [saving, setSaving] = useState(false);
   const [markingShipped, setMarkingShipped] = useState(false);
-
-  // Local state for quantities to prevent layout shift during edits
   const [localShippingQty, setLocalShippingQty] = useState<Record<string, number>>({});
-  const [localDeliveryQty, setLocalDeliveryQty] = useState<Record<string, number>>({});
+
+  // Fetch constructions for display
+  useEffect(() => {
+    const fetchConstructions = async () => {
+      const constructionIds = constructionItems.map(item => item.construction_id);
+      if (constructionIds.length === 0) return;
+
+      const { data } = await supabase
+        .from("order_constructions")
+        .select("*")
+        .in("id", constructionIds);
+
+      if (data) {
+        const constructionMap: Record<string, Construction> = {};
+        data.forEach(c => {
+          constructionMap[c.id] = c;
+        });
+        setConstructions(constructionMap);
+      }
+    };
+
+    fetchConstructions();
+  }, [constructionItems]);
 
   // Calculate progress
   const totalShipping = shippingItems.length + customShippingItems.length;
   const completedShipping = shippingItems.filter(i => i.is_complete).length + 
     customShippingItems.filter(i => i.is_complete).length;
   
-  const totalDelivery = deliveryItems.length + customDeliveryItems.length;
-  const completedDelivery = deliveryItems.filter(i => i.is_delivered).length + 
-    customDeliveryItems.filter(i => i.is_delivered).length;
+  const totalDelivery = constructionItems.length;
+  const completedDelivery = constructionItems.filter(i => i.is_delivered).length;
 
   const isShipped = batch.status === 'shipped';
 
@@ -149,50 +166,11 @@ export function DeliveryBatchCard({
     }
   };
 
-  const updateDeliveryItem = async (itemId: string, isDelivered: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("batch_delivery_items")
-        .update({ is_delivered: isDelivered })
-        .eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const updateDeliveryQty = async (itemId: string, quantity: number) => {
-    setLocalDeliveryQty(prev => ({ ...prev, [itemId]: quantity }));
-    try {
-      const { error } = await supabase
-        .from("batch_delivery_items")
-        .update({ quantity })
-        .eq("id", itemId);
-      if (error) throw error;
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
   const toggleCustomShipping = async (itemId: string, isComplete: boolean) => {
     try {
       const { error } = await supabase
         .from("batch_custom_shipping_items")
         .update({ is_complete: isComplete })
-        .eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const toggleCustomDelivery = async (itemId: string, isDelivered: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("batch_custom_delivery_items")
-        .update({ is_delivered: isDelivered })
         .eq("id", itemId);
       if (error) throw error;
       onRefresh();
@@ -221,39 +199,9 @@ export function DeliveryBatchCard({
     }
   };
 
-  const addCustomDeliveryItem = async () => {
-    if (!newCustomName.trim()) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("batch_custom_delivery_items")
-        .insert({ batch_id: batch.id, name: newCustomName.trim(), quantity: newCustomQty });
-      if (error) throw error;
-      setNewCustomName("");
-      setNewCustomQty(1);
-      setCustomDeliveryDialogOpen(false);
-      onRefresh();
-      toast({ title: "Item added", description: "Custom delivery item added" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteCustomShipping = async (itemId: string) => {
     try {
       const { error } = await supabase.from("batch_custom_shipping_items").delete().eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const deleteCustomDelivery = async (itemId: string) => {
-    try {
-      const { error } = await supabase.from("batch_custom_delivery_items").delete().eq("id", itemId);
       if (error) throw error;
       onRefresh();
     } catch (error: any) {
@@ -357,11 +305,11 @@ export function DeliveryBatchCard({
                       </DialogHeader>
                       <div className="space-y-4 pt-4">
                         <div className="space-y-2">
-                          <Label>Item Name</Label>
+                          <label className="text-sm font-medium">Item Name</label>
                           <Input value={newCustomName} onChange={(e) => setNewCustomName(e.target.value)} placeholder="Item name" />
                         </div>
                         <div className="space-y-2">
-                          <Label>Quantity</Label>
+                          <label className="text-sm font-medium">Quantity</label>
                           <Input type="number" min={1} value={newCustomQty} onChange={(e) => setNewCustomQty(Math.max(1, parseInt(e.target.value) || 1))} />
                         </div>
                         <Button onClick={addCustomShippingItem} disabled={saving || !newCustomName.trim()} className="w-full">
@@ -403,83 +351,45 @@ export function DeliveryBatchCard({
 
             <Separator />
 
-            {/* Delivery Items */}
+            {/* Construction Delivery Items */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm font-medium">Delivery Items</span>
-                </div>
-                {canEdit && (
-                  <Dialog open={customDeliveryDialogOpen} onOpenChange={setCustomDeliveryDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 gap-1">
-                        <Plus className="h-3 w-3" />
-                        Add
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add Custom Delivery Item</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <Label>Item Name</Label>
-                          <Input value={newCustomName} onChange={(e) => setNewCustomName(e.target.value)} placeholder="Item name" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Quantity</Label>
-                          <Input type="number" min={1} value={newCustomQty} onChange={(e) => setNewCustomQty(Math.max(1, parseInt(e.target.value) || 1))} />
-                        </div>
-                        <Button onClick={addCustomDeliveryItem} disabled={saving || !newCustomName.trim()} className="w-full">
-                          {saving ? "Adding..." : "Add Item"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-medium">Delivery Items</span>
+                <Badge variant="secondary" className="text-xs">{constructionItems.length} items</Badge>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 auto-rows-fr">
-                {deliveryItems.map((item, index) => (
-                  <div key={item.id} style={{ order: index }} className={`flex items-center gap-2 p-2 rounded-lg border text-sm h-10 ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => updateDeliveryItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
-                    <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
-                      {getItemLabel(item.item_type, DELIVERY_ITEM_TYPES)}
-                    </span>
-                    {canEdit ? (
-                      <Input type="number" min={0} value={localDeliveryQty[item.id] ?? item.quantity} onChange={(e) => updateDeliveryQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
-                    ) : item.quantity > 0 && (
-                      <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    )}
-                  </div>
-                ))}
-                {customDeliveryItems.map((item, index) => (
-                  <div key={item.id} style={{ order: deliveryItems.length + index }} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm h-10 ${item.is_delivered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_delivered} onCheckedChange={(c) => toggleCustomDelivery(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
-                    <span className={`flex-1 min-w-0 truncate ${item.is_delivered ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{item.name}</span>
-                    <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    {isAdmin && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomDelivery(item.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {constructionItems.map((item) => {
+                  const construction = constructions[item.construction_id];
+                  if (!construction) return null;
+                  
+                  return (
+                    <BatchConstructionCard
+                      key={item.id}
+                      item={item}
+                      construction={construction}
+                      canEdit={canEdit}
+                      isAdmin={isAdmin}
+                      onRefresh={onRefresh}
+                    />
+                  );
+                })}
               </div>
             </div>
 
             {/* Mark as Shipped Button */}
             {canEdit && !isShipped && (
-              <div className="pt-4 border-t border-border">
+              <>
+                <Separator />
                 <Button 
                   onClick={markAsShipped} 
                   disabled={markingShipped}
-                  className="w-full gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  <Truck className="h-4 w-4" />
-                  {markingShipped ? "Marking as Shipped..." : "Mark as Shipped"}
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {markingShipped ? "Marking..." : "Mark as Shipped"}
                 </Button>
-              </div>
+              </>
             )}
           </CardContent>
         </CollapsibleContent>

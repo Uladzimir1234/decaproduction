@@ -6,15 +6,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
-import { Truck, Plus, CalendarIcon, Trash2 } from "lucide-react";
+import { Truck, Plus, CalendarIcon, Trash2, Package } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DeliveryBatchCard } from "./DeliveryBatchCard";
+import { ConstructionDeliveryList, ConstructionSelection } from "./ConstructionDeliveryList";
 
 interface OrderInfo {
   id: string;
@@ -43,14 +45,6 @@ interface BatchShippingItem {
   is_complete: boolean;
 }
 
-interface BatchDeliveryItem {
-  id: string;
-  batch_id: string;
-  item_type: string;
-  quantity: number;
-  is_delivered: boolean;
-}
-
 interface BatchCustomShippingItem {
   id: string;
   batch_id: string;
@@ -59,12 +53,16 @@ interface BatchCustomShippingItem {
   is_complete: boolean;
 }
 
-interface BatchCustomDeliveryItem {
+interface BatchConstructionItem {
   id: string;
   batch_id: string;
-  name: string;
-  quantity: number;
+  construction_id: string;
+  include_glass: boolean;
+  include_screens: boolean;
+  include_blinds: boolean;
+  include_hardware: boolean;
   is_delivered: boolean;
+  delivery_notes: string | null;
 }
 
 interface DeliveryBatchSectionProps {
@@ -81,40 +79,25 @@ const SHIPPING_ITEM_TYPES = [
   { key: 'brackets', label: 'Brackets Packed', defaultQty: 0 },
 ];
 
-const DELIVERY_ITEM_TYPES = [
-  { key: 'windows', label: 'Windows' },
-  { key: 'doors', label: 'Doors' },
-  { key: 'sliding_doors', label: 'Sliding Doors' },
-  { key: 'glass', label: 'Glass' },
-  { key: 'screens', label: 'Screens' },
-  { key: 'handles', label: 'Handles' },
-  { key: 'nailing_fins', label: 'Nailing Fins' },
-  { key: 'brackets', label: 'Installation Brackets' },
-];
-
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
   const { canUpdateManufacturing, isSeller, isAdmin } = useRole();
   const [batches, setBatches] = useState<DeliveryBatch[]>([]);
   const [batchShippingItems, setBatchShippingItems] = useState<Record<string, BatchShippingItem[]>>({});
-  const [batchDeliveryItems, setBatchDeliveryItems] = useState<Record<string, BatchDeliveryItem[]>>({});
   const [batchCustomShipping, setBatchCustomShipping] = useState<Record<string, BatchCustomShippingItem[]>>({});
-  const [batchCustomDelivery, setBatchCustomDelivery] = useState<Record<string, BatchCustomDeliveryItem[]>>({});
+  const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, BatchConstructionItem[]>>({});
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
   const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
-  const [selectedDeliveryItems, setSelectedDeliveryItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
+  const [constructionSelections, setConstructionSelections] = useState<ConstructionSelection[]>([]);
   const [saving, setSaving] = useState(false);
   
-  // Custom items for new batch
+  // Custom shipping items for new batch
   const [newCustomShippingItems, setNewCustomShippingItems] = useState<{ name: string; qty: number }[]>([]);
-  const [newCustomDeliveryItems, setNewCustomDeliveryItems] = useState<{ name: string; qty: number }[]>([]);
   const [customShippingName, setCustomShippingName] = useState("");
   const [customShippingQty, setCustomShippingQty] = useState(1);
-  const [customDeliveryName, setCustomDeliveryName] = useState("");
-  const [customDeliveryQty, setCustomDeliveryQty] = useState(1);
 
   const canEdit = canUpdateManufacturing && !isSeller;
 
@@ -127,7 +110,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
     if (!error && data) {
       setBatches(data);
-      // Fetch items for each batch
       for (const batch of data) {
         fetchBatchItems(batch.id);
       }
@@ -135,23 +117,29 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   }, [order.id]);
 
   const fetchBatchItems = async (batchId: string) => {
-    const [shippingRes, deliveryRes, customShipRes, customDelRes] = await Promise.all([
+    const [shippingRes, customShipRes, constructionRes] = await Promise.all([
       supabase.from("batch_shipping_items").select("*").eq("batch_id", batchId),
-      supabase.from("batch_delivery_items").select("*").eq("batch_id", batchId),
       supabase.from("batch_custom_shipping_items").select("*").eq("batch_id", batchId),
-      supabase.from("batch_custom_delivery_items").select("*").eq("batch_id", batchId),
+      supabase.from("batch_construction_items").select("*").eq("batch_id", batchId),
     ]);
 
     setBatchShippingItems(prev => ({ ...prev, [batchId]: shippingRes.data || [] }));
-    setBatchDeliveryItems(prev => ({ ...prev, [batchId]: deliveryRes.data || [] }));
     setBatchCustomShipping(prev => ({ ...prev, [batchId]: customShipRes.data || [] }));
-    setBatchCustomDelivery(prev => ({ ...prev, [batchId]: customDelRes.data || [] }));
+    setBatchConstructionItems(prev => ({ ...prev, [batchId]: constructionRes.data || [] }));
   };
+
+  // Get all construction IDs already in batches (for marking in UI)
+  const getExistingBatchConstructionIds = useCallback(() => {
+    const ids: string[] = [];
+    Object.values(batchConstructionItems).forEach(items => {
+      items.forEach(item => ids.push(item.construction_id));
+    });
+    return ids;
+  }, [batchConstructionItems]);
 
   useEffect(() => {
     fetchBatches();
 
-    // Subscribe to real-time updates on delivery_batches for this order
     const batchesChannel = supabase
       .channel(`deliverybatches-${order.id}`)
       .on(
@@ -190,22 +178,14 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       shippingInit[item.key] = { selected: true, qty: 0 };
     });
     setSelectedShippingItems(shippingInit);
-
-    const deliveryInit: Record<string, { selected: boolean; qty: number }> = {};
-    DELIVERY_ITEM_TYPES.forEach(item => {
-      deliveryInit[item.key] = { selected: false, qty: 0 };
-    });
-    setSelectedDeliveryItems(deliveryInit);
     setNewBatchDate(new Date());
     setNewCustomShippingItems([]);
-    setNewCustomDeliveryItems([]);
     setCustomShippingName("");
     setCustomShippingQty(1);
-    setCustomDeliveryName("");
-    setCustomDeliveryQty(1);
+    setConstructionSelections([]); // Will be populated by ConstructionDeliveryList
   };
 
-  const initEditBatch = (batchId: string) => {
+  const initEditBatch = async (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
     if (!batch) return;
     
@@ -221,26 +201,25 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     });
     setSelectedShippingItems(shippingInit);
     
-    // Initialize delivery items from existing batch data
-    const deliveryItems = batchDeliveryItems[batchId] || [];
-    const deliveryInit: Record<string, { selected: boolean; qty: number }> = {};
-    DELIVERY_ITEM_TYPES.forEach(item => {
-      const existing = deliveryItems.find(di => di.item_type === item.key);
-      deliveryInit[item.key] = { selected: !!existing && existing.quantity > 0, qty: existing?.quantity || 0 };
-    });
-    setSelectedDeliveryItems(deliveryInit);
-    
-    // Initialize custom items
+    // Initialize custom shipping items
     const customShipping = batchCustomShipping[batchId] || [];
     setNewCustomShippingItems(customShipping.map(cs => ({ name: cs.name, qty: cs.quantity })));
     
-    const customDelivery = batchCustomDelivery[batchId] || [];
-    setNewCustomDeliveryItems(customDelivery.map(cd => ({ name: cd.name, qty: cd.quantity })));
+    // Initialize construction selections from existing batch data
+    const existingConstructions = batchConstructionItems[batchId] || [];
+    const constructionSelectionsInit: ConstructionSelection[] = existingConstructions.map(item => ({
+      constructionId: item.construction_id,
+      selected: true,
+      includeGlass: item.include_glass,
+      includeScreens: item.include_screens,
+      includeBlinds: item.include_blinds,
+      includeHardware: item.include_hardware,
+      notes: item.delivery_notes || "",
+    }));
+    setConstructionSelections(constructionSelectionsInit);
     
     setCustomShippingName("");
     setCustomShippingQty(1);
-    setCustomDeliveryName("");
-    setCustomDeliveryQty(1);
     
     setDialogOpen(true);
   };
@@ -256,20 +235,15 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setNewCustomShippingItems(newCustomShippingItems.filter((_, i) => i !== index));
   };
 
-  const addCustomDeliveryToList = () => {
-    if (!customDeliveryName.trim()) return;
-    setNewCustomDeliveryItems([...newCustomDeliveryItems, { name: customDeliveryName.trim(), qty: customDeliveryQty }]);
-    setCustomDeliveryName("");
-    setCustomDeliveryQty(1);
-  };
-
-  const removeCustomDeliveryFromList = (index: number) => {
-    setNewCustomDeliveryItems(newCustomDeliveryItems.filter((_, i) => i !== index));
-  };
-
   const saveBatch = async () => {
     if (!newBatchDate) {
       toast({ title: "Error", description: "Please select a delivery date", variant: "destructive" });
+      return;
+    }
+
+    const selectedConstructions = constructionSelections.filter(s => s.selected);
+    if (selectedConstructions.length === 0) {
+      toast({ title: "Error", description: "Please select at least one construction to deliver", variant: "destructive" });
       return;
     }
 
@@ -292,9 +266,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         
         // Delete existing items and re-insert
         await supabase.from("batch_shipping_items").delete().eq("batch_id", batchId);
-        await supabase.from("batch_delivery_items").delete().eq("batch_id", batchId);
         await supabase.from("batch_custom_shipping_items").delete().eq("batch_id", batchId);
-        await supabase.from("batch_custom_delivery_items").delete().eq("batch_id", batchId);
+        await supabase.from("batch_construction_items").delete().eq("batch_id", batchId);
       } else {
         // Create the batch
         const { data: batchData, error: batchError } = await supabase
@@ -329,23 +302,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (shippingError) throw shippingError;
       }
 
-      // Insert delivery items
-      const deliveryToInsert = Object.entries(selectedDeliveryItems)
-        .filter(([_, val]) => val.selected && val.qty > 0)
-        .map(([key, val]) => ({
-          batch_id: batchId,
-          item_type: key,
-          quantity: val.qty,
-          is_delivered: false
-        }));
-
-      if (deliveryToInsert.length > 0) {
-        const { error: deliveryError } = await supabase
-          .from("batch_delivery_items")
-          .insert(deliveryToInsert);
-        if (deliveryError) throw deliveryError;
-      }
-
       // Insert custom shipping items
       if (newCustomShippingItems.length > 0) {
         const customShipToInsert = newCustomShippingItems.map(item => ({
@@ -360,23 +316,28 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (customShipError) throw customShipError;
       }
 
-      // Insert custom delivery items
-      if (newCustomDeliveryItems.length > 0) {
-        const customDelToInsert = newCustomDeliveryItems.map(item => ({
-          batch_id: batchId,
-          name: item.name,
-          quantity: item.qty,
-          is_delivered: false
-        }));
-        const { error: customDelError } = await supabase
-          .from("batch_custom_delivery_items")
-          .insert(customDelToInsert);
-        if (customDelError) throw customDelError;
+      // Insert construction items
+      const constructionToInsert = selectedConstructions.map(sel => ({
+        batch_id: batchId,
+        construction_id: sel.constructionId,
+        include_glass: sel.includeGlass,
+        include_screens: sel.includeScreens,
+        include_blinds: sel.includeBlinds,
+        include_hardware: sel.includeHardware,
+        is_delivered: false,
+        delivery_notes: sel.notes || null,
+      }));
+
+      if (constructionToInsert.length > 0) {
+        const { error: constructionError } = await supabase
+          .from("batch_construction_items")
+          .insert(constructionToInsert);
+        if (constructionError) throw constructionError;
       }
 
       toast({ 
         title: editingBatchId ? "Batch updated" : "Batch created", 
-        description: editingBatchId ? "Delivery batch updated successfully" : "New delivery batch created successfully" 
+        description: `${selectedConstructions.length} construction(s) added to delivery batch` 
       });
       setDialogOpen(false);
       setEditingBatchId(null);
@@ -402,21 +363,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     }));
   };
 
-  const toggleDeliveryItem = (key: string, selected: boolean) => {
-    setSelectedDeliveryItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], selected, qty: selected ? (prev[key]?.qty || 1) : 0 }
-    }));
-  };
-
-  const updateDeliveryQty = (key: string, qty: number) => {
-    setSelectedDeliveryItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], qty: Math.max(0, qty), selected: qty > 0 }
-    }));
-  };
-
-  // Calculate totals across all batches
   const totalBatches = batches.length;
 
   return (
@@ -443,7 +389,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                     New Delivery
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingBatchId ? "Edit Delivery Batch" : "Create Delivery Batch"}</DialogTitle>
                   </DialogHeader>
@@ -475,6 +421,29 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                         </PopoverContent>
                       </Popover>
                     </div>
+
+                    <Separator />
+
+                    {/* Construction Items Selection */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-primary" />
+                        <Label className="text-base font-medium">Select Items for Delivery</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        All items are pre-selected. Deselect items that are not ready for this delivery.
+                      </p>
+                      <div className="border rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                        <ConstructionDeliveryList
+                          orderId={order.id}
+                          selections={constructionSelections}
+                          onSelectionsChange={setConstructionSelections}
+                          existingBatchConstructionIds={editingBatchId ? [] : getExistingBatchConstructionIds()}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
 
                     {/* Shipping Preparation Items */}
                     <div className="space-y-2">
@@ -533,63 +502,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                       </div>
                     </div>
 
-                    {/* Delivery Items */}
-                    <div className="space-y-2">
-                      <Label>Delivery Items</Label>
-                      <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                        {DELIVERY_ITEM_TYPES.map(item => {
-                          const val = selectedDeliveryItems[item.key] || { selected: false, qty: 0 };
-                          return (
-                            <div key={item.key} className="flex items-center gap-3">
-                              <Checkbox
-                                checked={val.selected}
-                                onCheckedChange={(c) => toggleDeliveryItem(item.key, c as boolean)}
-                              />
-                              <span className="flex-1 text-sm">{item.label}</span>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={val.qty}
-                                onChange={(e) => updateDeliveryQty(item.key, parseInt(e.target.value) || 0)}
-                                className="w-16 h-7 text-xs text-center"
-                                placeholder="Qty"
-                              />
-                            </div>
-                          );
-                        })}
-                        {/* Custom delivery items added */}
-                        {newCustomDeliveryItems.map((item, index) => (
-                          <div key={`custom-del-${index}`} className="flex items-center gap-3 border-t border-dashed pt-2">
-                            <Badge variant="secondary" className="text-xs">Custom</Badge>
-                            <span className="flex-1 text-sm">{item.name}</span>
-                            <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomDeliveryFromList(index)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Add custom delivery item */}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Custom item name"
-                          value={customDeliveryName}
-                          onChange={(e) => setCustomDeliveryName(e.target.value)}
-                          className="flex-1 h-8 text-sm"
-                        />
-                        <Input
-                          type="number"
-                          min={1}
-                          value={customDeliveryQty}
-                          onChange={(e) => setCustomDeliveryQty(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 h-8 text-xs text-center"
-                        />
-                        <Button variant="outline" size="sm" onClick={addCustomDeliveryToList} disabled={!customDeliveryName.trim()}>
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
                     <Button onClick={saveBatch} disabled={saving} className="w-full">
                       {saving ? (editingBatchId ? "Updating..." : "Creating...") : (editingBatchId ? "Update Delivery Batch" : "Create Delivery Batch")}
                     </Button>
@@ -600,7 +512,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           </div>
         </div>
         <CardDescription>
-          Manage multiple deliveries with separate shipping preparation and tracking
+          Pre-populated from order constructions - select/deselect items for each delivery
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -617,9 +529,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
               batch={batch}
               batchNumber={index + 1}
               shippingItems={batchShippingItems[batch.id] || []}
-              deliveryItems={batchDeliveryItems[batch.id] || []}
               customShippingItems={batchCustomShipping[batch.id] || []}
-              customDeliveryItems={batchCustomDelivery[batch.id] || []}
+              constructionItems={batchConstructionItems[batch.id] || []}
               canEdit={canEdit}
               isAdmin={isAdmin}
               onRefresh={fetchBatches}
