@@ -776,71 +776,125 @@ export default function Orders() {
       return { isLocked: true, lockReason: `${componentName} ${statusText}` };
     };
     
-    // Reinforcement Cutting - depends on reinforcement_status
+    // Helper to get stage dependency lock status (based on previous stages being complete)
+    const getStageDependencyLock = (requiredStages: { status: string | null | undefined; name: string }[]): LockInfo => {
+      for (const stage of requiredStages) {
+        if (stage.status !== 'complete') {
+          return { isLocked: true, lockReason: `${stage.name} Not Complete` };
+        }
+      }
+      return { isLocked: false };
+    };
+    
+    // Combined lock: check stage dependencies first, then component availability
+    const getCombinedLock = (
+      stageDeps: { status: string | null | undefined; name: string }[],
+      componentTypes: string[],
+      legacyStatus: string | null | undefined,
+      componentName: string
+    ): LockInfo => {
+      // Check stage dependencies first
+      const stageLock = getStageDependencyLock(stageDeps);
+      if (stageLock.isLocked) return stageLock;
+      
+      // Then check component availability
+      return getLockStatus(componentTypes, legacyStatus, componentName);
+    };
+    
+    // Reinforcement Cutting - depends on reinforcement_status only
     stages.push({ 
       name: 'Reinforcement Cutting', 
       status: getStatus(f?.reinforcement_cutting), 
       hasNotes: false, 
       field: 'reinforcement_cutting',
-      lock: getLockStatus(['reinforcement'], order.reinforcement_status, '')
+      lock: getLockStatus(['reinforcement'], order.reinforcement_status, 'Reinforcement')
     });
     
-    // Profile Cutting - depends on windows_profile_status
+    // Profile Cutting - depends on windows_profile_status only (independent from reinforcement)
     stages.push({ 
       name: 'Profile Cutting', 
       status: getStatus(f?.profile_cutting), 
       hasNotes: false, 
       field: 'profile_cutting',
-      lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, '')
+      lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, 'Profile')
     });
     
-    // Frames/Sashes Welded - depends on windows_profile_status
+    // Frames/Sashes Welded - requires BOTH Reinforcement Cutting complete AND Profile Cutting complete
+    const weldingLock = (() => {
+      if (f?.reinforcement_cutting !== 'complete') {
+        return { isLocked: true, lockReason: 'Reinforcement Not Cut' };
+      }
+      if (f?.profile_cutting !== 'complete') {
+        return { isLocked: true, lockReason: 'Profile Not Cut' };
+      }
+      return { isLocked: false };
+    })();
     stages.push({ 
       name: 'Frames/Sashes Welded', 
       status: getStatus(f?.welding_status), 
       hasNotes: !!(f?.welding_notes), 
       field: 'welding_status',
-      lock: getLockStatus(['profile', 'window_profile'], order.windows_profile_status, 'Profile')
+      lock: weldingLock
     });
     
-    // Doors Assembled - conditional, depends on hardware_status
+    // Doors Assembled - requires Welding complete AND Hardware available
     if (order.doors_count && order.doors_count > 0) {
       stages.push({ 
         name: 'Doors Assembled', 
         status: getStatus(f?.doors_status), 
         hasNotes: !!(f?.doors_notes), 
         field: 'doors_status',
-        lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+        lock: getCombinedLock(
+          [{ status: f?.welding_status, name: 'Welding' }],
+          ['hardware', 'handle'],
+          order.hardware_status,
+          'Hardware'
+        )
       });
     }
     
-    // Sliding Doors Assembled - conditional, depends on hardware_status
+    // Sliding Doors Assembled - requires Welding complete AND Hardware available
     if (order.has_sliding_doors) {
       stages.push({ 
         name: 'Sliding Doors Assembled', 
         status: getStatus(f?.sliding_doors_status), 
         hasNotes: !!(f?.sliding_doors_notes), 
         field: 'sliding_doors_status',
-        lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+        lock: getCombinedLock(
+          [{ status: f?.welding_status, name: 'Welding' }],
+          ['hardware', 'handle'],
+          order.hardware_status,
+          'Hardware'
+        )
       });
     }
     
-    // Frame & Sash Assembled - depends on hardware_status
+    // Frame & Sash Assembled - requires Welding complete AND Hardware available
     stages.push({ 
       name: 'Frame & Sash Assembled', 
       status: getStatus(f?.assembly_status), 
       hasNotes: !!(f?.assembly_notes), 
       field: 'assembly_status',
-      lock: getLockStatus(['hardware', 'handle'], order.hardware_status, 'Hardware')
+      lock: getCombinedLock(
+        [{ status: f?.welding_status, name: 'Welding' }],
+        ['hardware', 'handle'],
+        order.hardware_status,
+        'Hardware'
+      )
     });
     
-    // Glass Installed - depends on glass_status
+    // Glass Installed - requires Assembly complete AND Glass available
     stages.push({ 
       name: 'Glass Installed', 
       status: getStatus(f?.glass_status), 
       hasNotes: !!(f?.glass_notes), 
       field: 'glass_status',
-      lock: getLockStatus(['glass'], order.glass_status, 'Glass')
+      lock: getCombinedLock(
+        [{ status: f?.assembly_status, name: 'Frame & Sash Assembly' }],
+        ['glass'],
+        order.glass_status,
+        'Glass'
+      )
     });
     
     // Made Screens - depends on screens_status (only if has screens)
