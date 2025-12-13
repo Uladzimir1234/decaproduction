@@ -1334,7 +1334,7 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Frames Welded */}
+              {/* Frames Welded - Requires: Reinforcement Cutting Complete AND Profile Cutting Complete */}
               <AccordionItem value="welding">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
@@ -1345,10 +1345,15 @@ export default function OrderDetail() {
                         <Pause className="h-3 w-3" />
                         On Hold
                       </Badge>
-                    ) : !isProfileAvailable() && (
+                    ) : fulfillment.reinforcement_cutting !== 'complete' ? (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                         <Lock className="h-3 w-3" />
-                        Profile {getProfileLockText()}
+                        Reinforcement Not Cut
+                      </Badge>
+                    ) : fulfillment.profile_cutting !== 'complete' && (
+                      <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                        <Lock className="h-3 w-3" />
+                        Profile Not Cut
                       </Badge>
                     )}
                   </div>
@@ -1356,8 +1361,10 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                  ) : !isProfileAvailable() ? (
-                    <p className="text-sm text-muted-foreground">Profile must be available before this stage can be updated.</p>
+                  ) : fulfillment.reinforcement_cutting !== 'complete' ? (
+                    <p className="text-sm text-muted-foreground">Reinforcement must be cut before welding can begin.</p>
+                  ) : fulfillment.profile_cutting !== 'complete' ? (
+                    <p className="text-sm text-muted-foreground">Profile must be cut before welding can begin.</p>
                   ) : (
                     <>
                       <div className="space-y-3">
@@ -1385,7 +1392,7 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Doors Assembled - only if order has doors */}
+              {/* Doors Assembled - Requires: Welding Complete AND Hardware Available */}
               {order.doors_count > 0 && (
                 <AccordionItem value="doors">
                   <AccordionTrigger className="hover:no-underline">
@@ -1396,6 +1403,11 @@ export default function OrderDetail() {
                         <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
                           <Pause className="h-3 w-3" />
                           On Hold
+                        </Badge>
+                      ) : fulfillment.welding_status !== 'complete' ? (
+                        <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                          <Lock className="h-3 w-3" />
+                          Welding Not Complete
                         </Badge>
                       ) : !isHardwareAvailable() && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1408,6 +1420,8 @@ export default function OrderDetail() {
                   <AccordionContent className="pt-4 space-y-4">
                     {order.production_status === 'hold' ? (
                       <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                    ) : fulfillment.welding_status !== 'complete' ? (
+                      <p className="text-sm text-muted-foreground">Welding must be complete before door assembly can begin.</p>
                     ) : !isHardwareAvailable() ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
@@ -1470,7 +1484,7 @@ export default function OrderDetail() {
                 </AccordionItem>
               )}
 
-              {/* Sliding Doors Assembled - only if order has sliding doors */}
+              {/* Sliding Doors Assembled - Requires: Welding Complete AND Hardware Available */}
               {order.has_sliding_doors && (
                 <AccordionItem value="sliding">
                   <AccordionTrigger className="hover:no-underline">
@@ -1481,6 +1495,11 @@ export default function OrderDetail() {
                         <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
                           <Pause className="h-3 w-3" />
                           On Hold
+                        </Badge>
+                      ) : fulfillment.welding_status !== 'complete' ? (
+                        <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                          <Lock className="h-3 w-3" />
+                          Welding Not Complete
                         </Badge>
                       ) : !isHardwareAvailable() && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1493,6 +1512,8 @@ export default function OrderDetail() {
                   <AccordionContent className="pt-4 space-y-4">
                     {order.production_status === 'hold' ? (
                       <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                    ) : fulfillment.welding_status !== 'complete' ? (
+                      <p className="text-sm text-muted-foreground">Welding must be complete before sliding door assembly can begin.</p>
                     ) : !isHardwareAvailable() ? (
                       <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
@@ -1555,7 +1576,7 @@ export default function OrderDetail() {
                 </AccordionItem>
               )}
 
-              {/* Frame & Sash Assembled */}
+              {/* Frame & Sash Assembled - Requires: Welding Complete AND Hardware Available */}
               <AccordionItem value="frame-sash">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
@@ -1565,6 +1586,11 @@ export default function OrderDetail() {
                       <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
                         <Pause className="h-3 w-3" />
                         On Hold
+                      </Badge>
+                    ) : fulfillment.welding_status !== 'complete' ? (
+                      <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                        <Lock className="h-3 w-3" />
+                        Welding Not Complete
                       </Badge>
                     ) : !isHardwareAvailable() && (
                       <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
@@ -1577,6 +1603,8 @@ export default function OrderDetail() {
                 <AccordionContent className="pt-4 space-y-4">
                   {order.production_status === 'hold' ? (
                     <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
+                  ) : fulfillment.welding_status !== 'complete' ? (
+                    <p className="text-sm text-muted-foreground">Welding must be complete before assembly can begin.</p>
                   ) : !isHardwareAvailable() ? (
                     <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                   ) : (
