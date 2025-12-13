@@ -31,6 +31,13 @@ interface ManufacturingStageRow {
   status: string;
 }
 
+interface OrderFulfillment {
+  assembly_status: string | null;
+  doors_status: string | null;
+  sliding_doors_status: string | null;
+  glass_status: string | null;
+}
+
 export interface ConstructionSelection {
   constructionId: string;
   selected: boolean;
@@ -58,14 +65,15 @@ export function ConstructionDeliveryList({
 }: ConstructionDeliveryListProps) {
   const [constructions, setConstructions] = useState<Construction[]>([]);
   const [manufacturingStages, setManufacturingStages] = useState<ManufacturingStageRow[]>([]);
+  const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillment | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       
-      // Fetch constructions and ALL manufacturing stages
-      const [constructionsRes, manufacturingRes] = await Promise.all([
+      // Fetch constructions, manufacturing stages, AND order_fulfillment
+      const [constructionsRes, manufacturingRes, fulfillmentRes] = await Promise.all([
         supabase
           .from("order_constructions")
           .select("*")
@@ -73,8 +81,17 @@ export function ConstructionDeliveryList({
           .order("position_index", { ascending: true }),
         supabase
           .from("construction_manufacturing")
-          .select("construction_id, stage, status")
+          .select("construction_id, stage, status"),
+        supabase
+          .from("order_fulfillment")
+          .select("assembly_status, doors_status, sliding_doors_status, glass_status")
+          .eq("order_id", orderId)
+          .single()
       ]);
+
+      // Store order fulfillment data
+      const fulfillment = fulfillmentRes.data || null;
+      setOrderFulfillment(fulfillment);
 
       if (constructionsRes.data) {
         setConstructions(constructionsRes.data);
@@ -89,7 +106,7 @@ export function ConstructionDeliveryList({
         // Initialize selections - only pre-select deliverable items
         if (selections.length === 0) {
           const initialSelections: ConstructionSelection[] = constructionsRes.data.map(c => {
-            const status = getManufacturingStatusForConstruction(c.id, c.construction_type, relevantStages);
+            const status = getManufacturingStatusForConstruction(c.id, c.construction_type, relevantStages, fulfillment);
             const deliverability = checkDeliverability(c.construction_type, status);
             const alreadyInBatch = existingBatchConstructionIds.includes(c.id);
             
@@ -116,19 +133,48 @@ export function ConstructionDeliveryList({
   }, [orderId]);
 
   // Get manufacturing status for a specific construction
+  // Falls back to order_fulfillment when construction-level data doesn't exist
   const getManufacturingStatusForConstruction = (
     constructionId: string, 
     constructionType: string,
-    stages: ManufacturingStageRow[] = manufacturingStages
+    stages: ManufacturingStageRow[] = manufacturingStages,
+    fulfillment: OrderFulfillment | null = orderFulfillment
   ): ManufacturingStatus => {
     const constructionStages = stages.filter(s => s.construction_id === constructionId);
     
+    // First try construction-level stages
+    let welding = constructionStages.find(s => s.stage === 'welding')?.status;
+    let framesAssembled = constructionStages.find(s => s.stage === 'frames_sashes_assembled')?.status;
+    let doorsAssembly = constructionStages.find(s => s.stage === 'doors_assembly')?.status;
+    let slidingDoorsAssembly = constructionStages.find(s => s.stage === 'sliding_doors_assembly')?.status;
+    let glassInstallation = constructionStages.find(s => s.stage === 'glass_installation')?.status;
+    
+    // Fall back to order_fulfillment when construction-level data doesn't exist
+    if (fulfillment) {
+      // For windows: use assembly_status from order_fulfillment
+      if (constructionType === 'window' && !framesAssembled) {
+        framesAssembled = fulfillment.assembly_status || undefined;
+      }
+      // For doors: use doors_status from order_fulfillment  
+      if (constructionType === 'door' && !doorsAssembly) {
+        doorsAssembly = fulfillment.doors_status || undefined;
+      }
+      // For sliding doors: use sliding_doors_status from order_fulfillment
+      if (constructionType === 'sliding_door' && !slidingDoorsAssembly) {
+        slidingDoorsAssembly = fulfillment.sliding_doors_status || undefined;
+      }
+      // Fall back glass status if not set at construction level
+      if (!glassInstallation && fulfillment.glass_status) {
+        glassInstallation = fulfillment.glass_status;
+      }
+    }
+    
     return {
-      welding: constructionStages.find(s => s.stage === 'welding')?.status,
-      frames_sashes_assembled: constructionStages.find(s => s.stage === 'frames_sashes_assembled')?.status,
-      doors_assembly: constructionStages.find(s => s.stage === 'doors_assembly')?.status,
-      sliding_doors_assembly: constructionStages.find(s => s.stage === 'sliding_doors_assembly')?.status,
-      glass_installation: constructionStages.find(s => s.stage === 'glass_installation')?.status,
+      welding,
+      frames_sashes_assembled: framesAssembled,
+      doors_assembly: doorsAssembly,
+      sliding_doors_assembly: slidingDoorsAssembly,
+      glass_installation: glassInstallation,
     };
   };
 
@@ -172,7 +218,7 @@ export function ConstructionDeliveryList({
       const construction = constructions.find(c => c.id === s.constructionId);
       if (!construction) return s;
       
-      const status = getManufacturingStatusForConstruction(s.constructionId, construction.construction_type);
+      const status = getManufacturingStatusForConstruction(s.constructionId, construction.construction_type, manufacturingStages, orderFulfillment);
       const deliverability = checkDeliverability(construction.construction_type, status);
       const alreadyInBatch = existingBatchConstructionIds.includes(s.constructionId);
       
@@ -191,7 +237,7 @@ export function ConstructionDeliveryList({
 
   // Calculate counts
   const deliverableCount = constructions.filter(c => {
-    const status = getManufacturingStatusForConstruction(c.id, c.construction_type);
+    const status = getManufacturingStatusForConstruction(c.id, c.construction_type, manufacturingStages, orderFulfillment);
     return checkDeliverability(c.construction_type, status).isDeliverable;
   }).length;
   
@@ -216,7 +262,7 @@ export function ConstructionDeliveryList({
     
     // Count deliverable items in this group
     const deliverableInGroup = items.filter(c => {
-      const status = getManufacturingStatusForConstruction(c.id, c.construction_type);
+      const status = getManufacturingStatusForConstruction(c.id, c.construction_type, manufacturingStages, orderFulfillment);
       return checkDeliverability(c.construction_type, status).isDeliverable;
     }).length;
     
@@ -240,7 +286,7 @@ export function ConstructionDeliveryList({
             const selection = selections.find(s => s.constructionId === construction.id);
             if (!selection) return null;
             
-            const status = getManufacturingStatusForConstruction(construction.id, construction.construction_type);
+            const status = getManufacturingStatusForConstruction(construction.id, construction.construction_type, manufacturingStages, orderFulfillment);
             const deliverability = checkDeliverability(construction.construction_type, status);
             const alreadyInBatch = existingBatchConstructionIds.includes(construction.id);
             

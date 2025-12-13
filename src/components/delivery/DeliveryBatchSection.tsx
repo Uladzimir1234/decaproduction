@@ -162,7 +162,24 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
               batch.id === payload.new.id ? { ...batch, ...payload.new } : batch
             ));
           } else if (payload.eventType === 'DELETE') {
-            setBatches(prev => prev.filter(batch => batch.id !== payload.old.id));
+            const deletedId = payload.old.id;
+            setBatches(prev => prev.filter(batch => batch.id !== deletedId));
+            // Clear all items for the deleted batch so constructions become available again
+            setBatchConstructionItems(prev => {
+              const updated = { ...prev };
+              delete updated[deletedId];
+              return updated;
+            });
+            setBatchShippingItems(prev => {
+              const updated = { ...prev };
+              delete updated[deletedId];
+              return updated;
+            });
+            setBatchCustomShipping(prev => {
+              const updated = { ...prev };
+              delete updated[deletedId];
+              return updated;
+            });
           }
         }
       )
