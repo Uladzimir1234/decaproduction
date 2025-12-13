@@ -635,6 +635,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           delivery_date: string
+          delivery_person: string | null
           id: string
           notes: string | null
           order_id: string
@@ -644,6 +645,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delivery_date: string
+          delivery_person?: string | null
           id?: string
           notes?: string | null
           order_id: string
@@ -653,6 +655,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delivery_date?: string
+          delivery_person?: string | null
           id?: string
           notes?: string | null
           order_id?: string

@@ -20,6 +20,7 @@ interface DeliveryBatch {
   status: string;
   notes: string | null;
   created_at: string;
+  delivery_person: string | null;
 }
 
 interface BatchShippingItem {
@@ -254,6 +255,11 @@ export function DeliveryBatchCard({
               )}
               <CardTitle className={`text-base ${isShipped ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                 Delivery #{batchNumber} - {format(new Date(batch.delivery_date), "MMM dd, yyyy")}
+                {batch.delivery_person && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ({batch.delivery_person})
+                  </span>
+                )}
               </CardTitle>
               {isShipped && (
                 <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-white text-xs">Shipped</Badge>
