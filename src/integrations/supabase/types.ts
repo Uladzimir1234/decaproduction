@@ -47,6 +47,60 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_construction_items: {
+        Row: {
+          batch_id: string
+          construction_id: string
+          created_at: string
+          delivery_notes: string | null
+          id: string
+          include_blinds: boolean
+          include_glass: boolean
+          include_hardware: boolean
+          include_screens: boolean
+          is_delivered: boolean
+        }
+        Insert: {
+          batch_id: string
+          construction_id: string
+          created_at?: string
+          delivery_notes?: string | null
+          id?: string
+          include_blinds?: boolean
+          include_glass?: boolean
+          include_hardware?: boolean
+          include_screens?: boolean
+          is_delivered?: boolean
+        }
+        Update: {
+          batch_id?: string
+          construction_id?: string
+          created_at?: string
+          delivery_notes?: string | null
+          id?: string
+          include_blinds?: boolean
+          include_glass?: boolean
+          include_hardware?: boolean
+          include_screens?: boolean
+          is_delivered?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_construction_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_construction_items_construction_id_fkey"
+            columns: ["construction_id"]
+            isOneToOne: false
+            referencedRelation: "order_constructions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_custom_delivery_items: {
         Row: {
           batch_id: string
