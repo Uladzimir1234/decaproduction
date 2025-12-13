@@ -35,6 +35,7 @@ interface DeliveryBatch {
   status: string;
   notes: string | null;
   created_at: string;
+  delivery_person: string | null;
 }
 
 interface BatchShippingItem {
@@ -90,6 +91,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
+  const [deliveryPerson, setDeliveryPerson] = useState<string>("");
   const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
   const [constructionSelections, setConstructionSelections] = useState<ConstructionSelection[]>([]);
   const [saving, setSaving] = useState(false);
@@ -178,7 +180,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       shippingInit[item.key] = { selected: true, qty: 0 };
     });
     setSelectedShippingItems(shippingInit);
-    setNewBatchDate(new Date());
+    setNewBatchDate(new Date()); // Auto-set to today
+    setDeliveryPerson("");
     setNewCustomShippingItems([]);
     setCustomShippingName("");
     setCustomShippingQty(1);
@@ -191,6 +194,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     
     setEditingBatchId(batchId);
     setNewBatchDate(new Date(batch.delivery_date));
+    setDeliveryPerson(batch.delivery_person || "");
     
     // Initialize shipping items from existing batch data
     const shippingItems = batchShippingItems[batchId] || [];
@@ -236,8 +240,8 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   };
 
   const saveBatch = async () => {
-    if (!newBatchDate) {
-      toast({ title: "Error", description: "Please select a delivery date", variant: "destructive" });
+    if (!deliveryPerson.trim()) {
+      toast({ title: "Error", description: "Please enter the name of the person in charge", variant: "destructive" });
       return;
     }
 
@@ -259,6 +263,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           .from("delivery_batches")
           .update({
             delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+            delivery_person: deliveryPerson.trim(),
           })
           .eq("id", editingBatchId);
         if (batchError) throw batchError;
@@ -275,6 +280,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           .insert({
             order_id: order.id,
             delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+            delivery_person: deliveryPerson.trim(),
             status: 'preparing',
             created_by: userData.user?.id
           })
@@ -394,7 +400,17 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                     <DialogTitle>{editingBatchId ? "Edit Delivery Batch" : "Create Delivery Batch"}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
-                    {/* Date Picker */}
+                    {/* Delivery Person Name */}
+                    <div className="space-y-2">
+                      <Label>Person in Charge of Delivery</Label>
+                      <Input 
+                        value={deliveryPerson} 
+                        onChange={(e) => setDeliveryPerson(e.target.value)} 
+                        placeholder="Enter name of person checking delivery"
+                      />
+                    </div>
+
+                    {/* Date - Auto-set but editable */}
                     <div className="space-y-2">
                       <Label>Delivery Date</Label>
                       <Popover>
