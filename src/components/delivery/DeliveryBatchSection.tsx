@@ -131,13 +131,19 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   };
 
   // Get all construction IDs already in batches (for marking in UI)
+  // Only includes items from batches that currently exist (not deleted ones)
   const getExistingBatchConstructionIds = useCallback(() => {
     const ids: string[] = [];
-    Object.values(batchConstructionItems).forEach(items => {
-      items.forEach(item => ids.push(item.construction_id));
+    const existingBatchIds = new Set(batches.map(b => b.id));
+    
+    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
+      // Only include items from batches that still exist
+      if (existingBatchIds.has(batchId)) {
+        items.forEach(item => ids.push(item.construction_id));
+      }
     });
     return ids;
-  }, [batchConstructionItems]);
+  }, [batchConstructionItems, batches]);
 
   useEffect(() => {
     fetchBatches();
