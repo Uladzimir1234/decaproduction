@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Package, BoxIcon, Trash2, CalendarIcon, Pencil, CheckCircle, User } from "lucide-react";
+import { Truck, Package, BoxIcon, Trash2, CalendarIcon, Pencil, CheckCircle, User, Undo2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface DeliveryBatch {
@@ -89,6 +89,7 @@ export function DeliveryBatchCard({
   const { toast } = useToast();
   const [constructions, setConstructions] = useState<Record<string, Construction>>({});
   const [markingShipped, setMarkingShipped] = useState(false);
+  const [undoingShipment, setUndoingShipment] = useState(false);
 
   // Fetch constructions for display
   useEffect(() => {
@@ -140,6 +141,23 @@ export function DeliveryBatchCard({
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setMarkingShipped(false);
+    }
+  };
+
+  const undoShipment = async () => {
+    setUndoingShipment(true);
+    try {
+      const { error } = await supabase
+        .from("delivery_batches")
+        .update({ status: 'preparing' })
+        .eq("id", batch.id);
+      if (error) throw error;
+      onRefresh();
+      toast({ title: "Shipment reverted", description: "Batch status changed back to preparing" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUndoingShipment(false);
     }
   };
 
@@ -261,18 +279,31 @@ export function DeliveryBatchCard({
           )}
         </div>
 
-        {/* Mark as Shipped Button */}
-        {canEdit && !isShipped && (
+        {/* Mark as Shipped / Undo Shipment Buttons */}
+        {canEdit && (
           <div className="mt-3 pt-3 border-t">
-            <Button 
-              onClick={markAsShipped} 
-              disabled={markingShipped}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Truck className="h-4 w-4 mr-2" />
-              {markingShipped ? "Marking..." : "Mark as Shipped"}
-            </Button>
+            {!isShipped ? (
+              <Button 
+                onClick={markAsShipped} 
+                disabled={markingShipped}
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                {markingShipped ? "Marking..." : "Mark as Shipped"}
+              </Button>
+            ) : (
+              <Button 
+                onClick={undoShipment} 
+                disabled={undoingShipment}
+                size="sm"
+                variant="outline"
+                className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+              >
+                <Undo2 className="h-4 w-4 mr-2" />
+                {undoingShipment ? "Reverting..." : "Undo Shipment"}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
