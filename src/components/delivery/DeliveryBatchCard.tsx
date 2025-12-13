@@ -2,16 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Package, BoxIcon, Plus, Trash2, ChevronDown, ChevronUp, CalendarIcon, Pencil, CheckCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Truck, Package, BoxIcon, Trash2, CalendarIcon, Pencil, CheckCircle, User } from "lucide-react";
 import { format } from "date-fns";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BatchConstructionCard } from "./BatchConstructionCard";
 
 interface DeliveryBatch {
   id: string;
@@ -57,12 +51,6 @@ interface Construction {
   construction_type: string;
   width_inches: number | null;
   height_inches: number | null;
-  color_exterior: string | null;
-  color_interior: string | null;
-  glass_type: string | null;
-  screen_type: string | null;
-  has_blinds: boolean | null;
-  handle_type: string | null;
   quantity: number;
 }
 
@@ -78,14 +66,14 @@ interface DeliveryBatchCardProps {
   batchNumber: number;
 }
 
-const SHIPPING_ITEM_TYPES = [
-  { key: 'handles', label: 'Handles in Box' },
-  { key: 'hinges_covers', label: 'Hinges Covers' },
-  { key: 'weeping_covers', label: 'Weeping Holes Covers' },
-  { key: 'spec_labels', label: 'Spec Labels' },
-  { key: 'nailing_fins', label: 'Nailing Fins Packed' },
-  { key: 'brackets', label: 'Brackets Packed' },
-];
+const SHIPPING_ITEM_LABELS: Record<string, string> = {
+  'handles': 'Handles',
+  'hinges_covers': 'Hinges',
+  'weeping_covers': 'Weeping',
+  'spec_labels': 'Labels',
+  'nailing_fins': 'Fins',
+  'brackets': 'Brackets',
+};
 
 export function DeliveryBatchCard({
   batch,
@@ -99,14 +87,8 @@ export function DeliveryBatchCard({
   batchNumber
 }: DeliveryBatchCardProps) {
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(true);
   const [constructions, setConstructions] = useState<Record<string, Construction>>({});
-  const [customShippingDialogOpen, setCustomShippingDialogOpen] = useState(false);
-  const [newCustomName, setNewCustomName] = useState("");
-  const [newCustomQty, setNewCustomQty] = useState(1);
-  const [saving, setSaving] = useState(false);
   const [markingShipped, setMarkingShipped] = useState(false);
-  const [localShippingQty, setLocalShippingQty] = useState<Record<string, number>>({});
 
   // Fetch constructions for display
   useEffect(() => {
@@ -116,7 +98,7 @@ export function DeliveryBatchCard({
 
       const { data } = await supabase
         .from("order_constructions")
-        .select("*")
+        .select("id, construction_number, construction_type, width_inches, height_inches, quantity")
         .in("id", constructionIds);
 
       if (data) {
@@ -131,84 +113,7 @@ export function DeliveryBatchCard({
     fetchConstructions();
   }, [constructionItems]);
 
-  // Calculate progress
-  const totalShipping = shippingItems.length + customShippingItems.length;
-  const completedShipping = shippingItems.filter(i => i.is_complete).length + 
-    customShippingItems.filter(i => i.is_complete).length;
-  
-  const totalDelivery = constructionItems.length;
-  const completedDelivery = constructionItems.filter(i => i.is_delivered).length;
-
   const isShipped = batch.status === 'shipped';
-
-  const updateShippingItem = async (itemId: string, isComplete: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("batch_shipping_items")
-        .update({ is_complete: isComplete })
-        .eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const updateShippingQty = async (itemId: string, quantity: number) => {
-    setLocalShippingQty(prev => ({ ...prev, [itemId]: quantity }));
-    try {
-      const { error } = await supabase
-        .from("batch_shipping_items")
-        .update({ quantity })
-        .eq("id", itemId);
-      if (error) throw error;
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const toggleCustomShipping = async (itemId: string, isComplete: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("batch_custom_shipping_items")
-        .update({ is_complete: isComplete })
-        .eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const addCustomShippingItem = async () => {
-    if (!newCustomName.trim()) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("batch_custom_shipping_items")
-        .insert({ batch_id: batch.id, name: newCustomName.trim(), quantity: newCustomQty });
-      if (error) throw error;
-      setNewCustomName("");
-      setNewCustomQty(1);
-      setCustomShippingDialogOpen(false);
-      onRefresh();
-      toast({ title: "Item added", description: "Custom shipping item added" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteCustomShipping = async (itemId: string) => {
-    try {
-      const { error } = await supabase.from("batch_custom_shipping_items").delete().eq("id", itemId);
-      if (error) throw error;
-      onRefresh();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
 
   const deleteBatch = async () => {
     try {
@@ -238,168 +143,139 @@ export function DeliveryBatchCard({
     }
   };
 
-  const getItemLabel = (itemType: string, types: { key: string; label: string }[]) => {
-    return types.find(t => t.key === itemType)?.label || itemType;
-  };
+  // Count windows and doors
+  const windowCount = constructionItems.filter(item => {
+    const c = constructions[item.construction_id];
+    return c && c.construction_type === 'window';
+  }).reduce((sum, item) => sum + (constructions[item.construction_id]?.quantity || 1), 0);
+
+  const doorCount = constructionItems.filter(item => {
+    const c = constructions[item.construction_id];
+    return c && (c.construction_type === 'door' || c.construction_type === 'sliding_door');
+  }).reduce((sum, item) => sum + (constructions[item.construction_id]?.quantity || 1), 0);
+
+  // Count shipping items with quantities
+  const totalShippingQty = shippingItems.reduce((sum, item) => sum + item.quantity, 0) + 
+    customShippingItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Get shipping summary
+  const shippingSummary = [
+    ...shippingItems.filter(i => i.quantity > 0).map(i => `${SHIPPING_ITEM_LABELS[i.item_type] || i.item_type}: ${i.quantity}`),
+    ...customShippingItems.filter(i => i.quantity > 0).map(i => `${i.name}: ${i.quantity}`)
+  ];
+
+  // Get accessory counts from construction items
+  const glassCount = constructionItems.filter(i => i.include_glass).length;
+  const screensCount = constructionItems.filter(i => i.include_screens).length;
+  const blindsCount = constructionItems.filter(i => i.include_blinds).length;
+  const hardwareCount = constructionItems.filter(i => i.include_hardware).length;
 
   return (
     <Card className={`border-primary/20 ${isShipped ? 'bg-emerald-500/5 border-emerald-500/30' : ''}`}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80">
-              {isShipped ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500" />
-              ) : (
-                <CalendarIcon className="h-4 w-4 text-primary" />
-              )}
-              <CardTitle className={`text-base ${isShipped ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
-                Delivery #{batchNumber} - {format(new Date(batch.delivery_date), "MMM dd, yyyy")}
-                {batch.delivery_person && (
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({batch.delivery_person})
-                  </span>
-                )}
-              </CardTitle>
-              {isShipped && (
-                <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-white text-xs">Shipped</Badge>
-              )}
-              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </CollapsibleTrigger>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400">
-                <BoxIcon className="h-3 w-3 mr-1" />
-                {completedShipping}/{totalShipping}
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isShipped ? (
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+            ) : (
+              <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
+            )}
+            <CardTitle className={`text-base ${isShipped ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              Delivery #{batchNumber}
+            </CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {format(new Date(batch.delivery_date), "MMM dd, yyyy")}
+            </span>
+            {batch.delivery_person && (
+              <Badge variant="outline" className="gap-1">
+                <User className="h-3 w-3" />
+                {batch.delivery_person}
               </Badge>
-              <Badge variant="outline" className="border-emerald-500/50 text-emerald-600 dark:text-emerald-400">
-                <Truck className="h-3 w-3 mr-1" />
-                {completedDelivery}/{totalDelivery}
-              </Badge>
-              {canEdit && (
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
+            )}
+            {isShipped && (
+              <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-white text-xs">Shipped</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {canEdit && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={deleteBatch}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-wrap gap-4 items-start">
+          {/* Delivery Items Summary */}
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-emerald-500 shrink-0" />
+            <div className="flex flex-wrap gap-1.5">
+              {windowCount > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {windowCount} Window{windowCount !== 1 ? 's' : ''}
+                </Badge>
               )}
-              {isAdmin && (
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={deleteBatch}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              {doorCount > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {doorCount} Door{doorCount !== 1 ? 's' : ''}
+                </Badge>
+              )}
+              {glassCount > 0 && (
+                <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                  Glass: {glassCount}
+                </Badge>
+              )}
+              {screensCount > 0 && (
+                <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                  Screens: {screensCount}
+                </Badge>
+              )}
+              {blindsCount > 0 && (
+                <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">
+                  Blinds: {blindsCount}
+                </Badge>
+              )}
+              {hardwareCount > 0 && (
+                <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                  Hardware: {hardwareCount}
+                </Badge>
               )}
             </div>
           </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="space-y-4 pt-0">
-            {/* Shipping Preparation */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BoxIcon className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm font-medium">Shipping Preparation</span>
-                </div>
-                {canEdit && (
-                  <Dialog open={customShippingDialogOpen} onOpenChange={setCustomShippingDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 gap-1">
-                        <Plus className="h-3 w-3" />
-                        Add
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add Custom Shipping Item</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Item Name</label>
-                          <Input value={newCustomName} onChange={(e) => setNewCustomName(e.target.value)} placeholder="Item name" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Quantity</label>
-                          <Input type="number" min={1} value={newCustomQty} onChange={(e) => setNewCustomQty(Math.max(1, parseInt(e.target.value) || 1))} />
-                        </div>
-                        <Button onClick={addCustomShippingItem} disabled={saving || !newCustomName.trim()} className="w-full">
-                          {saving ? "Adding..." : "Add Item"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 auto-rows-fr">
-                {shippingItems.map((item, index) => (
-                  <div key={item.id} style={{ order: index }} className={`flex items-center gap-2 p-2 rounded-lg border text-sm h-10 ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => updateShippingItem(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
-                    <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-                      {getItemLabel(item.item_type, SHIPPING_ITEM_TYPES)}
-                    </span>
-                    {canEdit ? (
-                      <Input type="number" min={0} value={localShippingQty[item.id] ?? item.quantity} onChange={(e) => updateShippingQty(item.id, parseInt(e.target.value) || 0)} className="w-16 h-6 text-xs text-center p-1 shrink-0" />
-                    ) : item.quantity > 0 && (
-                      <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    )}
-                  </div>
-                ))}
-                {customShippingItems.map((item, index) => (
-                  <div key={item.id} style={{ order: shippingItems.length + index }} className={`flex items-center gap-2 p-2 rounded-lg border border-dashed text-sm h-10 ${item.is_complete ? 'bg-blue-500/10 border-blue-500/30' : 'bg-card border-border'}`}>
-                    <Checkbox checked={item.is_complete} onCheckedChange={(c) => toggleCustomShipping(item.id, c as boolean)} disabled={!canEdit} className="shrink-0" />
-                    <span className={`flex-1 min-w-0 truncate ${item.is_complete ? 'text-blue-600 dark:text-blue-400' : ''}`}>{item.name}</span>
-                    <Badge variant="secondary" className="text-xs shrink-0">×{item.quantity}</Badge>
-                    {isAdmin && (
-                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => deleteCustomShipping(item.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+          {/* Shipping Items Summary */}
+          {totalShippingQty > 0 && (
+            <div className="flex items-center gap-2">
+              <BoxIcon className="h-4 w-4 text-blue-500 shrink-0" />
+              <span className="text-xs text-muted-foreground">
+                {shippingSummary.slice(0, 3).join(' • ')}
+                {shippingSummary.length > 3 && ` +${shippingSummary.length - 3} more`}
+              </span>
             </div>
+          )}
+        </div>
 
-            <Separator />
-
-            {/* Construction Delivery Items */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm font-medium">Delivery Items</span>
-                <Badge variant="secondary" className="text-xs">{constructionItems.length} items</Badge>
-              </div>
-              <div className="space-y-2">
-                {constructionItems.map((item) => {
-                  const construction = constructions[item.construction_id];
-                  if (!construction) return null;
-                  
-                  return (
-                    <BatchConstructionCard
-                      key={item.id}
-                      item={item}
-                      construction={construction}
-                      canEdit={canEdit}
-                      isAdmin={isAdmin}
-                      onRefresh={onRefresh}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Mark as Shipped Button */}
-            {canEdit && !isShipped && (
-              <>
-                <Separator />
-                <Button 
-                  onClick={markAsShipped} 
-                  disabled={markingShipped}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {markingShipped ? "Marking..." : "Mark as Shipped"}
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+        {/* Mark as Shipped Button */}
+        {canEdit && !isShipped && (
+          <div className="mt-3 pt-3 border-t">
+            <Button 
+              onClick={markAsShipped} 
+              disabled={markingShipped}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Truck className="h-4 w-4 mr-2" />
+              {markingShipped ? "Marking..." : "Mark as Shipped"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
