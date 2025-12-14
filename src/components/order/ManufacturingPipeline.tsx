@@ -474,7 +474,7 @@ export function ManufacturingPipelineSection({
   if (!fulfillment) return null;
 
   return (
-    <div className={cn(size === "compact" ? "space-y-0.5" : "space-y-4")}>
+    <div className={cn(size === "compact" ? "space-y-0.5" : "space-y-1")}>
       {hasWindows && (
         <ManufacturingPipeline
           trackType="windows"
