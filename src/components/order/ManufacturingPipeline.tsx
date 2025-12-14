@@ -182,20 +182,24 @@ export function ManufacturingPipeline({
         </TooltipProvider>
       </div>
 
-      {/* Legend - only in default mode */}
+      {/* Legend - only in default mode, mobile-friendly sizing */}
       {!isCompact && (
-        <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-sm bg-destructive" />
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-destructive" />
             <span>Not Started</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-amber-500" />
             <span>Partial</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-emerald-500" />
             <span>Complete</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            <span>Locked</span>
           </div>
         </div>
       )}
