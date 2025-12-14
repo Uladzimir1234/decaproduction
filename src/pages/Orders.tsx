@@ -35,6 +35,11 @@ interface OrderFulfillment {
   sliding_doors_glass_installed: boolean | null;
   sliding_doors_status: string | null;
   sliding_doors_notes: string | null;
+  // Sliding doors independent track
+  sliding_doors_reinforcement_cutting: string | null;
+  sliding_doors_profile_cutting: string | null;
+  sliding_doors_welding_status: string | null;
+  sliding_doors_welding_notes: string | null;
   frame_sash_assembled: boolean | null;
   assembly_status: string | null;
   assembly_notes: string | null;
@@ -141,6 +146,11 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
+  // Sliding doors independent components
+  sliding_doors_profile_status: string | null;
+  sliding_doors_profile_order_date: string | null;
+  sliding_doors_hardware_status: string | null;
+  sliding_doors_hardware_order_date: string | null;
   production_status: string;
   hold_started_at: string | null;
   is_priority: boolean | null;
@@ -853,19 +863,83 @@ export default function Orders() {
       });
     }
     
-    // Sliding Doors Assembled - requires Welding complete AND Hardware available
+    // SLIDING DOORS INDEPENDENT TRACK (when order has sliding doors)
     if (order.has_sliding_doors) {
+      // SD Reinforcement Cutting - depends on reinforcement_status only
       stages.push({ 
-        name: 'Sliding Doors Assembled', 
+        name: 'SD Reinf. Cutting', 
+        status: getStatus(f?.sliding_doors_reinforcement_cutting), 
+        hasNotes: false, 
+        field: 'sliding_doors_reinforcement_cutting',
+        lock: getLockStatus(['reinforcement'], order.reinforcement_status, 'Reinforcement')
+      });
+      
+      // SD Profile Cutting - depends on sliding_doors_profile_status
+      const sdProfileLock = order.sliding_doors_profile_status === 'available' 
+        ? { isLocked: false } 
+        : { isLocked: true, lockReason: `SD Profile ${order.sliding_doors_profile_status === 'ordered' ? 'Ordered' : 'Not Ordered'}` };
+      stages.push({ 
+        name: 'SD Profile Cutting', 
+        status: getStatus(f?.sliding_doors_profile_cutting), 
+        hasNotes: false, 
+        field: 'sliding_doors_profile_cutting',
+        lock: sdProfileLock
+      });
+      
+      // SD Welded - requires SD Reinforcement Cutting complete AND SD Profile Cutting complete
+      const sdWeldingLock = (() => {
+        if (f?.sliding_doors_reinforcement_cutting !== 'complete') {
+          return { isLocked: true, lockReason: 'SD Reinf. Not Cut' };
+        }
+        if (f?.sliding_doors_profile_cutting !== 'complete') {
+          return { isLocked: true, lockReason: 'SD Profile Not Cut' };
+        }
+        return { isLocked: false };
+      })();
+      stages.push({ 
+        name: 'SD Welded', 
+        status: getStatus(f?.sliding_doors_welding_status), 
+        hasNotes: !!(f?.sliding_doors_welding_notes), 
+        field: 'sliding_doors_welding_status',
+        lock: sdWeldingLock
+      });
+      
+      // SD Assembled - requires SD Welded complete AND SD Hardware available
+      const sdHardwareLock = order.sliding_doors_hardware_status === 'available' 
+        ? { isLocked: false } 
+        : { isLocked: true, lockReason: `SD Hardware ${order.sliding_doors_hardware_status === 'ordered' ? 'Ordered' : 'Not Ordered'}` };
+      const sdAssemblyLock = (() => {
+        if (f?.sliding_doors_welding_status !== 'complete') {
+          return { isLocked: true, lockReason: 'SD Welding Not Complete' };
+        }
+        if (sdHardwareLock.isLocked) {
+          return sdHardwareLock;
+        }
+        return { isLocked: false };
+      })();
+      stages.push({ 
+        name: 'SD Assembled', 
         status: getStatus(f?.sliding_doors_status), 
         hasNotes: !!(f?.sliding_doors_notes), 
         field: 'sliding_doors_status',
-        lock: getCombinedLock(
-          [{ status: f?.welding_status, name: 'Welding' }],
-          ['hardware', 'handle'],
-          order.hardware_status,
-          'Hardware'
-        )
+        lock: sdAssemblyLock
+      });
+      
+      // SD Glass Installed - requires SD Assembled complete AND Glass available
+      const sdGlassLock = (() => {
+        if (f?.sliding_doors_status !== 'complete') {
+          return { isLocked: true, lockReason: 'SD Not Assembled' };
+        }
+        const glassAvail = getLockStatus(['glass'], order.glass_status, 'Glass');
+        if (glassAvail.isLocked) return glassAvail;
+        return { isLocked: false };
+      })();
+      stages.push({ 
+        name: 'SD Glass Installed', 
+        status: f?.sliding_doors_glass_installed ? 'complete' : 'not_started', 
+        hasNotes: false, 
+        field: 'sliding_doors_glass_installed',
+        lock: sdGlassLock
       });
     }
     

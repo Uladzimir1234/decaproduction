@@ -54,6 +54,11 @@ interface OrderFulfillment {
   sliding_doors_status: string | null;
   sliding_doors_notes: string | null;
   sliding_doors_image_url: string | null;
+  // Sliding doors independent manufacturing track
+  sliding_doors_reinforcement_cutting: string | null;
+  sliding_doors_profile_cutting: string | null;
+  sliding_doors_welding_status: string | null;
+  sliding_doors_welding_notes: string | null;
   frame_sash_assembled: boolean | null;
   assembly_status: string | null;
   assembly_notes: string | null;
@@ -112,6 +117,11 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
+  // Sliding doors independent components
+  sliding_doors_profile_status: string | null;
+  sliding_doors_profile_order_date: string | null;
+  sliding_doors_hardware_status: string | null;
+  sliding_doors_hardware_order_date: string | null;
   production_status: string;
 }
 
@@ -468,6 +478,35 @@ export default function OrderDetail() {
       return screensComponent.status === 'ordered' ? 'Ordered' : 'Not Ordered';
     }
     return order?.screens_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  // Sliding doors independent track helper functions
+  const isSlidingDoorsProfileAvailable = () => {
+    return order?.sliding_doors_profile_status === 'available';
+  };
+
+  const isSlidingDoorsHardwareAvailable = () => {
+    return order?.sliding_doors_hardware_status === 'available';
+  };
+
+  const getSlidingDoorsProfileLockText = () => {
+    return order?.sliding_doors_profile_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  const getSlidingDoorsHardwareLockText = () => {
+    return order?.sliding_doors_hardware_status === 'ordered' ? 'Ordered' : 'Not Ordered';
+  };
+
+  const isSlidingDoorsReinforcementCut = () => {
+    return fulfillment?.sliding_doors_reinforcement_cutting === 'complete';
+  };
+
+  const isSlidingDoorsProfileCut = () => {
+    return fulfillment?.sliding_doors_profile_cutting === 'complete';
+  };
+
+  const isSlidingDoorsWelded = () => {
+    return fulfillment?.sliding_doors_welding_status === 'complete';
   };
 
   const addCustomStep = async (stepType: 'ordering' | 'manufacturing', name: string) => {
@@ -1087,6 +1126,94 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
+              {/* Sliding Doors Components - Independent Track (only if order has sliding doors) */}
+              {order.has_sliding_doors && (
+                <>
+                  <div className="text-xs text-muted-foreground mt-4 mb-2 font-medium uppercase tracking-wide border-t pt-4">
+                    Sliding Doors Components
+                  </div>
+                  
+                  {/* SD Profile */}
+                  <AccordionItem value="order-sd-profile">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        {order.sliding_doors_profile_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                         order.sliding_doors_profile_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                         <AlertCircle className="h-4 w-4 text-destructive" />}
+                        <span>SD Profile</span>
+                        <Badge variant="outline" className="ml-2 capitalize">
+                          {(order.sliding_doors_profile_status || 'not_ordered').replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                      <div className="space-y-3">
+                        <Label>Status</Label>
+                        <StatusButtonGroup
+                          value={order.sliding_doors_profile_status || 'not_ordered'}
+                          onChange={value => updateOrderComponent({
+                            sliding_doors_profile_status: value,
+                            sliding_doors_profile_order_date: value === 'ordered' ? order.sliding_doors_profile_order_date || new Date().toISOString().split('T')[0] : null
+                          })}
+                          options={orderingStatusOptions}
+                          disabled={!canUpdateOrdering || isSeller}
+                        />
+                      </div>
+                      {order.sliding_doors_profile_status === 'ordered' && (
+                        <div className="space-y-2">
+                          <Label>Order Date</Label>
+                          <Input
+                            type="date"
+                            value={order.sliding_doors_profile_order_date || ''}
+                            onChange={e => updateOrderComponent({ sliding_doors_profile_order_date: e.target.value })}
+                            disabled={!canUpdateOrdering || isSeller}
+                          />
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  
+                  {/* SD Hardware */}
+                  <AccordionItem value="order-sd-hardware">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        {order.sliding_doors_hardware_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                         order.sliding_doors_hardware_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
+                         <AlertCircle className="h-4 w-4 text-destructive" />}
+                        <span>SD Hardware</span>
+                        <Badge variant="outline" className="ml-2 capitalize">
+                          {(order.sliding_doors_hardware_status || 'not_ordered').replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                      <div className="space-y-3">
+                        <Label>Status</Label>
+                        <StatusButtonGroup
+                          value={order.sliding_doors_hardware_status || 'not_ordered'}
+                          onChange={value => updateOrderComponent({
+                            sliding_doors_hardware_status: value,
+                            sliding_doors_hardware_order_date: value === 'ordered' ? order.sliding_doors_hardware_order_date || new Date().toISOString().split('T')[0] : null
+                          })}
+                          options={orderingStatusOptions}
+                          disabled={!canUpdateOrdering || isSeller}
+                        />
+                      </div>
+                      {order.sliding_doors_hardware_status === 'ordered' && (
+                        <div className="space-y-2">
+                          <Label>Order Date</Label>
+                          <Input
+                            type="date"
+                            value={order.sliding_doors_hardware_order_date || ''}
+                            onChange={e => updateOrderComponent({ sliding_doors_hardware_order_date: e.target.value })}
+                            disabled={!canUpdateOrdering || isSeller}
+                          />
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                </>
+              )}
 
               {/* Aggregated Components from Constructions */}
               {aggregatedComponents.length > 0 && (
@@ -1484,96 +1611,238 @@ export default function OrderDetail() {
                 </AccordionItem>
               )}
 
-              {/* Sliding Doors Assembled - Requires: Welding Complete AND Hardware Available */}
+              {/* SLIDING DOORS INDEPENDENT MANUFACTURING TRACK */}
               {order.has_sliding_doors && (
-                <AccordionItem value="sliding">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={fulfillment.sliding_doors_status === 'complete' ? 'complete' : fulfillment.sliding_doors_status === 'partial' ? 'partial' : 'not_started'} />
-                      <span>Sliding Doors Assembled</span>
+                <>
+                  <div className="text-xs text-muted-foreground mt-6 mb-2 font-medium uppercase tracking-wide border-t pt-4">
+                    Sliding Doors Manufacturing Track
+                  </div>
+                  
+                  {/* SD Reinforcement Cutting */}
+                  <AccordionItem value="sd-reinforcement">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={fulfillment.sliding_doors_reinforcement_cutting as StageStatus || "not_started"} />
+                        <span>SD Reinforcement Cutting</span>
+                        {order.production_status === 'hold' ? (
+                          <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                            <Pause className="h-3 w-3" />
+                            On Hold
+                          </Badge>
+                        ) : order.reinforcement_status !== 'available' && (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            {order.reinforcement_status === 'ordered' ? 'Ordered' : 'Not Ordered'}
+                          </Badge>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4">
                       {order.production_status === 'hold' ? (
-                        <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
-                          <Pause className="h-3 w-3" />
-                          On Hold
-                        </Badge>
-                      ) : fulfillment.welding_status !== 'complete' ? (
-                        <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
-                          <Lock className="h-3 w-3" />
-                          Welding Not Complete
-                        </Badge>
-                      ) : !isHardwareAvailable() && (
-                        <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
-                          <Lock className="h-3 w-3" />
-                          Hardware {getHardwareLockText()}
-                        </Badge>
+                        <p className="text-sm text-muted-foreground">Order is on hold.</p>
+                      ) : order.reinforcement_status !== 'available' ? (
+                        <p className="text-sm text-muted-foreground">Reinforcement must be available before this stage can be updated.</p>
+                      ) : (
+                        <StatusButtonGroup
+                          value={fulfillment.sliding_doors_reinforcement_cutting || "not_started"}
+                          onChange={value => updateFulfillment("sliding_doors_reinforcement_cutting", value)}
+                          options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
+                        />
                       )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    {order.production_status === 'hold' ? (
-                      <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                    ) : fulfillment.welding_status !== 'complete' ? (
-                      <p className="text-sm text-muted-foreground">Welding must be complete before sliding door assembly can begin.</p>
-                    ) : !isHardwareAvailable() ? (
-                      <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
-                    ) : (
-                      <>
-                        <div className="space-y-3">
-                          <Label>Status</Label>
-                          <StatusButtonGroup
-                            value={fulfillment.sliding_doors_status || "not_started"}
-                            onChange={value => updateFulfillment("sliding_doors_status", value)}
-                            options={manufacturingStatusOptions}
-                            disabled={!canUpdateManufacturing}
-                          />
-                        </div>
-                        {fulfillment.sliding_doors_status === 'partial' && (
-                          <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                              placeholder="Add notes about sliding door assembly..."
-                              value={fulfillment.sliding_doors_notes || ""}
-                              onChange={e => updateFulfillment("sliding_doors_notes", e.target.value)}
+                    </AccordionContent>
+                  </AccordionItem>
+                  
+                  {/* SD Profile Cutting */}
+                  <AccordionItem value="sd-profile">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={fulfillment.sliding_doors_profile_cutting as StageStatus || "not_started"} />
+                        <span>SD Profile Cutting</span>
+                        {order.production_status === 'hold' ? (
+                          <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                            <Pause className="h-3 w-3" />
+                            On Hold
+                          </Badge>
+                        ) : !isSlidingDoorsProfileAvailable() && (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            {getSlidingDoorsProfileLockText()}
+                          </Badge>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4">
+                      {order.production_status === 'hold' ? (
+                        <p className="text-sm text-muted-foreground">Order is on hold.</p>
+                      ) : !isSlidingDoorsProfileAvailable() ? (
+                        <p className="text-sm text-muted-foreground">Sliding Doors Profile must be available before this stage can be updated.</p>
+                      ) : (
+                        <StatusButtonGroup
+                          value={fulfillment.sliding_doors_profile_cutting || "not_started"}
+                          onChange={value => updateFulfillment("sliding_doors_profile_cutting", value)}
+                          options={manufacturingStatusOptions}
+                          disabled={!canUpdateManufacturing}
+                        />
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  
+                  {/* SD Welded - Requires: SD Reinforcement Cutting Complete AND SD Profile Cutting Complete */}
+                  <AccordionItem value="sd-welding">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={fulfillment.sliding_doors_welding_status as StageStatus || "not_started"} />
+                        <span>SD Frames Welded</span>
+                        {order.production_status === 'hold' ? (
+                          <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                            <Pause className="h-3 w-3" />
+                            On Hold
+                          </Badge>
+                        ) : !isSlidingDoorsReinforcementCut() ? (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            SD Reinforcement Not Cut
+                          </Badge>
+                        ) : !isSlidingDoorsProfileCut() && (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            SD Profile Not Cut
+                          </Badge>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                      {order.production_status === 'hold' ? (
+                        <p className="text-sm text-muted-foreground">Order is on hold.</p>
+                      ) : !isSlidingDoorsReinforcementCut() ? (
+                        <p className="text-sm text-muted-foreground">SD Reinforcement Cutting must be complete before welding can begin.</p>
+                      ) : !isSlidingDoorsProfileCut() ? (
+                        <p className="text-sm text-muted-foreground">SD Profile Cutting must be complete before welding can begin.</p>
+                      ) : (
+                        <>
+                          <div className="space-y-3">
+                            <Label>Status</Label>
+                            <StatusButtonGroup
+                              value={fulfillment.sliding_doors_welding_status || "not_started"}
+                              onChange={value => updateFulfillment("sliding_doors_welding_status", value)}
+                              options={manufacturingStatusOptions}
                               disabled={!canUpdateManufacturing}
                             />
                           </div>
+                          {fulfillment.sliding_doors_welding_status === 'partial' && (
+                            <div className="space-y-2">
+                              <Label>Notes</Label>
+                              <Textarea
+                                placeholder="Add notes about SD welding..."
+                                value={fulfillment.sliding_doors_welding_notes || ""}
+                                onChange={e => updateFulfillment("sliding_doors_welding_notes", e.target.value)}
+                                disabled={!canUpdateManufacturing}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  
+                  {/* SD Assembled - Requires: SD Welded Complete AND SD Hardware Available */}
+                  <AccordionItem value="sd-assembled">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={fulfillment.sliding_doors_status === 'complete' ? 'complete' : fulfillment.sliding_doors_status === 'partial' ? 'partial' : 'not_started'} />
+                        <span>SD Assembled</span>
+                        {order.production_status === 'hold' ? (
+                          <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                            <Pause className="h-3 w-3" />
+                            On Hold
+                          </Badge>
+                        ) : !isSlidingDoorsWelded() ? (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            SD Welding Not Complete
+                          </Badge>
+                        ) : !isSlidingDoorsHardwareAvailable() && (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            SD Hardware {getSlidingDoorsHardwareLockText()}
+                          </Badge>
                         )}
-                        
-                        {/* Sliding Doors Glass Installation - locked until sliding doors assembled */}
-                        <div className="border-t pt-4 mt-4">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Label>Glass Installed</Label>
-                            {fulfillment.sliding_doors_status !== 'complete' && (
-                              <Badge variant="outline" className="text-muted-foreground gap-1">
-                                <Lock className="h-3 w-3" />
-                                Sliding Doors Not Assembled
-                              </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                      {order.production_status === 'hold' ? (
+                        <p className="text-sm text-muted-foreground">Order is on hold.</p>
+                      ) : !isSlidingDoorsWelded() ? (
+                        <p className="text-sm text-muted-foreground">SD Welding must be complete before assembly can begin.</p>
+                      ) : !isSlidingDoorsHardwareAvailable() ? (
+                        <p className="text-sm text-muted-foreground">SD Hardware must be available before this stage can be updated.</p>
+                      ) : (
+                        <>
+                          <div className="space-y-3">
+                            <Label>Status</Label>
+                            <StatusButtonGroup
+                              value={fulfillment.sliding_doors_status || "not_started"}
+                              onChange={value => updateFulfillment("sliding_doors_status", value)}
+                              options={manufacturingStatusOptions}
+                              disabled={!canUpdateManufacturing}
+                            />
+                          </div>
+                          {fulfillment.sliding_doors_status === 'partial' && (
+                            <div className="space-y-2">
+                              <Label>Notes</Label>
+                              <Textarea
+                                placeholder="Add notes about sliding door assembly..."
+                                value={fulfillment.sliding_doors_notes || ""}
+                                onChange={e => updateFulfillment("sliding_doors_notes", e.target.value)}
+                                disabled={!canUpdateManufacturing}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Sliding Doors Glass Installation - locked until sliding doors assembled */}
+                          <div className="border-t pt-4 mt-4">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Label>Glass Installed</Label>
+                              {fulfillment.sliding_doors_status !== 'complete' ? (
+                                <Badge variant="outline" className="text-muted-foreground gap-1">
+                                  <Lock className="h-3 w-3" />
+                                  SD Not Assembled
+                                </Badge>
+                              ) : !isGlassAvailable() && (
+                                <Badge variant="outline" className="text-muted-foreground gap-1">
+                                  <Lock className="h-3 w-3" />
+                                  Glass {getGlassLockText()}
+                                </Badge>
+                              )}
+                            </div>
+                            {fulfillment.sliding_doors_status !== 'complete' ? (
+                              <p className="text-sm text-muted-foreground">Sliding doors must be assembled before glass can be installed.</p>
+                            ) : !isGlassAvailable() ? (
+                              <p className="text-sm text-muted-foreground">Glass must be available before installation.</p>
+                            ) : (
+                              <Switch 
+                                checked={fulfillment.sliding_doors_glass_installed || false} 
+                                onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)}
+                                disabled={!canUpdateManufacturing}
+                              />
                             )}
                           </div>
-                          {fulfillment.sliding_doors_status !== 'complete' ? (
-                            <p className="text-sm text-muted-foreground">Sliding doors must be assembled before glass can be installed.</p>
-                          ) : (
-                            <Switch 
-                              checked={fulfillment.sliding_doors_glass_installed || false} 
-                              onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)}
-                              disabled={!canUpdateManufacturing}
+                          
+                          <div className="space-y-2">
+                            <Label>Photo</Label>
+                            <ImageUpload
+                              value={fulfillment.sliding_doors_image_url}
+                              onChange={url => updateFulfillment("sliding_doors_image_url", url)}
+                              folder={`sliding-doors/${order.id}`}
+                              disabled={saving || !canUpdateManufacturing}
                             />
-                          )}
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Photo</Label>
-                          <ImageUpload
-                            value={fulfillment.sliding_doors_image_url}
-                            onChange={url => updateFulfillment("sliding_doors_image_url", url)}
-                            folder={`sliding-doors/${order.id}`}
-                            disabled={saving || !canUpdateManufacturing}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
+                          </div>
+                        </>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                </>
               )}
 
               {/* Frame & Sash Assembled - Requires: Welding Complete AND Hardware Available */}
