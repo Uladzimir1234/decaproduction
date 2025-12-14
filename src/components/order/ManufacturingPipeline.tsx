@@ -25,6 +25,8 @@ interface ManufacturingPipelineProps {
   canUpdate: boolean;
   onStatusChange: (field: string, value: string) => void;
   size?: "default" | "compact";
+  showLegend?: boolean;
+  showTrackLetter?: boolean;
 }
 
 const getStatusColor = (status: StageStatus | string | null | boolean, isLocked: boolean) => {
@@ -81,13 +83,16 @@ export function ManufacturingPipeline({
   canUpdate,
   onStatusChange,
   size = "default",
+  showLegend = true,
+  showTrackLetter = false,
 }: ManufacturingPipelineProps) {
   const isCompact = size === "compact";
+  const trackLetter = trackType === 'windows' ? 'W' : trackType === 'doors' ? 'D' : 'S';
   
   return (
     <div className={cn("space-y-1", isCompact && "space-y-0")}>
-      {/* Track Label - hidden in compact mode, show icon only */}
-      {!isCompact && (
+      {/* Track Label - hidden in compact mode or when showTrackLetter is true */}
+      {!isCompact && !showTrackLetter && (
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">{trackLabel}</span>
           {!isProductionReady && (
@@ -101,10 +106,13 @@ export function ManufacturingPipeline({
 
       {/* Pipeline Arrow */}
       <div className="flex items-center">
-        {/* Track icon for compact mode */}
-        {isCompact && (
-          <span className="text-xs font-bold text-muted-foreground mr-1.5 w-4">
-            {trackType === 'windows' ? 'W' : trackType === 'doors' ? 'D' : 'S'}
+        {/* Track letter indicator - show in compact mode OR when showTrackLetter is true */}
+        {(isCompact || showTrackLetter) && (
+          <span className={cn(
+            "font-bold text-muted-foreground",
+            isCompact ? "text-xs mr-1.5 w-4" : "text-base mr-2 w-6"
+          )}>
+            {trackLetter}
           </span>
         )}
         <TooltipProvider>
@@ -182,8 +190,8 @@ export function ManufacturingPipeline({
         </TooltipProvider>
       </div>
 
-      {/* Legend - only in default mode, mobile-friendly sizing */}
-      {!isCompact && (
+      {/* Legend - only when showLegend is true and in default mode */}
+      {showLegend && !isCompact && (
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-1">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-destructive" />
@@ -231,6 +239,8 @@ interface ManufacturingPipelineSectionProps {
   canUpdateManufacturing: boolean;
   updateFulfillment: (field: string, value: any) => void;
   size?: "default" | "compact";
+  showLegend?: boolean;
+  showTrackLetter?: boolean;
 }
 
 export function ManufacturingPipelineSection({
@@ -240,6 +250,8 @@ export function ManufacturingPipelineSection({
   canUpdateManufacturing,
   updateFulfillment,
   size = "default",
+  showLegend = true,
+  showTrackLetter = false,
 }: ManufacturingPipelineSectionProps) {
   // Helper to check component availability from aggregated components or legacy fields
   const isProfileAvailable = () => {
@@ -473,6 +485,8 @@ export function ManufacturingPipelineSection({
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
           size={size}
+          showLegend={showLegend}
+          showTrackLetter={showTrackLetter}
         />
       )}
       
@@ -486,6 +500,8 @@ export function ManufacturingPipelineSection({
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
           size={size}
+          showLegend={showLegend}
+          showTrackLetter={showTrackLetter}
         />
       )}
       
@@ -499,6 +515,8 @@ export function ManufacturingPipelineSection({
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
           size={size}
+          showLegend={showLegend}
+          showTrackLetter={showTrackLetter}
         />
       )}
     </div>

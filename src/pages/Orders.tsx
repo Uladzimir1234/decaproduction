@@ -2098,6 +2098,8 @@ export default function Orders() {
                               canUpdateManufacturing={canUpdateManufacturing}
                               updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
                               size="default"
+                              showLegend={false}
+                              showTrackLetter={true}
                             />
                           </div>
                           {/* Custom Manufacturing Steps */}
