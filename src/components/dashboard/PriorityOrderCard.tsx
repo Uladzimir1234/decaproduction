@@ -72,6 +72,8 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
         plisse_screens_status: 'plisse',
         nail_fins_status: 'nail_fins',
         hardware_status: 'hardware',
+        sliding_doors_profile_status: 'sd_profile',
+        sliding_doors_hardware_status: 'sd_hardware',
       };
       const componentType = typeMap[field];
       if (componentType) {
@@ -97,6 +99,11 @@ export function PriorityOrderCard({ order, showDetails = true }: PriorityOrderCa
     ...(order.has_plisse_screens ? [{ name: 'Plisse', status: getActualComponentStatus('plisse_screens_status') }] : []),
     ...(order.has_nailing_flanges ? [{ name: 'Nail Fins', status: getActualComponentStatus('nail_fins_status') }] : []),
     { name: 'Hardware', status: getActualComponentStatus('hardware_status') },
+    // Sliding doors components
+    ...(order.has_sliding_doors ? [
+      { name: 'SD Profile', status: getActualComponentStatus('sliding_doors_profile_status') },
+      { name: 'SD Hardware', status: getActualComponentStatus('sliding_doors_hardware_status') },
+    ] : []),
   ];
 
   return (

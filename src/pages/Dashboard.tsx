@@ -50,17 +50,18 @@ export default function Dashboard() {
   const onHoldOrders = orders.filter(o => o.production_status === 'hold');
   const productionReadyOrders = orders.filter(o => o.production_status === 'production_ready');
   
-  // Pending deliveries - orders with 90%+ manufacturing but items still to deliver
+  // Pending deliveries - orders with batches preparing or shipped
   const pendingDeliveryOrders: PendingDeliveryOrder[] = orders
-    .filter(o => o.manufacturingProgress >= 90 && o.deliveryProgress.deliveredCount < o.deliveryProgress.totalItems)
+    .filter(o => o.deliveryProgress.batchesPreparing > 0 || o.deliveryProgress.batchesShipped > 0)
     .map(o => ({
       id: o.id,
       order_number: o.order_number,
       customer_name: o.customer_name,
       daysUntilDelivery: o.daysUntilDelivery,
-      deliveredCount: o.deliveryProgress.deliveredCount,
-      totalItems: o.deliveryProgress.totalItems,
-      pendingItems: o.deliveryProgress.pendingItems,
+      batchesPreparing: o.deliveryProgress.batchesPreparing,
+      batchesShipped: o.deliveryProgress.batchesShipped,
+      batchesDelivered: o.deliveryProgress.batchesDelivered,
+      totalBatches: o.deliveryProgress.totalItems,
       manufacturingProgress: o.manufacturingProgress,
     }));
   
