@@ -2097,7 +2097,7 @@ export default function Orders() {
                               }))}
                               canUpdateManufacturing={canUpdateManufacturing}
                               updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
-                              size="compact"
+                              size="default"
                             />
                           </div>
                           {/* Custom Manufacturing Steps */}
