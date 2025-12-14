@@ -89,10 +89,12 @@ export default function Auth() {
   return <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md animate-slide-up">
         <div className="text-center mb-8">
-          <div className="h-12 w-12 rounded-xl bg-primary mx-auto flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-xl">WD</span>
-          </div>
-          <h1 className="text-2xl font-bold">Deca order tracker    </h1>
+          <img 
+            src="/src/assets/deca-logo.png" 
+            alt="Deca Euro Windows and Doors" 
+            className="h-16 mx-auto mb-4"
+          />
+          <h1 className="text-2xl font-bold">Order Tracker</h1>
           <p className="text-muted-foreground mt-1">Manufacturing Order Tracking</p>
         </div>
 
