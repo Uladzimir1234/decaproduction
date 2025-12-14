@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Package, Truck, AlertCircle, Calendar, Pause, PlayCircle } from 'lucide-react';
+import { AlertTriangle, Package, Truck, AlertCircle, Calendar, Pause, PlayCircle, PackageCheck, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { DashboardMetrics } from '@/hooks/useDashboardData';
 
@@ -47,6 +47,20 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       highlight: metrics.atRiskCount > 0,
     },
     {
+      label: 'Batches Preparing',
+      value: metrics.batchesPreparing,
+      icon: PackageCheck,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+    },
+    {
+      label: 'Batches Shipped',
+      value: metrics.batchesShipped,
+      icon: Send,
+      color: 'text-info',
+      bgColor: 'bg-info/10',
+    },
+    {
       label: 'Ready to Ship',
       value: metrics.readyToShip,
       icon: Truck,
@@ -64,7 +78,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-3">
       {items.map((item) => (
         <Card
           key={item.label}

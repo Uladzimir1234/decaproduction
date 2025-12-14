@@ -1,16 +1,18 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Package, AlertTriangle } from "lucide-react";
+import { Truck, Package, AlertTriangle, PackageCheck, Send } from "lucide-react";
 
 export interface PendingDeliveryOrder {
   id: string;
   order_number: string;
   customer_name: string;
   daysUntilDelivery: number;
-  deliveredCount: number;
-  totalItems: number;
-  pendingItems: string[];
+  // Batch-based delivery
+  batchesPreparing: number;
+  batchesShipped: number;
+  batchesDelivered: number;
+  totalBatches: number;
   manufacturingProgress: number;
 }
 
@@ -21,6 +23,10 @@ interface PendingDeliveriesProps {
 export function PendingDeliveries({ orders }: PendingDeliveriesProps) {
   if (orders.length === 0) return null;
 
+  // Calculate totals
+  const totalPreparing = orders.reduce((sum, o) => sum + o.batchesPreparing, 0);
+  const totalShipped = orders.reduce((sum, o) => sum + o.batchesShipped, 0);
+
   return (
     <Card className="border-primary/20">
       <CardHeader className="pb-3">
@@ -29,12 +35,21 @@ export function PendingDeliveries({ orders }: PendingDeliveriesProps) {
             <Truck className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Pending Deliveries</CardTitle>
           </div>
-          <Badge variant="outline" className="border-primary/50">
-            {orders.length} order{orders.length !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {totalPreparing > 0 && (
+              <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                {totalPreparing} preparing
+              </Badge>
+            )}
+            {totalShipped > 0 && (
+              <Badge variant="outline" className="border-info/50 text-info">
+                {totalShipped} in transit
+              </Badge>
+            )}
+          </div>
         </div>
         <CardDescription>
-          Orders with manufacturing complete but items still to deliver
+          Orders with delivery batches pending
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -53,10 +68,24 @@ export function PendingDeliveries({ orders }: PendingDeliveriesProps) {
                       {order.customer_name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      {order.deliveredCount}/{order.totalItems} delivered
-                    </Badge>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {order.batchesPreparing > 0 && (
+                      <Badge variant="outline" className="text-xs gap-1 border-amber-500/50 text-amber-600">
+                        <PackageCheck className="h-3 w-3" />
+                        {order.batchesPreparing} preparing
+                      </Badge>
+                    )}
+                    {order.batchesShipped > 0 && (
+                      <Badge variant="outline" className="text-xs gap-1 border-info/50 text-info">
+                        <Send className="h-3 w-3" />
+                        {order.batchesShipped} in transit
+                      </Badge>
+                    )}
+                    {order.batchesDelivered > 0 && (
+                      <Badge variant="outline" className="text-xs gap-1 border-success/50 text-success">
+                        {order.batchesDelivered} delivered
+                      </Badge>
+                    )}
                     {order.daysUntilDelivery <= 3 && (
                       <Badge variant="destructive" className="text-xs gap-1">
                         <AlertTriangle className="h-3 w-3" />
@@ -64,24 +93,6 @@ export function PendingDeliveries({ orders }: PendingDeliveriesProps) {
                       </Badge>
                     )}
                   </div>
-                  {order.pendingItems.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {order.pendingItems.slice(0, 4).map((item) => (
-                        <Badge 
-                          key={item} 
-                          variant="secondary" 
-                          className="text-xs py-0 px-1.5"
-                        >
-                          {item}
-                        </Badge>
-                      ))}
-                      {order.pendingItems.length > 4 && (
-                        <Badge variant="secondary" className="text-xs py-0 px-1.5">
-                          +{order.pendingItems.length - 4} more
-                        </Badge>
-                      )}
-                    </div>
-                  )}
                 </div>
                 <Package className="h-4 w-4 text-muted-foreground shrink-0" />
               </div>
