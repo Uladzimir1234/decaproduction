@@ -148,7 +148,7 @@ export function ManufacturingPipeline({
                             // Size variants - compact is touch-friendly (44px min target)
                             isCompact 
                               ? "h-9 min-w-[44px] text-[11px]" 
-                              : "h-10 min-w-[90px] text-xs"
+                              : "h-7 min-w-[90px] text-xs"
                           )}
                         >
                           {isLocked && <Lock className={cn("mr-0.5", isCompact ? "h-3 w-3" : "h-3 w-3")} />}
