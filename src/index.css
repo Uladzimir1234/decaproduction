@@ -169,6 +169,19 @@
   .table-row-hover {
     @apply transition-colors hover:bg-muted/50;
   }
+
+  /* Pipeline chevron shapes */
+  .pipeline-chevron {
+    clip-path: polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%, 15% 50%);
+  }
+  
+  .pipeline-chevron-first {
+    clip-path: polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%);
+  }
+  
+  .pipeline-chevron-last {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 15% 50%);
+  }
 }
 
 @layer utilities {
