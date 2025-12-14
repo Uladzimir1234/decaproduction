@@ -20,6 +20,7 @@ import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptio
 import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
 import { useProcurementCart } from "@/contexts/ProcurementCartContext";
+import { ManufacturingPipelineSection } from "@/components/order/ManufacturingPipeline";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -2054,9 +2055,10 @@ export default function Orders() {
                             })}
                           </div>
                         )}
-                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {/* Manufacturing Pipeline - Compact Arrow View */}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-muted-foreground font-medium mr-1">Manufacturing:</span>
+                          <span className="text-xs text-muted-foreground font-medium">Mfg:</span>
                           {order.production_status === 'hold' && (
                             <TooltipProvider>
                               <Tooltip>
@@ -2072,92 +2074,32 @@ export default function Orders() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          {manufacturingStages.map((stage) => {
-                            const f = fulfillments[order.id];
-                            const trackingInfo = formatTrackingInfo(f?.updated_at, f?.updated_by_email);
-                            const isLocked = stage.lock?.isLocked && order.production_status !== 'hold';
-                            const lockReason = stage.lock?.lockReason;
-                            
-                            const badgeContent = (
-                              <span 
-                                className={`inline-flex items-center gap-1 rounded-full text-white text-xs font-medium py-0.5 px-2.5 ${
-                                  stage.status === 'complete' ? 'bg-emerald-500' : 
-                                  stage.status === 'partial' ? 'bg-amber-500' : 'bg-red-500'
-                                } ${order.production_status === 'hold' || isLocked ? 'opacity-50' : ''} ${canUpdateManufacturing && order.production_status !== 'hold' && !isLocked ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                              >
-                                {stage.name}
-                                {stage.progress && (
-                                  <span className="opacity-80">({stage.progress})</span>
-                                )}
-                                {isLocked && (
-                                  <Lock className="h-3 w-3" />
-                                )}
-                                {stage.hasNotes && !stage.progress && !isLocked && (
-                                  <AlertCircle className="h-3 w-3" />
-                                )}
-                              </span>
-                            );
-                            
-                            // Locked stages show tooltip with lock reason
-                            if (isLocked) {
-                              return (
-                                <TooltipProvider key={stage.name}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      {badgeContent}
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{lockReason || 'Component not available'}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            }
-                            
-                            return canUpdateManufacturing && order.production_status !== 'hold' ? (
-                              <Popover key={stage.name}>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <PopoverTrigger asChild>
-                                      <TooltipTrigger asChild>
-                                        <button 
-                                          onClick={(e) => e.stopPropagation()}
-                                          type="button"
-                                        >
-                                          {badgeContent}
-                                        </button>
-                                      </TooltipTrigger>
-                                    </PopoverTrigger>
-                                    {trackingInfo && (
-                                      <TooltipContent className="whitespace-pre-line">
-                                        <p>{trackingInfo}</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <PopoverContent className="w-36 p-0" align="start">
-                                  <StatusPopoverButtons
-                                    currentValue={stage.status}
-                                    options={manufacturingPopoverOptions}
-                                    onChange={(value) => handleStageStatusChange(order.id, stage.field, value)}
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            ) : (
-                              <TooltipProvider key={stage.name}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    {badgeContent}
-                                  </TooltipTrigger>
-                                  {trackingInfo && (
-                                    <TooltipContent className="whitespace-pre-line">
-                                      <p>{trackingInfo}</p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TooltipProvider>
-                            );
-                          })}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ManufacturingPipelineSection
+                              order={{
+                                reinforcement_status: order.reinforcement_status,
+                                windows_profile_status: order.windows_profile_status,
+                                glass_status: order.glass_status,
+                                hardware_status: order.hardware_status,
+                                screens_status: order.screens_status,
+                                sliding_doors_profile_status: order.sliding_doors_profile_status,
+                                sliding_doors_hardware_status: order.sliding_doors_hardware_status,
+                                windows_count: order.windows_count,
+                                doors_count: order.doors_count,
+                                has_sliding_doors: order.has_sliding_doors ?? false,
+                                production_status: order.production_status,
+                              }}
+                              fulfillment={fulfillments[order.id] || {}}
+                              aggregatedComponents={(constructionComponents[order.id] || []).map(c => ({
+                                component_type: c.component_type,
+                                component_name: c.component_name,
+                                status: c.status,
+                              }))}
+                              canUpdateManufacturing={canUpdateManufacturing}
+                              updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
+                              size="compact"
+                            />
+                          </div>
                           {/* Custom Manufacturing Steps */}
                           {customManufacturingSteps.map((step) => {
                             const trackingInfo = formatTrackingInfo(step.updated_at, step.updated_by_email);

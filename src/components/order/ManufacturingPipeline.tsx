@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Lock, ChevronRight } from "lucide-react";
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatusPopoverButtons, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
@@ -24,11 +24,11 @@ interface ManufacturingPipelineProps {
   isProductionReady: boolean;
   canUpdate: boolean;
   onStatusChange: (field: string, value: string) => void;
+  size?: "default" | "compact";
 }
 
 const getStatusColor = (status: StageStatus | string | null | boolean, isLocked: boolean) => {
   if (isLocked) return "bg-muted text-muted-foreground";
-  // Handle boolean values for glass_installed fields
   if (typeof status === 'boolean') {
     return status ? "bg-emerald-500 text-white" : "bg-destructive text-white";
   }
@@ -58,6 +58,20 @@ const getStatusLabel = (status: StageStatus | string | null | boolean): string =
   }
 };
 
+// Abbreviated labels for compact mode
+const compactLabels: Record<string, string> = {
+  'Reinf. Cut': 'R',
+  'Prof. Cut': 'P',
+  'Welded': 'W',
+  'Assembly': 'A',
+  'Glass': 'G',
+  'SD Reinf.': 'R',
+  'SD Prof.': 'P',
+  'SD Weld': 'W',
+  'SD Assy': 'A',
+  'SD Glass': 'G',
+};
+
 export function ManufacturingPipeline({
   trackType,
   trackLabel,
@@ -66,28 +80,40 @@ export function ManufacturingPipeline({
   isProductionReady,
   canUpdate,
   onStatusChange,
+  size = "default",
 }: ManufacturingPipelineProps) {
+  const isCompact = size === "compact";
+  
   return (
-    <div className="space-y-2">
-      {/* Track Label */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">{trackLabel}</span>
-        {!isProductionReady && (
-          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-            <Lock className="h-3 w-3" />
-            On Hold
-          </span>
-        )}
-      </div>
+    <div className={cn("space-y-1", isCompact && "space-y-0")}>
+      {/* Track Label - hidden in compact mode, show icon only */}
+      {!isCompact && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">{trackLabel}</span>
+          {!isProductionReady && (
+            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              On Hold
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Pipeline Arrow */}
-      <div className="flex items-center overflow-x-auto pb-2">
+      <div className="flex items-center">
+        {/* Track icon for compact mode */}
+        {isCompact && (
+          <span className="text-[9px] font-bold text-muted-foreground mr-1 w-3">
+            {trackType === 'windows' ? 'W' : trackType === 'doors' ? 'D' : 'S'}
+          </span>
+        )}
         <TooltipProvider>
           {stages.map((stage, index) => {
             const status = fulfillment[stage.fulfillmentField];
             const isLocked = !isProductionReady || stage.isLocked;
             const isFirst = index === 0;
             const isLast = index === stages.length - 1;
+            const displayLabel = isCompact ? (compactLabels[stage.shortLabel] || stage.shortLabel.charAt(0)) : stage.shortLabel;
 
             return (
               <React.Fragment key={stage.id}>
@@ -98,7 +124,7 @@ export function ManufacturingPipeline({
                         <button
                           disabled={isLocked || !canUpdate}
                           className={cn(
-                            "relative h-10 min-w-[90px] flex items-center justify-center text-xs font-medium transition-all duration-300",
+                            "relative flex items-center justify-center font-medium transition-all duration-300",
                             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
                             getStatusColor(status, isLocked),
                             isLocked && "cursor-not-allowed opacity-70",
@@ -110,11 +136,15 @@ export function ManufacturingPipeline({
                               ? "[clip-path:polygon(0%_0%,100%_0%,100%_100%,0%_100%,15%_50%)]"
                               : "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%,15%_50%)]",
                             // Add slight overlap for connected look
-                            !isFirst && "-ml-3"
+                            !isFirst && "-ml-1",
+                            // Size variants
+                            isCompact 
+                              ? "h-5 min-w-[28px] text-[9px]" 
+                              : "h-10 min-w-[90px] text-xs"
                           )}
                         >
-                          {isLocked && <Lock className="h-3 w-3 mr-1" />}
-                          <span className="truncate px-3">{stage.shortLabel}</span>
+                          {isLocked && <Lock className={cn("mr-0.5", isCompact ? "h-2 w-2" : "h-3 w-3")} />}
+                          <span className={cn("truncate", isCompact ? "px-1" : "px-3")}>{displayLabel}</span>
                         </button>
                       </PopoverTrigger>
                     </TooltipTrigger>
@@ -146,32 +176,29 @@ export function ManufacturingPipeline({
                     </PopoverContent>
                   )}
                 </Popover>
-
-                {/* Arrow connector between stages */}
-                {!isLast && (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/50 -mx-1 flex-shrink-0" />
-                )}
               </React.Fragment>
             );
           })}
         </TooltipProvider>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-sm bg-destructive" />
-          <span>Not Started</span>
+      {/* Legend - only in default mode */}
+      {!isCompact && (
+        <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm bg-destructive" />
+            <span>Not Started</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+            <span>Partial</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+            <span>Complete</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
-          <span>Partial</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-          <span>Complete</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -199,6 +226,7 @@ interface ManufacturingPipelineSectionProps {
   }>;
   canUpdateManufacturing: boolean;
   updateFulfillment: (field: string, value: any) => void;
+  size?: "default" | "compact";
 }
 
 export function ManufacturingPipelineSection({
@@ -207,6 +235,7 @@ export function ManufacturingPipelineSection({
   aggregatedComponents,
   canUpdateManufacturing,
   updateFulfillment,
+  size = "default",
 }: ManufacturingPipelineSectionProps) {
   // Helper to check component availability from aggregated components or legacy fields
   const isProfileAvailable = () => {
@@ -429,7 +458,7 @@ export function ManufacturingPipelineSection({
   if (!fulfillment) return null;
 
   return (
-    <div className="space-y-4">
+    <div className={cn(size === "compact" ? "space-y-0.5" : "space-y-4")}>
       {hasWindows && (
         <ManufacturingPipeline
           trackType="windows"
@@ -439,6 +468,7 @@ export function ManufacturingPipelineSection({
           isProductionReady={isProductionReady}
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
+          size={size}
         />
       )}
       
@@ -451,6 +481,7 @@ export function ManufacturingPipelineSection({
           isProductionReady={isProductionReady}
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
+          size={size}
         />
       )}
       
@@ -463,6 +494,7 @@ export function ManufacturingPipelineSection({
           isProductionReady={isProductionReady}
           canUpdate={canUpdateManufacturing}
           onStatusChange={updateFulfillment}
+          size={size}
         />
       )}
     </div>
