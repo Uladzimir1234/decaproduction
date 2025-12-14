@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { createAuditLog } from "@/lib/auditLog";
 import { DeliveryBatchSection } from "@/components/delivery/DeliveryBatchSection";
 import { OrderMap } from "@/components/order/OrderMap";
-import { ManufacturingPipelineSection } from "@/components/order/ManufacturingPipeline";
+
 
 type StageStatus = "not_started" | "partial" | "complete";
 
@@ -1391,18 +1391,6 @@ export default function OrderDetail() {
             )}
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Manufacturing Pipeline Visualization */}
-            <ManufacturingPipelineSection
-              order={order}
-              fulfillment={fulfillment}
-              aggregatedComponents={aggregatedComponents}
-              canUpdateManufacturing={canUpdateManufacturing}
-              updateFulfillment={updateFulfillment}
-            />
-            
-            <div className="border-t pt-4">
-              <p className="text-xs text-muted-foreground mb-3">Detailed stage controls</p>
-            </div>
             
             <Accordion type="multiple" className="w-full">
               {/* Reinforcement Cutting */}
