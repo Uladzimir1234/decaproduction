@@ -112,11 +112,6 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
-  // Sliding door specific components
-  sliding_doors_profile_status: string | null;
-  sliding_doors_profile_order_date: string | null;
-  sliding_doors_hardware_status: string | null;
-  sliding_doors_hardware_order_date: string | null;
   production_status: string;
 }
 
@@ -474,24 +469,6 @@ export default function OrderDetail() {
     }
     return order?.screens_status === 'ordered' ? 'Ordered' : 'Not Ordered';
   };
-
-  // Sliding door specific component checks
-  const isSlidingDoorsProfileAvailable = () => {
-    return order?.sliding_doors_profile_status === 'available';
-  };
-
-  const isSlidingDoorsHardwareAvailable = () => {
-    return order?.sliding_doors_hardware_status === 'available';
-  };
-
-  const getSlidingDoorsProfileLockText = () => {
-    return order?.sliding_doors_profile_status === 'ordered' ? 'Ordered' : 'Not Ordered';
-  };
-
-  const getSlidingDoorsHardwareLockText = () => {
-    return order?.sliding_doors_hardware_status === 'ordered' ? 'Ordered' : 'Not Ordered';
-  };
-
 
   const addCustomStep = async (stepType: 'ordering' | 'manufacturing', name: string) => {
     if (!id || !name.trim()) return;
@@ -1110,89 +1087,6 @@ export default function OrderDetail() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Sliding Door Profile - Only shown if order has sliding doors */}
-              {order.has_sliding_doors && (
-                <AccordionItem value="order-sliding-doors-profile">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      {order.sliding_doors_profile_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                       order.sliding_doors_profile_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                       <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>Sliding Door Profile</span>
-                      <Badge variant="outline" className="ml-2 capitalize">
-                        {(order.sliding_doors_profile_status || 'not_ordered').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={order.sliding_doors_profile_status || 'not_ordered'}
-                        onChange={value => updateOrderComponent({
-                          sliding_doors_profile_status: value,
-                          sliding_doors_profile_order_date: value === 'ordered' ? order.sliding_doors_profile_order_date || new Date().toISOString().split('T')[0] : null
-                        })}
-                        options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                    {order.sliding_doors_profile_status === 'ordered' && (
-                      <div className="space-y-2">
-                        <Label>Order Date</Label>
-                        <Input
-                          type="date"
-                          value={order.sliding_doors_profile_order_date || ''}
-                          onChange={e => updateOrderComponent({ sliding_doors_profile_order_date: e.target.value })}
-                          disabled={!canUpdateOrdering || isSeller}
-                        />
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
-
-              {/* Sliding Door Hardware - Only shown if order has sliding doors */}
-              {order.has_sliding_doors && (
-                <AccordionItem value="order-sliding-doors-hardware">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      {order.sliding_doors_hardware_status === 'available' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                       order.sliding_doors_hardware_status === 'ordered' ? <Clock className="h-4 w-4 text-amber-500" /> :
-                       <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>Sliding Door Hardware</span>
-                      <Badge variant="outline" className="ml-2 capitalize">
-                        {(order.sliding_doors_hardware_status || 'not_ordered').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-4 space-y-4">
-                    <div className="space-y-3">
-                      <Label>Status</Label>
-                      <StatusButtonGroup
-                        value={order.sliding_doors_hardware_status || 'not_ordered'}
-                        onChange={value => updateOrderComponent({
-                          sliding_doors_hardware_status: value,
-                          sliding_doors_hardware_order_date: value === 'ordered' ? order.sliding_doors_hardware_order_date || new Date().toISOString().split('T')[0] : null
-                        })}
-                        options={orderingStatusOptions}
-                        disabled={!canUpdateOrdering || isSeller}
-                      />
-                    </div>
-                    {order.sliding_doors_hardware_status === 'ordered' && (
-                      <div className="space-y-2">
-                        <Label>Order Date</Label>
-                        <Input
-                          type="date"
-                          value={order.sliding_doors_hardware_order_date || ''}
-                          onChange={e => updateOrderComponent({ sliding_doors_hardware_order_date: e.target.value })}
-                          disabled={!canUpdateOrdering || isSeller}
-                        />
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              )}
 
               {/* Aggregated Components from Constructions */}
               {aggregatedComponents.length > 0 && (
@@ -1590,7 +1484,7 @@ export default function OrderDetail() {
                 </AccordionItem>
               )}
 
-              {/* Sliding Doors Assembled - Requires: Sliding Door Profile AND Sliding Door Hardware Available */}
+              {/* Sliding Doors Assembled - Requires: Welding Complete AND Hardware Available */}
               {order.has_sliding_doors && (
                 <AccordionItem value="sliding">
                   <AccordionTrigger className="hover:no-underline">
@@ -1602,15 +1496,15 @@ export default function OrderDetail() {
                           <Pause className="h-3 w-3" />
                           On Hold
                         </Badge>
-                      ) : !isSlidingDoorsProfileAvailable() ? (
+                      ) : fulfillment.welding_status !== 'complete' ? (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
-                          SD Profile {getSlidingDoorsProfileLockText()}
+                          Welding Not Complete
                         </Badge>
-                      ) : !isSlidingDoorsHardwareAvailable() && (
+                      ) : !isHardwareAvailable() && (
                         <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
                           <Lock className="h-3 w-3" />
-                          SD Hardware {getSlidingDoorsHardwareLockText()}
+                          Hardware {getHardwareLockText()}
                         </Badge>
                       )}
                     </div>
@@ -1618,10 +1512,10 @@ export default function OrderDetail() {
                   <AccordionContent className="pt-4 space-y-4">
                     {order.production_status === 'hold' ? (
                       <p className="text-sm text-muted-foreground">Order is on hold. Change production status to "Production Ready" to update manufacturing stages.</p>
-                    ) : !isSlidingDoorsProfileAvailable() ? (
-                      <p className="text-sm text-muted-foreground">Sliding Door Profile must be available before sliding door assembly can begin.</p>
-                    ) : !isSlidingDoorsHardwareAvailable() ? (
-                      <p className="text-sm text-muted-foreground">Sliding Door Hardware must be available before this stage can be updated.</p>
+                    ) : fulfillment.welding_status !== 'complete' ? (
+                      <p className="text-sm text-muted-foreground">Welding must be complete before sliding door assembly can begin.</p>
+                    ) : !isHardwareAvailable() ? (
+                      <p className="text-sm text-muted-foreground">Hardware must be available before this stage can be updated.</p>
                     ) : (
                       <>
                         <div className="space-y-3">

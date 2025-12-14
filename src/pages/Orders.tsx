@@ -141,11 +141,6 @@ interface Order {
   nail_fins_order_date: string | null;
   hardware_status: string | null;
   hardware_order_date: string | null;
-  // Sliding door specific components
-  sliding_doors_profile_status: string | null;
-  sliding_doors_profile_order_date: string | null;
-  sliding_doors_hardware_status: string | null;
-  sliding_doors_hardware_order_date: string | null;
   production_status: string;
   hold_started_at: string | null;
   is_priority: boolean | null;
@@ -858,26 +853,19 @@ export default function Orders() {
       });
     }
     
-    // Sliding Doors Assembled - requires SD Profile AND SD Hardware available (independent from windows)
+    // Sliding Doors Assembled - requires Welding complete AND Hardware available
     if (order.has_sliding_doors) {
-      const slidingDoorsLock = (() => {
-        if (order.sliding_doors_profile_status !== 'available') {
-          const statusText = order.sliding_doors_profile_status === 'ordered' ? 'Ordered' : 'Not Ordered';
-          return { isLocked: true, lockReason: `SD Profile ${statusText}` };
-        }
-        if (order.sliding_doors_hardware_status !== 'available') {
-          const statusText = order.sliding_doors_hardware_status === 'ordered' ? 'Ordered' : 'Not Ordered';
-          return { isLocked: true, lockReason: `SD Hardware ${statusText}` };
-        }
-        return { isLocked: false };
-      })();
-      
       stages.push({ 
         name: 'Sliding Doors Assembled', 
         status: getStatus(f?.sliding_doors_status), 
         hasNotes: !!(f?.sliding_doors_notes), 
         field: 'sliding_doors_status',
-        lock: slidingDoorsLock
+        lock: getCombinedLock(
+          [{ status: f?.welding_status, name: 'Welding' }],
+          ['hardware', 'handle'],
+          order.hardware_status,
+          'Hardware'
+        )
       });
     }
     
@@ -1122,9 +1110,6 @@ export default function Orders() {
     if (order.screen_type && order.screens_status === 'not_ordered') components.push({ name: 'Screens', field: 'screens_status', isFileExtracted: false });
     if (order.has_plisse_screens && order.plisse_screens_status === 'not_ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status', isFileExtracted: false });
     if (order.has_nailing_flanges && order.nail_fins_status === 'not_ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status', isFileExtracted: false });
-    // Sliding door specific components
-    if (order.has_sliding_doors && order.sliding_doors_profile_status === 'not_ordered') components.push({ name: 'SD Profile', field: 'sliding_doors_profile_status', isFileExtracted: false });
-    if (order.has_sliding_doors && order.sliding_doors_hardware_status === 'not_ordered') components.push({ name: 'SD Hardware', field: 'sliding_doors_hardware_status', isFileExtracted: false });
     return components;
   };
 
@@ -1176,9 +1161,6 @@ export default function Orders() {
     if (order.screen_type && order.screens_status === 'ordered') components.push({ name: 'Screens', field: 'screens_status', isFileExtracted: false });
     if (order.has_plisse_screens && order.plisse_screens_status === 'ordered') components.push({ name: 'Plisse Screens', field: 'plisse_screens_status', isFileExtracted: false });
     if (order.has_nailing_flanges && order.nail_fins_status === 'ordered') components.push({ name: 'Nail Fins', field: 'nail_fins_status', isFileExtracted: false });
-    // Sliding door specific components
-    if (order.has_sliding_doors && order.sliding_doors_profile_status === 'ordered') components.push({ name: 'SD Profile', field: 'sliding_doors_profile_status', isFileExtracted: false });
-    if (order.has_sliding_doors && order.sliding_doors_hardware_status === 'ordered') components.push({ name: 'SD Hardware', field: 'sliding_doors_hardware_status', isFileExtracted: false });
     return components;
   };
 
