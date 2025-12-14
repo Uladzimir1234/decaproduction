@@ -103,7 +103,7 @@ export function ManufacturingPipeline({
       <div className="flex items-center">
         {/* Track icon for compact mode */}
         {isCompact && (
-          <span className="text-[9px] font-bold text-muted-foreground mr-1 w-3">
+          <span className="text-xs font-bold text-muted-foreground mr-1.5 w-4">
             {trackType === 'windows' ? 'W' : trackType === 'doors' ? 'D' : 'S'}
           </span>
         )}
@@ -128,7 +128,7 @@ export function ManufacturingPipeline({
                             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
                             getStatusColor(status, isLocked),
                             isLocked && "cursor-not-allowed opacity-70",
-                            !isLocked && canUpdate && "hover:scale-105 cursor-pointer",
+                            !isLocked && canUpdate && "hover:scale-105 active:scale-95 cursor-pointer",
                             // Chevron shape using clip-path
                             isFirst
                               ? "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%)]"
@@ -137,14 +137,14 @@ export function ManufacturingPipeline({
                               : "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%,15%_50%)]",
                             // Add slight overlap for connected look
                             !isFirst && "-ml-1",
-                            // Size variants
+                            // Size variants - compact is touch-friendly (44px min target)
                             isCompact 
-                              ? "h-5 min-w-[28px] text-[9px]" 
+                              ? "h-9 min-w-[44px] text-[11px]" 
                               : "h-10 min-w-[90px] text-xs"
                           )}
                         >
-                          {isLocked && <Lock className={cn("mr-0.5", isCompact ? "h-2 w-2" : "h-3 w-3")} />}
-                          <span className={cn("truncate", isCompact ? "px-1" : "px-3")}>{displayLabel}</span>
+                          {isLocked && <Lock className={cn("mr-0.5", isCompact ? "h-3 w-3" : "h-3 w-3")} />}
+                          <span className={cn("truncate", isCompact ? "px-1.5" : "px-3")}>{displayLabel}</span>
                         </button>
                       </PopoverTrigger>
                     </TooltipTrigger>
