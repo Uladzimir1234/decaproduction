@@ -855,7 +855,11 @@ export type Database = {
           sliding_doors_glass_installed: boolean | null
           sliding_doors_image_url: string | null
           sliding_doors_notes: string | null
+          sliding_doors_profile_cutting: string | null
+          sliding_doors_reinforcement_cutting: string | null
           sliding_doors_status: string | null
+          sliding_doors_welding_notes: string | null
+          sliding_doors_welding_status: string | null
           updated_at: string | null
           updated_by: string | null
           updated_by_email: string | null
@@ -922,7 +926,11 @@ export type Database = {
           sliding_doors_glass_installed?: boolean | null
           sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
+          sliding_doors_profile_cutting?: string | null
+          sliding_doors_reinforcement_cutting?: string | null
           sliding_doors_status?: string | null
+          sliding_doors_welding_notes?: string | null
+          sliding_doors_welding_status?: string | null
           updated_at?: string | null
           updated_by?: string | null
           updated_by_email?: string | null
@@ -989,7 +997,11 @@ export type Database = {
           sliding_doors_glass_installed?: boolean | null
           sliding_doors_image_url?: string | null
           sliding_doors_notes?: string | null
+          sliding_doors_profile_cutting?: string | null
+          sliding_doors_reinforcement_cutting?: string | null
           sliding_doors_status?: string | null
+          sliding_doors_welding_notes?: string | null
+          sliding_doors_welding_status?: string | null
           updated_at?: string | null
           updated_by?: string | null
           updated_by_email?: string | null
