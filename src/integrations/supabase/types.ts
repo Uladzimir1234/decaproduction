@@ -1054,6 +1054,10 @@ export type Database = {
           screens_status: string | null
           sliding_door_type: string | null
           sliding_doors_count: number | null
+          sliding_doors_hardware_order_date: string | null
+          sliding_doors_hardware_status: string | null
+          sliding_doors_profile_order_date: string | null
+          sliding_doors_profile_status: string | null
           user_id: string
           visible_hinges_count: number | null
           windows_count: number | null
@@ -1107,6 +1111,10 @@ export type Database = {
           screens_status?: string | null
           sliding_door_type?: string | null
           sliding_doors_count?: number | null
+          sliding_doors_hardware_order_date?: string | null
+          sliding_doors_hardware_status?: string | null
+          sliding_doors_profile_order_date?: string | null
+          sliding_doors_profile_status?: string | null
           user_id: string
           visible_hinges_count?: number | null
           windows_count?: number | null
@@ -1160,6 +1168,10 @@ export type Database = {
           screens_status?: string | null
           sliding_door_type?: string | null
           sliding_doors_count?: number | null
+          sliding_doors_hardware_order_date?: string | null
+          sliding_doors_hardware_status?: string | null
+          sliding_doors_profile_order_date?: string | null
+          sliding_doors_profile_status?: string | null
           user_id?: string
           visible_hinges_count?: number | null
           windows_count?: number | null
