@@ -1,0 +1,470 @@
+import * as React from "react";
+import { Lock, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { StatusPopoverButtons, manufacturingPopoverOptions } from "@/components/ui/status-popover-buttons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type StageStatus = "not_started" | "partial" | "complete";
+
+interface Stage {
+  id: string;
+  label: string;
+  shortLabel: string;
+  fulfillmentField: string;
+  isLocked: boolean;
+  lockReason?: string;
+}
+
+interface ManufacturingPipelineProps {
+  trackType: "windows" | "doors" | "sliding_doors";
+  trackLabel: string;
+  stages: Stage[];
+  fulfillment: Record<string, any>;
+  isProductionReady: boolean;
+  canUpdate: boolean;
+  onStatusChange: (field: string, value: string) => void;
+}
+
+const getStatusColor = (status: StageStatus | string | null | boolean, isLocked: boolean) => {
+  if (isLocked) return "bg-muted text-muted-foreground";
+  // Handle boolean values for glass_installed fields
+  if (typeof status === 'boolean') {
+    return status ? "bg-emerald-500 text-white" : "bg-destructive text-white";
+  }
+  switch (status) {
+    case "complete":
+      return "bg-emerald-500 text-white";
+    case "partial":
+      return "bg-amber-500 text-white";
+    case "not_started":
+    default:
+      return "bg-destructive text-white";
+  }
+};
+
+const getStatusLabel = (status: StageStatus | string | null | boolean): string => {
+  if (typeof status === 'boolean') {
+    return status ? "Complete" : "Not Started";
+  }
+  switch (status) {
+    case "complete":
+      return "Complete";
+    case "partial":
+      return "Partial";
+    case "not_started":
+    default:
+      return "Not Started";
+  }
+};
+
+export function ManufacturingPipeline({
+  trackType,
+  trackLabel,
+  stages,
+  fulfillment,
+  isProductionReady,
+  canUpdate,
+  onStatusChange,
+}: ManufacturingPipelineProps) {
+  return (
+    <div className="space-y-2">
+      {/* Track Label */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-muted-foreground">{trackLabel}</span>
+        {!isProductionReady && (
+          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+            <Lock className="h-3 w-3" />
+            On Hold
+          </span>
+        )}
+      </div>
+
+      {/* Pipeline Arrow */}
+      <div className="flex items-center overflow-x-auto pb-2">
+        <TooltipProvider>
+          {stages.map((stage, index) => {
+            const status = fulfillment[stage.fulfillmentField];
+            const isLocked = !isProductionReady || stage.isLocked;
+            const isFirst = index === 0;
+            const isLast = index === stages.length - 1;
+
+            return (
+              <React.Fragment key={stage.id}>
+                <Popover>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <button
+                          disabled={isLocked || !canUpdate}
+                          className={cn(
+                            "relative h-10 min-w-[90px] flex items-center justify-center text-xs font-medium transition-all duration-300",
+                            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+                            getStatusColor(status, isLocked),
+                            isLocked && "cursor-not-allowed opacity-70",
+                            !isLocked && canUpdate && "hover:scale-105 cursor-pointer",
+                            // Chevron shape using clip-path
+                            isFirst
+                              ? "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%)]"
+                              : isLast
+                              ? "[clip-path:polygon(0%_0%,100%_0%,100%_100%,0%_100%,15%_50%)]"
+                              : "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%,15%_50%)]",
+                            // Add slight overlap for connected look
+                            !isFirst && "-ml-3"
+                          )}
+                        >
+                          {isLocked && <Lock className="h-3 w-3 mr-1" />}
+                          <span className="truncate px-3">{stage.shortLabel}</span>
+                        </button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <div className="text-xs">
+                        <p className="font-medium">{stage.label}</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          Status: {getStatusLabel(status)}
+                        </p>
+                        {isLocked && stage.lockReason && (
+                          <p className="text-amber-500 mt-0.5">{stage.lockReason}</p>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  
+                  {!isLocked && canUpdate && (
+                    <PopoverContent className="w-auto p-0" align="center">
+                      <div className="p-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-2 px-2">
+                          {stage.label}
+                        </p>
+                        <StatusPopoverButtons
+                          currentValue={typeof status === 'boolean' ? (status ? 'complete' : 'not_started') : (status || "not_started")}
+                          options={manufacturingPopoverOptions}
+                          onChange={(value) => onStatusChange(stage.fulfillmentField, value)}
+                        />
+                      </div>
+                    </PopoverContent>
+                  )}
+                </Popover>
+
+                {/* Arrow connector between stages */}
+                {!isLast && (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50 -mx-1 flex-shrink-0" />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </TooltipProvider>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <div className="w-2.5 h-2.5 rounded-sm bg-destructive" />
+          <span>Not Started</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+          <span>Partial</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+          <span>Complete</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Section wrapper that combines multiple pipelines
+interface ManufacturingPipelineSectionProps {
+  order: {
+    reinforcement_status: string | null;
+    windows_profile_status: string | null;
+    glass_status: string | null;
+    hardware_status: string | null;
+    screens_status: string | null;
+    sliding_doors_profile_status: string | null;
+    sliding_doors_hardware_status: string | null;
+    windows_count: number;
+    doors_count: number;
+    has_sliding_doors: boolean;
+    production_status: string;
+  };
+  fulfillment: Record<string, any>;
+  aggregatedComponents: Array<{
+    component_type: string;
+    component_name: string | null;
+    status: string;
+  }>;
+  canUpdateManufacturing: boolean;
+  updateFulfillment: (field: string, value: any) => void;
+}
+
+export function ManufacturingPipelineSection({
+  order,
+  fulfillment,
+  aggregatedComponents,
+  canUpdateManufacturing,
+  updateFulfillment,
+}: ManufacturingPipelineSectionProps) {
+  // Helper to check component availability from aggregated components or legacy fields
+  const isProfileAvailable = () => {
+    const profileComponents = aggregatedComponents.filter(c => c.component_type === 'profile');
+    if (profileComponents.length > 0) {
+      return profileComponents.some(c => c.status === 'available');
+    }
+    return order?.windows_profile_status === 'available';
+  };
+
+  const isGlassAvailable = () => {
+    const glassComponents = aggregatedComponents.filter(c => c.component_type === 'glass');
+    if (glassComponents.length > 0) {
+      return glassComponents.some(c => c.status === 'available');
+    }
+    return order?.glass_status === 'available';
+  };
+
+  const isHardwareAvailable = () => {
+    const hardwareComponents = aggregatedComponents.filter(c => c.component_type === 'hardware');
+    if (hardwareComponents.length > 0) {
+      return hardwareComponents.some(c => c.status === 'available');
+    }
+    return order?.hardware_status === 'available';
+  };
+
+  const isReinforcementAvailable = () => order?.reinforcement_status === 'available';
+  const isSlidingDoorsProfileAvailable = () => order?.sliding_doors_profile_status === 'available';
+  const isSlidingDoorsHardwareAvailable = () => order?.sliding_doors_hardware_status === 'available';
+
+  // Check stage completion
+  const isReinforcementCut = () => fulfillment?.reinforcement_cutting === 'complete';
+  const isProfileCut = () => fulfillment?.profile_cutting === 'complete';
+  const isWelded = () => fulfillment?.welding_status === 'complete';
+  const isAssembled = () => fulfillment?.assembly_status === 'complete';
+  const isDoorsAssembled = () => fulfillment?.doors_status === 'complete';
+  const isSlidingDoorsReinforcementCut = () => fulfillment?.sliding_doors_reinforcement_cutting === 'complete';
+  const isSlidingDoorsProfileCut = () => fulfillment?.sliding_doors_profile_cutting === 'complete';
+  const isSlidingDoorsWelded = () => fulfillment?.sliding_doors_welding_status === 'complete';
+  const isSlidingDoorsAssembled = () => fulfillment?.sliding_doors_status === 'complete';
+
+  const getComponentLockReason = (available: boolean, name: string, status: string | null) => {
+    if (available) return undefined;
+    return status === 'ordered' ? `${name} ordered` : `${name} not ordered`;
+  };
+
+  // Windows/General track stages
+  const windowsStages = [
+    {
+      id: 'reinforcement',
+      label: 'Reinforcement Cutting',
+      shortLabel: 'Reinf. Cut',
+      fulfillmentField: 'reinforcement_cutting',
+      isLocked: !isReinforcementAvailable(),
+      lockReason: getComponentLockReason(isReinforcementAvailable(), 'Reinforcement', order?.reinforcement_status || null),
+    },
+    {
+      id: 'profile',
+      label: 'Profile Cutting',
+      shortLabel: 'Prof. Cut',
+      fulfillmentField: 'profile_cutting',
+      isLocked: !isProfileAvailable(),
+      lockReason: getComponentLockReason(isProfileAvailable(), 'Profile', order?.windows_profile_status || null),
+    },
+    {
+      id: 'welding',
+      label: 'Frames/Sashes Welded',
+      shortLabel: 'Welded',
+      fulfillmentField: 'welding_status',
+      isLocked: !isReinforcementCut() || !isProfileCut(),
+      lockReason: !isReinforcementCut() 
+        ? 'Reinforcement not cut' 
+        : !isProfileCut() 
+          ? 'Profile not cut' 
+          : undefined,
+    },
+    {
+      id: 'assembly',
+      label: 'Frame/Sash Assembly',
+      shortLabel: 'Assembly',
+      fulfillmentField: 'assembly_status',
+      isLocked: !isWelded() || !isHardwareAvailable(),
+      lockReason: !isWelded() 
+        ? 'Welding not complete' 
+        : !isHardwareAvailable() 
+          ? 'Hardware not available' 
+          : undefined,
+    },
+    {
+      id: 'glass',
+      label: 'Glass Installed',
+      shortLabel: 'Glass',
+      fulfillmentField: 'glass_status',
+      isLocked: !isAssembled() || !isGlassAvailable(),
+      lockReason: !isAssembled() 
+        ? 'Assembly not complete' 
+        : !isGlassAvailable() 
+          ? 'Glass not available' 
+          : undefined,
+    },
+  ];
+
+  // Doors track stages
+  const doorsStages = [
+    {
+      id: 'doors-reinforcement',
+      label: 'Reinforcement Cutting',
+      shortLabel: 'Reinf. Cut',
+      fulfillmentField: 'reinforcement_cutting',
+      isLocked: !isReinforcementAvailable(),
+      lockReason: getComponentLockReason(isReinforcementAvailable(), 'Reinforcement', order?.reinforcement_status || null),
+    },
+    {
+      id: 'doors-profile',
+      label: 'Profile Cutting',
+      shortLabel: 'Prof. Cut',
+      fulfillmentField: 'profile_cutting',
+      isLocked: !isProfileAvailable(),
+      lockReason: getComponentLockReason(isProfileAvailable(), 'Profile', order?.windows_profile_status || null),
+    },
+    {
+      id: 'doors-welding',
+      label: 'Frame Welded',
+      shortLabel: 'Welded',
+      fulfillmentField: 'welding_status',
+      isLocked: !isReinforcementCut() || !isProfileCut(),
+      lockReason: !isReinforcementCut() 
+        ? 'Reinforcement not cut' 
+        : !isProfileCut() 
+          ? 'Profile not cut' 
+          : undefined,
+    },
+    {
+      id: 'doors-assembly',
+      label: 'Doors Assembled',
+      shortLabel: 'Assembly',
+      fulfillmentField: 'doors_status',
+      isLocked: !isWelded() || !isHardwareAvailable(),
+      lockReason: !isWelded() 
+        ? 'Welding not complete' 
+        : !isHardwareAvailable() 
+          ? 'Hardware not available' 
+          : undefined,
+    },
+    {
+      id: 'doors-glass',
+      label: 'Glass Installed',
+      shortLabel: 'Glass',
+      fulfillmentField: 'doors_glass_installed',
+      isLocked: !isDoorsAssembled() || !isGlassAvailable(),
+      lockReason: !isDoorsAssembled() 
+        ? 'Doors not assembled' 
+        : !isGlassAvailable() 
+          ? 'Glass not available' 
+          : undefined,
+    },
+  ];
+
+  // Sliding doors independent track stages
+  const slidingDoorsStages = [
+    {
+      id: 'sd-reinforcement',
+      label: 'SD Reinforcement Cutting',
+      shortLabel: 'SD Reinf.',
+      fulfillmentField: 'sliding_doors_reinforcement_cutting',
+      isLocked: !isReinforcementAvailable(),
+      lockReason: getComponentLockReason(isReinforcementAvailable(), 'Reinforcement', order?.reinforcement_status || null),
+    },
+    {
+      id: 'sd-profile',
+      label: 'SD Profile Cutting',
+      shortLabel: 'SD Prof.',
+      fulfillmentField: 'sliding_doors_profile_cutting',
+      isLocked: !isSlidingDoorsProfileAvailable(),
+      lockReason: getComponentLockReason(isSlidingDoorsProfileAvailable(), 'SD Profile', order?.sliding_doors_profile_status || null),
+    },
+    {
+      id: 'sd-welding',
+      label: 'SD Frames Welded',
+      shortLabel: 'SD Weld',
+      fulfillmentField: 'sliding_doors_welding_status',
+      isLocked: !isSlidingDoorsReinforcementCut() || !isSlidingDoorsProfileCut(),
+      lockReason: !isSlidingDoorsReinforcementCut() 
+        ? 'SD Reinforcement not cut' 
+        : !isSlidingDoorsProfileCut() 
+          ? 'SD Profile not cut' 
+          : undefined,
+    },
+    {
+      id: 'sd-assembly',
+      label: 'SD Assembled',
+      shortLabel: 'SD Assy',
+      fulfillmentField: 'sliding_doors_status',
+      isLocked: !isSlidingDoorsWelded() || !isSlidingDoorsHardwareAvailable(),
+      lockReason: !isSlidingDoorsWelded() 
+        ? 'SD Welding not complete' 
+        : !isSlidingDoorsHardwareAvailable() 
+          ? 'SD Hardware not available' 
+          : undefined,
+    },
+    {
+      id: 'sd-glass',
+      label: 'SD Glass Installed',
+      shortLabel: 'SD Glass',
+      fulfillmentField: 'sliding_doors_glass_installed',
+      isLocked: !isSlidingDoorsAssembled() || !isGlassAvailable(),
+      lockReason: !isSlidingDoorsAssembled() 
+        ? 'SD not assembled' 
+        : !isGlassAvailable() 
+          ? 'Glass not available' 
+          : undefined,
+    },
+  ];
+
+  const hasWindows = (order?.windows_count ?? 0) > 0;
+  const hasDoors = (order?.doors_count ?? 0) > 0;
+  const hasSlidingDoors = order?.has_sliding_doors ?? false;
+  const isProductionReady = order?.production_status === 'production_ready';
+
+  if (!fulfillment) return null;
+
+  return (
+    <div className="space-y-4">
+      {hasWindows && (
+        <ManufacturingPipeline
+          trackType="windows"
+          trackLabel="Windows Track"
+          stages={windowsStages}
+          fulfillment={fulfillment}
+          isProductionReady={isProductionReady}
+          canUpdate={canUpdateManufacturing}
+          onStatusChange={updateFulfillment}
+        />
+      )}
+      
+      {hasDoors && (
+        <ManufacturingPipeline
+          trackType="doors"
+          trackLabel="Doors Track"
+          stages={doorsStages}
+          fulfillment={fulfillment}
+          isProductionReady={isProductionReady}
+          canUpdate={canUpdateManufacturing}
+          onStatusChange={updateFulfillment}
+        />
+      )}
+      
+      {hasSlidingDoors && (
+        <ManufacturingPipeline
+          trackType="sliding_doors"
+          trackLabel="Sliding Doors Track"
+          stages={slidingDoorsStages}
+          fulfillment={fulfillment}
+          isProductionReady={isProductionReady}
+          canUpdate={canUpdateManufacturing}
+          onStatusChange={updateFulfillment}
+        />
+      )}
+    </div>
+  );
+}
