@@ -20,7 +20,7 @@ import { StatusPopoverButtons, orderingPopoverOptions, manufacturingPopoverOptio
 import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
 import { useProcurementCart } from "@/contexts/ProcurementCartContext";
-import { ManufacturingPipelineSection } from "@/components/order/ManufacturingPipeline";
+import { SupplyManufacturingSection } from "@/components/order/SupplyManufacturingPipeline";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -2075,8 +2075,9 @@ export default function Orders() {
                             </TooltipProvider>
                           )}
                           <div onClick={(e) => e.stopPropagation()}>
-                            <ManufacturingPipelineSection
+                            <SupplyManufacturingSection
                               order={{
+                                id: order.id,
                                 reinforcement_status: order.reinforcement_status,
                                 windows_profile_status: order.windows_profile_status,
                                 glass_status: order.glass_status,
@@ -2095,11 +2096,10 @@ export default function Orders() {
                                 component_name: c.component_name,
                                 status: c.status,
                               }))}
+                              canUpdateSupply={canUpdateOrdering}
                               canUpdateManufacturing={canUpdateManufacturing}
-                              updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
-                              size="default"
-                              showLegend={false}
-                              showTrackLetter={true}
+                              onSupplyStatusChange={(field, value) => handleComponentStatusChange(order.id, field, value)}
+                              onManufacturingStatusChange={(field, value) => handleStageStatusChange(order.id, field, value)}
                             />
                           </div>
                           {/* Custom Manufacturing Steps */}
