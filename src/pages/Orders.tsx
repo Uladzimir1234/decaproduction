@@ -5,7 +5,8 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -155,6 +156,7 @@ interface Order {
   production_status: string;
   hold_started_at: string | null;
   is_priority: boolean | null;
+  delivery_complete: boolean | null;
   // Ordering tracking fields
   ordering_updated_at: string | null;
   ordering_updated_by: string | null;
@@ -1640,10 +1642,28 @@ export default function Orders() {
             </Select>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
+          <Tabs defaultValue="active" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="active" className="gap-2">
+                <Wrench className="h-4 w-4" />
+                Active Orders
+                <Badge variant="secondary" className="ml-1">
+                  {filteredOrders.filter(o => !o.delivery_complete).length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="finished" className="gap-2">
+                <Archive className="h-4 w-4" />
+                Finished Orders
+                <Badge variant="secondary" className="ml-1">
+                  {filteredOrders.filter(o => o.delivery_complete).length}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="active">
           {(() => {
-            // Apply sorting to filtered orders
-            const sortedOrders = [...filteredOrders].sort((a, b) => {
+            // Sort orders helper
+            const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
               // Priority orders always come first
               if (a.is_priority && !b.is_priority) return -1;
               if (!a.is_priority && b.is_priority) return 1;
@@ -1667,16 +1687,26 @@ export default function Orders() {
               }
             });
             
-            return sortedOrders.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>No orders found.</p>
-                {orders.length === 0 && <Link to="/orders/new">
-                    <Button variant="link" className="mt-2">Create your first order</Button>
-                  </Link>}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedOrders.map(order => {
+            // Split orders by delivery status
+            const activeOrders = sortOrders(filteredOrders.filter(o => !o.delivery_complete));
+            const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+            
+            // Render orders list helper
+            const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
+              if (ordersList.length === 0) {
+                return (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p>{emptyMessage}</p>
+                    {orders.length === 0 && <Link to="/orders/new">
+                        <Button variant="link" className="mt-2">Create your first order</Button>
+                      </Link>}
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="space-y-3">
+                  {ordersList.map(order => {
             const daysUntil = getDaysUntilDelivery(order.delivery_date);
             const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
             const notOrderedComponents = getNotOrderedComponents(order);
@@ -2385,10 +2415,107 @@ export default function Orders() {
                       </div>
                     )}
                   </div>;
-          })}
-              </div>
+                  })}
+                </div>
+              );
+            };
+            
+            return (
+              <>
+                {renderOrdersList(activeOrders, "No active orders found.")}
+              </>
             );
           })()}
+            </TabsContent>
+            <TabsContent value="finished">
+              {(() => {
+                // Sort orders helper
+                const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
+                  switch (sortBy) {
+                    case 'time_left_asc':
+                      return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
+                    case 'time_left_desc':
+                      return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
+                    case 'order_date_asc':
+                      return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
+                    case 'order_date_desc':
+                      return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
+                    case 'fulfillment_asc':
+                      return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
+                    case 'fulfillment_desc':
+                      return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
+                    default:
+                      return 0;
+                  }
+                });
+                
+                const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+                
+                if (finishedOrders.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <p>No finished orders found.</p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-3">
+                    {finishedOrders.map(order => {
+                      const daysUntil = getDaysUntilDelivery(order.delivery_date);
+                      const orderBatches = getOrderDeliveryBatches(order.id);
+                      const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
+                      const deliveredBatches = orderBatches.filter(b => b.status === 'delivered').length;
+                      
+                      return (
+                        <div 
+                          key={order.id} 
+                          id={`order-${order.id}`} 
+                          className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} 
+                          onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
+                                #{order.order_number}
+                              </span>
+                              <span className="font-medium truncate">
+                                {order.customer_name}
+                              </span>
+                              <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
+                                <CheckCircle className="h-3 w-3" />
+                                Delivered
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
+                              {shippedBatches > 0 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              {(isAdmin || isManager) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => handleEditClick(e, order)}
+                                  className="shrink-0"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
