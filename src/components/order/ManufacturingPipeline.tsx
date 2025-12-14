@@ -143,8 +143,8 @@ export function ManufacturingPipeline({
                               : isLast
                               ? "[clip-path:polygon(0%_0%,100%_0%,100%_100%,0%_100%,15%_50%)]"
                               : "[clip-path:polygon(0%_0%,85%_0%,100%_50%,85%_100%,0%_100%,15%_50%)]",
-                            // Add slight overlap for connected look
-                            !isFirst && "-ml-1",
+                            // Add overlap for connected look
+                            !isFirst && "-ml-2",
                             // Size variants - compact is touch-friendly (44px min target)
                             isCompact 
                               ? "h-9 min-w-[44px] text-[11px]" 
