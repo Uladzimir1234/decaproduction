@@ -1,9 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode as hexEncode } from 'https://deno.land/std@0.177.0/encoding/hex.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Hash password using SHA-256 with salt
+async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = new TextDecoder().decode(hexEncode(salt));
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(saltHex + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashHex = new TextDecoder().decode(hexEncode(new Uint8Array(hashBuffer)));
+  
+  // Return salt:hash format
+  return `${saltHex}:${hashHex}`;
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -105,14 +120,17 @@ Deno.serve(async (req) => {
       console.error('Error assigning role:', roleError);
     }
 
-    // Store invitation record
+    // Hash the password before storing
+    const hashedPassword = await hashPassword(password);
+
+    // Store invitation record with hashed password
     const { error: inviteError } = await supabaseAdmin
       .from('user_invitations')
       .insert({
         email: email,
         role: role,
         invited_by: callerUser.id,
-        temporary_password: password,
+        temporary_password: hashedPassword, // Store hashed, not plaintext
         accepted_at: new Date().toISOString(), // Mark as accepted since we created the account directly
       });
 
