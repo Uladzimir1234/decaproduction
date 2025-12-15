@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // Use the most accurate model for document extraction
-const AI_MODEL = 'google/gemini-2.5-pro';
+const AI_MODEL = 'google/gemini-3-pro-preview';
 
 interface ConstructionComponent {
   component_type: string;
