@@ -5,8 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Use the most accurate model for document extraction
-const AI_MODEL = 'google/gemini-3-pro-preview';
+// Available models for comparison
+const MODELS = {
+  gemini25: 'google/gemini-2.5-pro',
+  gemini3: 'google/gemini-3-pro-preview',
+};
+
+// Default model
+const DEFAULT_MODEL = MODELS.gemini3;
 
 interface ConstructionComponent {
   component_type: string;
@@ -47,18 +53,35 @@ interface ParsedOrder {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
-  // NEW: Aggregated components for ordering
   aggregated_components: {
     component_type: string;
     component_name: string;
     total_quantity: number;
   }[];
-  // NEW: Profile info
   profile_info: {
     model: string | null;
     color_exterior: string | null;
     color_interior: string | null;
   } | null;
+}
+
+interface ModelResult {
+  model: string;
+  data: ParsedOrder;
+  processingTimeMs: number;
+  error?: string;
+}
+
+interface ComparisonResult {
+  gemini25: ModelResult;
+  gemini3: ModelResult;
+  comparison: {
+    constructionCountMatch: boolean;
+    componentCountMatch: boolean;
+    differences: string[];
+    gemini25Stats: { constructions: number; components: number; filledFields: number };
+    gemini3Stats: { constructions: number; components: number; filledFields: number };
+  };
 }
 
 // Shared tool definition for extraction
@@ -220,7 +243,7 @@ function processExtractedData(extracted: any): ParsedOrder {
     .filter((c: Construction) => c.construction_type === 'sliding_door')
     .reduce((sum: number, c: Construction) => sum + c.quantity, 0);
 
-  // NEW: Aggregate components across all constructions
+  // Aggregate components across all constructions
   const componentMap = new Map<string, { type: string; name: string; qty: number }>();
   
   for (const construction of constructions) {
@@ -303,7 +326,7 @@ function processExtractedData(extracted: any): ParsedOrder {
     total_quantity: c.qty,
   }));
 
-  // NEW: Extract profile info from first construction with data
+  // Extract profile info from first construction with data
   let profile_info = null;
   for (const c of constructions) {
     if (c.model || c.color_exterior || c.color_interior) {
@@ -314,11 +337,6 @@ function processExtractedData(extracted: any): ParsedOrder {
       };
       break;
     }
-  }
-
-  console.log(`Aggregated ${aggregated_components.length} unique component types from ${constructions.length} constructions`);
-  for (const comp of aggregated_components) {
-    console.log(`  - ${comp.component_type}: ${comp.component_name} x${comp.total_quantity}`);
   }
 
   return {
@@ -334,69 +352,96 @@ function processExtractedData(extracted: any): ParsedOrder {
   };
 }
 
-async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY is not configured');
-  }
-
-  console.log('Parsing CSV with AI (gemini-2.5-pro)...');
-
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${csvContent}` }
-      ],
-      tools: [extractionTool],
-      tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('AI error:', response.status, errorText);
-    if (response.status === 429) throw new Error('Rate limit exceeded. Try again later.');
-    if (response.status === 402) throw new Error('AI credits exhausted.');
-    throw new Error(`AI processing failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+// Count non-null fields in constructions for completeness comparison
+function countFilledFields(data: ParsedOrder): number {
+  let count = 0;
+  const fieldsToCheck = [
+    'quote_number', 'customer_name', 'order_date'
+  ];
   
-  if (!toolCall?.function?.arguments) {
-    throw new Error('Failed to extract data from CSV');
+  for (const field of fieldsToCheck) {
+    if ((data as any)[field]) count++;
   }
-
-  const extracted = JSON.parse(toolCall.function.arguments);
-  console.log('Raw extraction result:', JSON.stringify(extracted, null, 2).substring(0, 2000));
   
-  return processExtractedData(extracted);
+  for (const c of data.constructions) {
+    const constructionFields = [
+      'width_mm', 'height_mm', 'width_inches', 'height_inches',
+      'model', 'opening_type', 'color_exterior', 'color_interior',
+      'glass_type', 'screen_type', 'handle_type', 'blinds_color',
+      'location', 'rough_opening', 'comments'
+    ];
+    for (const field of constructionFields) {
+      if ((c as any)[field]) count++;
+    }
+  }
+  
+  return count;
 }
 
-async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
+// Compare two extraction results
+function compareResults(result25: ParsedOrder, result3: ParsedOrder) {
+  const differences: string[] = [];
+  
+  // Compare construction counts
+  if (result25.constructions.length !== result3.constructions.length) {
+    differences.push(`Construction count: Gemini 2.5 found ${result25.constructions.length}, Gemini 3 found ${result3.constructions.length}`);
+  }
+  
+  // Compare component counts
+  if (result25.aggregated_components.length !== result3.aggregated_components.length) {
+    differences.push(`Component types: Gemini 2.5 found ${result25.aggregated_components.length}, Gemini 3 found ${result3.aggregated_components.length}`);
+  }
+  
+  // Compare quote/customer
+  if (result25.quote_number !== result3.quote_number) {
+    differences.push(`Quote number: "${result25.quote_number}" vs "${result3.quote_number}"`);
+  }
+  if (result25.customer_name !== result3.customer_name) {
+    differences.push(`Customer name: "${result25.customer_name}" vs "${result3.customer_name}"`);
+  }
+  
+  // Compare window/door/sliding counts
+  if (result25.windows_count !== result3.windows_count) {
+    differences.push(`Windows count: ${result25.windows_count} vs ${result3.windows_count}`);
+  }
+  if (result25.doors_count !== result3.doors_count) {
+    differences.push(`Doors count: ${result25.doors_count} vs ${result3.doors_count}`);
+  }
+  if (result25.sliding_doors_count !== result3.sliding_doors_count) {
+    differences.push(`Sliding doors count: ${result25.sliding_doors_count} vs ${result3.sliding_doors_count}`);
+  }
+  
+  return {
+    constructionCountMatch: result25.constructions.length === result3.constructions.length,
+    componentCountMatch: result25.aggregated_components.length === result3.aggregated_components.length,
+    differences,
+    gemini25Stats: {
+      constructions: result25.constructions.length,
+      components: result25.aggregated_components.length,
+      filledFields: countFilledFields(result25),
+    },
+    gemini3Stats: {
+      constructions: result3.constructions.length,
+      components: result3.aggregated_components.length,
+      filledFields: countFilledFields(result3),
+    },
+  };
+}
+
+async function extractWithModel(model: string, content: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) {
     throw new Error('LOVABLE_API_KEY is not configured');
   }
 
-  console.log('Processing PDF with AI (gemini-2.5-pro)...');
+  const startTime = Date.now();
+  console.log(`Extracting with ${model}...`);
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: [
+  try {
+    let messages: any[];
+    
+    if (contentType === 'pdf' && base64Content) {
+      messages = [
         { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
@@ -405,34 +450,88 @@ async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
             { type: 'image_url', image_url: { url: `data:application/pdf;base64,${base64Content}` } }
           ]
         }
-      ],
-      tools: [extractionTool],
-      tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
-    }),
-  });
+      ];
+    } else {
+      messages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${content}` }
+      ];
+    }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('AI error:', response.status, errorText);
-    throw new Error(`AI processing failed: ${response.status}`);
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        tools: [extractionTool],
+        tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`AI error for ${model}:`, response.status, errorText);
+      throw new Error(`AI processing failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (!toolCall?.function?.arguments) {
+      throw new Error('Failed to extract data');
+    }
+
+    const extracted = JSON.parse(toolCall.function.arguments);
+    const processingTimeMs = Date.now() - startTime;
+    
+    console.log(`${model} completed in ${processingTimeMs}ms`);
+    
+    return {
+      model,
+      data: processExtractedData(extracted),
+      processingTimeMs,
+    };
+  } catch (error) {
+    const processingTimeMs = Date.now() - startTime;
+    console.error(`Error with ${model}:`, error);
+    return {
+      model,
+      data: {
+        quote_number: null,
+        customer_name: null,
+        order_date: null,
+        constructions: [],
+        windows_count: 0,
+        doors_count: 0,
+        sliding_doors_count: 0,
+        aggregated_components: [],
+        profile_info: null,
+      },
+      processingTimeMs,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
-
-  const data = await response.json();
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-  
-  if (!toolCall?.function?.arguments) {
-    throw new Error('Failed to extract data from PDF');
-  }
-
-  return processExtractedData(JSON.parse(toolCall.function.arguments));
 }
 
-async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY is not configured');
-  }
+async function parseCSVWithAI(csvContent: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
+  console.log(`Parsing CSV with ${model}...`);
+  const result = await extractWithModel(model, csvContent, 'csv');
+  if (result.error) throw new Error(result.error);
+  return result.data;
+}
 
+async function processPDFWithAI(base64Content: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
+  console.log(`Processing PDF with ${model}...`);
+  const result = await extractWithModel(model, '', 'pdf', base64Content);
+  if (result.error) throw new Error(result.error);
+  return result.data;
+}
+
+async function parseExcelWithAI(base64Content: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
   console.log('Converting Excel to text...');
 
   // Extract text from Excel binary
@@ -466,38 +565,69 @@ async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
     .join('\n');
 
   console.log('Extracted text preview:', textContent.substring(0, 500));
-
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}` }
-      ],
-      tools: [extractionTool],
-      tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('AI error:', response.status, errorText);
-    throw new Error(`AI processing failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   
-  if (!toolCall?.function?.arguments) {
-    throw new Error('Failed to extract data from Excel');
-  }
+  const result = await extractWithModel(model, textContent, 'excel');
+  if (result.error) throw new Error(result.error);
+  return result.data;
+}
 
-  return processExtractedData(JSON.parse(toolCall.function.arguments));
+async function runComparison(
+  fileContent: string, 
+  fileType: 'csv' | 'pdf' | 'excel',
+  base64Content: string
+): Promise<ComparisonResult> {
+  console.log('Running model comparison...');
+  
+  let content = '';
+  if (fileType === 'csv') {
+    content = atob(base64Content);
+  } else if (fileType === 'excel') {
+    // Extract text for Excel
+    const binaryString = atob(base64Content);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    let currentString = '';
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i];
+      if ((byte >= 32 && byte <= 126) || byte === 10 || byte === 13 || byte === 9) {
+        currentString += String.fromCharCode(byte);
+      } else if (currentString.length > 3) {
+        content += currentString + '\n';
+        currentString = '';
+      } else {
+        currentString = '';
+      }
+    }
+    if (currentString.length > 3) {
+      content += currentString;
+    }
+    content = content
+      .split('\n')
+      .filter(line => line.trim().length > 2)
+      .filter(line => !/^[\x00-\x1F\x7F]+$/.test(line))
+      .join('\n');
+  }
+  
+  // Run both models in parallel
+  const [result25, result3] = await Promise.all([
+    extractWithModel(MODELS.gemini25, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+    extractWithModel(MODELS.gemini3, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+  ]);
+  
+  const comparison = compareResults(result25.data, result3.data);
+  
+  console.log('Comparison complete:');
+  console.log(`  Gemini 2.5: ${result25.processingTimeMs}ms, ${result25.data.constructions.length} constructions`);
+  console.log(`  Gemini 3: ${result3.processingTimeMs}ms, ${result3.data.constructions.length} constructions`);
+  console.log(`  Differences: ${comparison.differences.length}`);
+  
+  return {
+    gemini25: result25,
+    gemini3: result3,
+    comparison,
+  };
 }
 
 serve(async (req) => {
@@ -506,9 +636,18 @@ serve(async (req) => {
   }
 
   try {
-    const { file_content, file_type, file_name } = await req.json();
-    console.log(`Processing ${file_type} file: ${file_name}`);
+    const { file_content, file_type, file_name, compare_models } = await req.json();
+    console.log(`Processing ${file_type} file: ${file_name}${compare_models ? ' (COMPARISON MODE)' : ''}`);
 
+    // Comparison mode - run both models
+    if (compare_models) {
+      const comparisonResult = await runComparison(file_content, file_type, file_content);
+      return new Response(JSON.stringify(comparisonResult), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Normal mode - single model
     let result: ParsedOrder;
 
     if (file_type === 'csv') {

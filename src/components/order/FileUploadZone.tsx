@@ -1,8 +1,11 @@
 import { useState, useCallback } from "react";
-import { Upload, FileText, Loader2, X } from "lucide-react";
+import { Upload, FileText, Loader2, X, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ModelComparisonView } from "./ModelComparisonView";
 
 export interface ParsedComponent {
   component_type: string;
@@ -35,14 +38,12 @@ export interface ParsedConstruction {
   components?: ParsedComponent[];
 }
 
-// NEW: Aggregated component for order-level tracking
 export interface AggregatedComponent {
   component_type: string;
   component_name: string;
   total_quantity: number;
 }
 
-// NEW: Profile info extracted from file
 export interface ProfileInfo {
   model: string | null;
   color_exterior: string | null;
@@ -57,10 +58,27 @@ export interface ParsedOrderData {
   windows_count: number;
   doors_count: number;
   sliding_doors_count: number;
-  // NEW: Pre-aggregated components from backend
   aggregated_components?: AggregatedComponent[];
-  // NEW: Profile info
   profile_info?: ProfileInfo | null;
+}
+
+interface ModelResult {
+  model: string;
+  data: ParsedOrderData;
+  processingTimeMs: number;
+  error?: string;
+}
+
+interface ComparisonData {
+  gemini25: ModelResult;
+  gemini3: ModelResult;
+  comparison: {
+    constructionCountMatch: boolean;
+    componentCountMatch: boolean;
+    differences: string[];
+    gemini25Stats: { constructions: number; components: number; filledFields: number };
+    gemini3Stats: { constructions: number; components: number; filledFields: number };
+  };
 }
 
 interface FileUploadZoneProps {
@@ -73,6 +91,8 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [compareModels, setCompareModels] = useState(false);
+  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const { toast } = useToast();
 
   const processFile = useCallback(async (file: File) => {
@@ -99,14 +119,13 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
     setIsProcessing(true);
     setFileName(file.name);
+    setComparisonData(null);
 
     try {
-      // Read file as base64
       const reader = new FileReader();
       const base64Content = await new Promise<string>((resolve, reject) => {
         reader.onload = () => {
           const result = reader.result as string;
-          // Remove data URL prefix (e.g., "data:text/csv;base64,")
           const base64 = result.split(',')[1];
           resolve(base64);
         };
@@ -124,19 +143,29 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           file_content: base64Content,
           file_type: fileType,
           file_name: file.name,
+          compare_models: compareModels,
         },
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      onDataParsed(data);
-      
-      const componentCount = data.aggregated_components?.length || 0;
-      toast({
-        title: "File processed",
-        description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
-      });
+      if (compareModels && data.gemini25 && data.gemini3) {
+        // Comparison mode - show comparison UI
+        setComparisonData(data as ComparisonData);
+        toast({
+          title: "Comparison complete",
+          description: `Compared Gemini 2.5 Pro vs Gemini 3 Pro Preview`,
+        });
+      } else {
+        // Normal mode
+        onDataParsed(data);
+        const componentCount = data.aggregated_components?.length || 0;
+        toast({
+          title: "File processed",
+          description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
+        });
+      }
     } catch (error: any) {
       console.error('Error processing file:', error);
       toast({
@@ -148,7 +177,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
     } finally {
       setIsProcessing(false);
     }
-  }, [onDataParsed, toast]);
+  }, [onDataParsed, toast, compareModels]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -179,8 +208,29 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
   const handleClear = useCallback(() => {
     setFileName(null);
+    setComparisonData(null);
     onClear();
   }, [onClear]);
+
+  const handleSelectModel = useCallback((modelData: ParsedOrderData, modelName: string) => {
+    onDataParsed(modelData);
+    setComparisonData(null);
+    toast({
+      title: "Model selected",
+      description: `Using extraction from ${modelName}`,
+    });
+  }, [onDataParsed, toast]);
+
+  // Show comparison view
+  if (comparisonData) {
+    return (
+      <ModelComparisonView 
+        data={comparisonData}
+        onSelectModel={handleSelectModel}
+        onCancel={handleClear}
+      />
+    );
+  }
 
   if (parsedData) {
     const componentCount = parsedData.aggregated_components?.length || 0;
@@ -209,41 +259,66 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   }
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      className={`
-        border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
-        ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-        ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
-      `}
-    >
-      <input
-        type="file"
-        accept=".csv,.pdf,.xls,.xlsx"
-        onChange={handleFileSelect}
-        className="hidden"
-        id="file-upload"
-        disabled={isProcessing}
-      />
-      <label htmlFor="file-upload" className="cursor-pointer">
-        {isProcessing ? (
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <p className="text-sm font-medium">Processing {fileName}...</p>
-            <p className="text-xs text-muted-foreground">Using AI for accurate extraction...</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm font-medium">Upload Order File</p>
-            <p className="text-xs text-muted-foreground">
-              PDF, CSV, or Excel
-            </p>
-          </div>
-        )}
-      </label>
+    <div className="space-y-3">
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className={`
+          border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+          ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+          ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
+        `}
+      >
+        <input
+          type="file"
+          accept=".csv,.pdf,.xls,.xlsx"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="file-upload"
+          disabled={isProcessing}
+        />
+        <label htmlFor="file-upload" className="cursor-pointer">
+          {isProcessing ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <p className="text-sm font-medium">
+                {compareModels ? 'Comparing models...' : `Processing ${fileName}...`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {compareModels 
+                  ? 'Running Gemini 2.5 Pro and Gemini 3 Pro Preview in parallel...'
+                  : 'Using AI for accurate extraction...'}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Upload className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium">Upload Order File</p>
+              <p className="text-xs text-muted-foreground">
+                PDF, CSV, or Excel
+              </p>
+            </div>
+          )}
+        </label>
+      </div>
+      
+      {/* Compare Models Toggle */}
+      <div className="flex items-center gap-2 px-1">
+        <Checkbox 
+          id="compare-models" 
+          checked={compareModels}
+          onCheckedChange={(checked) => setCompareModels(checked === true)}
+          disabled={isProcessing}
+        />
+        <Label 
+          htmlFor="compare-models" 
+          className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
+        >
+          <GitCompare className="h-3.5 w-3.5" />
+          Compare Gemini 2.5 Pro vs Gemini 3 Pro Preview
+        </Label>
+      </div>
     </div>
   );
 }
