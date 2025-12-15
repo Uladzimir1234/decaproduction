@@ -1,9 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode as hexEncode } from 'https://deno.land/std@0.177.0/encoding/hex.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Hash password using SHA-256 with salt
+async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = new TextDecoder().decode(hexEncode(salt));
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(saltHex + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashHex = new TextDecoder().decode(hexEncode(new Uint8Array(hashBuffer)));
+  
+  // Return salt:hash format
+  return `${saltHex}:${hashHex}`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -101,6 +116,7 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Update password in Supabase Auth
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: password,
       });
@@ -111,6 +127,19 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: updateError.message }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Get user email to update invitation record
+      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      
+      if (userData?.user?.email) {
+        // Hash the new password and update the invitation record
+        const hashedPassword = await hashPassword(password);
+        
+        await supabaseAdmin
+          .from('user_invitations')
+          .update({ temporary_password: hashedPassword })
+          .eq('email', userData.user.email);
       }
 
       return new Response(

@@ -26,8 +26,6 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [currentPassword, setCurrentPassword] = useState<string | null>(null);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -36,27 +34,6 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
       setNewName(user.full_name || "");
     } else {
       setNewName("");
-    }
-  }, [open, user]);
-
-  useEffect(() => {
-    if (open && user) {
-      // Fetch the temporary password from user_invitations
-      const fetchCurrentPassword = async () => {
-        const { data } = await supabase
-          .from('user_invitations')
-          .select('temporary_password')
-          .eq('email', user.email)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        setCurrentPassword(data?.temporary_password || null);
-      };
-      fetchCurrentPassword();
-    } else {
-      setCurrentPassword(null);
-      setShowCurrentPassword(false);
     }
   }, [open, user]);
 
@@ -239,32 +216,9 @@ export function UserEditDialog({ open, onOpenChange, user, onSuccess }: UserEdit
           </TabsContent>
 
           <TabsContent value="password" className="space-y-4 pt-4">
-            {currentPassword && (
-              <div className="space-y-2">
-                <Label>Current Password</Label>
-                <div className="relative">
-                  <Input
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={currentPassword}
-                    disabled
-                    className="bg-muted pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
-                    {showCurrentPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Set a new password for this user. Passwords are stored securely and cannot be retrieved.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <div className="relative">
