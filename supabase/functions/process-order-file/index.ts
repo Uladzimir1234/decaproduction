@@ -65,6 +65,13 @@ interface ParsedOrder {
   } | null;
 }
 
+interface FieldDifference {
+  field: string;
+  constructionNumber?: string;
+  gemini25Value: string | null;
+  gemini3Value: string | null;
+}
+
 interface ModelResult {
   model: string;
   data: ParsedOrder;
@@ -79,6 +86,7 @@ interface ComparisonResult {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
+    fieldDifferences: FieldDifference[];
     gemini25Stats: { constructions: number; components: number; filledFields: number };
     gemini3Stats: { constructions: number; components: number; filledFields: number };
   };
@@ -378,9 +386,32 @@ function countFilledFields(data: ParsedOrder): number {
   return count;
 }
 
-// Compare two extraction results
+// Compare two extraction results with field-level detail
 function compareResults(result25: ParsedOrder, result3: ParsedOrder) {
   const differences: string[] = [];
+  const fieldDifferences: FieldDifference[] = [];
+  
+  // Helper to format value for display
+  const formatValue = (val: any): string | null => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    if (typeof val === 'number') return String(val);
+    return String(val);
+  };
+  
+  // Compare order-level fields
+  const orderFields = ['quote_number', 'customer_name', 'order_date'];
+  for (const field of orderFields) {
+    const val25 = (result25 as any)[field];
+    const val3 = (result3 as any)[field];
+    if (val25 !== val3) {
+      fieldDifferences.push({
+        field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        gemini25Value: formatValue(val25),
+        gemini3Value: formatValue(val3),
+      });
+    }
+  }
   
   // Compare construction counts
   if (result25.constructions.length !== result3.constructions.length) {
@@ -392,29 +423,136 @@ function compareResults(result25: ParsedOrder, result3: ParsedOrder) {
     differences.push(`Component types: Gemini 2.5 found ${result25.aggregated_components.length}, Gemini 3 found ${result3.aggregated_components.length}`);
   }
   
-  // Compare quote/customer
-  if (result25.quote_number !== result3.quote_number) {
-    differences.push(`Quote number: "${result25.quote_number}" vs "${result3.quote_number}"`);
-  }
-  if (result25.customer_name !== result3.customer_name) {
-    differences.push(`Customer name: "${result25.customer_name}" vs "${result3.customer_name}"`);
-  }
-  
   // Compare window/door/sliding counts
   if (result25.windows_count !== result3.windows_count) {
-    differences.push(`Windows count: ${result25.windows_count} vs ${result3.windows_count}`);
+    fieldDifferences.push({
+      field: 'Windows Count',
+      gemini25Value: String(result25.windows_count),
+      gemini3Value: String(result3.windows_count),
+    });
   }
   if (result25.doors_count !== result3.doors_count) {
-    differences.push(`Doors count: ${result25.doors_count} vs ${result3.doors_count}`);
+    fieldDifferences.push({
+      field: 'Doors Count',
+      gemini25Value: String(result25.doors_count),
+      gemini3Value: String(result3.doors_count),
+    });
   }
   if (result25.sliding_doors_count !== result3.sliding_doors_count) {
-    differences.push(`Sliding doors count: ${result25.sliding_doors_count} vs ${result3.sliding_doors_count}`);
+    fieldDifferences.push({
+      field: 'Sliding Doors Count',
+      gemini25Value: String(result25.sliding_doors_count),
+      gemini3Value: String(result3.sliding_doors_count),
+    });
+  }
+  
+  // Compare construction-level fields
+  const constructionFields = [
+    'construction_type', 'width_mm', 'height_mm', 'width_inches', 'height_inches',
+    'model', 'opening_type', 'color_exterior', 'color_interior',
+    'glass_type', 'screen_type', 'handle_type', 'has_blinds', 'blinds_color',
+    'location', 'rough_opening', 'comments', 'quantity', 'center_seal'
+  ];
+  
+  // Build a map of constructions by number for comparison
+  const constructions25Map = new Map(result25.constructions.map(c => [c.construction_number, c]));
+  const constructions3Map = new Map(result3.constructions.map(c => [c.construction_number, c]));
+  
+  // Get all unique construction numbers
+  const allConstructionNumbers = new Set([
+    ...result25.constructions.map(c => c.construction_number),
+    ...result3.constructions.map(c => c.construction_number),
+  ]);
+  
+  for (const cNum of allConstructionNumbers) {
+    const c25 = constructions25Map.get(cNum);
+    const c3 = constructions3Map.get(cNum);
+    
+    if (!c25 && c3) {
+      fieldDifferences.push({
+        field: 'Construction',
+        constructionNumber: cNum,
+        gemini25Value: null,
+        gemini3Value: `Found (${c3.construction_type})`,
+      });
+      continue;
+    }
+    
+    if (c25 && !c3) {
+      fieldDifferences.push({
+        field: 'Construction',
+        constructionNumber: cNum,
+        gemini25Value: `Found (${c25.construction_type})`,
+        gemini3Value: null,
+      });
+      continue;
+    }
+    
+    if (c25 && c3) {
+      for (const field of constructionFields) {
+        const val25 = (c25 as any)[field];
+        const val3 = (c3 as any)[field];
+        if (val25 !== val3) {
+          fieldDifferences.push({
+            field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            constructionNumber: cNum,
+            gemini25Value: formatValue(val25),
+            gemini3Value: formatValue(val3),
+          });
+        }
+      }
+    }
+  }
+  
+  // Compare aggregated components
+  const comp25Map = new Map(result25.aggregated_components.map(c => [`${c.component_type}::${c.component_name}`, c]));
+  const comp3Map = new Map(result3.aggregated_components.map(c => [`${c.component_type}::${c.component_name}`, c]));
+  
+  const allCompKeys = new Set([...comp25Map.keys(), ...comp3Map.keys()]);
+  
+  for (const key of allCompKeys) {
+    const c25 = comp25Map.get(key);
+    const c3 = comp3Map.get(key);
+    
+    if (!c25 && c3) {
+      fieldDifferences.push({
+        field: `Component: ${c3.component_type}`,
+        gemini25Value: null,
+        gemini3Value: `${c3.component_name} x${c3.total_quantity}`,
+      });
+    } else if (c25 && !c3) {
+      fieldDifferences.push({
+        field: `Component: ${c25.component_type}`,
+        gemini25Value: `${c25.component_name} x${c25.total_quantity}`,
+        gemini3Value: null,
+      });
+    } else if (c25 && c3 && c25.total_quantity !== c3.total_quantity) {
+      fieldDifferences.push({
+        field: `Component: ${c25.component_type}`,
+        gemini25Value: `${c25.component_name} x${c25.total_quantity}`,
+        gemini3Value: `${c3.component_name} x${c3.total_quantity}`,
+      });
+    }
+  }
+  
+  // Generate summary differences
+  if (fieldDifferences.length > 0) {
+    const constructionDiffs = fieldDifferences.filter(d => d.constructionNumber);
+    const orderDiffs = fieldDifferences.filter(d => !d.constructionNumber);
+    
+    if (orderDiffs.length > 0) {
+      differences.push(`${orderDiffs.length} order-level field differences`);
+    }
+    if (constructionDiffs.length > 0) {
+      differences.push(`${constructionDiffs.length} construction-level field differences`);
+    }
   }
   
   return {
     constructionCountMatch: result25.constructions.length === result3.constructions.length,
     componentCountMatch: result25.aggregated_components.length === result3.aggregated_components.length,
     differences,
+    fieldDifferences,
     gemini25Stats: {
       constructions: result25.constructions.length,
       components: result25.aggregated_components.length,

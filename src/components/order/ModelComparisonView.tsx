@@ -1,8 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, Clock, Layers, Package, FileText, ArrowRight } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Layers, Package, FileText, ArrowRight, AlertTriangle } from "lucide-react";
 import { ParsedOrderData } from "./FileUploadZone";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+interface FieldDifference {
+  field: string;
+  constructionNumber?: string;
+  gemini25Value: string | null;
+  gemini3Value: string | null;
+}
 
 interface ModelResult {
   model: string;
@@ -18,6 +34,7 @@ interface ComparisonData {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
+    fieldDifferences: FieldDifference[];
     gemini25Stats: { constructions: number; components: number; filledFields: number };
     gemini3Stats: { constructions: number; components: number; filledFields: number };
   };
@@ -45,6 +62,18 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
   };
   
   const winner = getWinner();
+  
+  // Group field differences by construction number
+  const orderLevelDiffs = comparison.fieldDifferences?.filter(d => !d.constructionNumber) || [];
+  const constructionDiffs = comparison.fieldDifferences?.filter(d => d.constructionNumber) || [];
+  
+  // Group construction diffs by construction number
+  const constructionDiffsByNumber = constructionDiffs.reduce((acc, diff) => {
+    const key = diff.constructionNumber || '';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(diff);
+    return acc;
+  }, {} as Record<string, FieldDifference[]>);
 
   return (
     <div className="space-y-4">
@@ -66,8 +95,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
               </>
             ) : (
               <>
-                <XCircle className="h-4 w-4 text-amber-500" />
-                <span>{comparison.differences.length} differences found</span>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span>{comparison.fieldDifferences?.length || 0} field differences found</span>
               </>
             )}
           </div>
@@ -192,6 +221,100 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           </CardContent>
         </Card>
       </div>
+      
+      {/* Field-by-Field Differences */}
+      {comparison.fieldDifferences && comparison.fieldDifferences.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-amber-500" />
+              Field Differences ({comparison.fieldDifferences.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {/* Order-level differences */}
+              {orderLevelDiffs.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium mb-2 text-muted-foreground">Order-Level Fields</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[150px]">Field</TableHead>
+                        <TableHead className="text-blue-600">Gemini 2.5</TableHead>
+                        <TableHead className="text-purple-600">Gemini 3</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orderLevelDiffs.map((diff, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium text-sm">{diff.field}</TableCell>
+                          <TableCell className="text-sm">
+                            {diff.gemini25Value ? (
+                              <span className="text-foreground">{diff.gemini25Value}</span>
+                            ) : (
+                              <span className="text-muted-foreground italic">empty</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {diff.gemini3Value ? (
+                              <span className="text-foreground">{diff.gemini3Value}</span>
+                            ) : (
+                              <span className="text-muted-foreground italic">empty</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              
+              {/* Construction-level differences grouped by construction number */}
+              {Object.keys(constructionDiffsByNumber).length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2 text-muted-foreground">Construction-Level Fields</h4>
+                  {Object.entries(constructionDiffsByNumber).map(([cNum, diffs]) => (
+                    <div key={cNum} className="mb-4">
+                      <Badge variant="outline" className="mb-2">Construction #{cNum}</Badge>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[150px]">Field</TableHead>
+                            <TableHead className="text-blue-600">Gemini 2.5</TableHead>
+                            <TableHead className="text-purple-600">Gemini 3</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {diffs.map((diff, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-medium text-sm">{diff.field}</TableCell>
+                              <TableCell className="text-sm">
+                                {diff.gemini25Value ? (
+                                  <span className="text-foreground">{diff.gemini25Value}</span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">empty</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {diff.gemini3Value ? (
+                                  <span className="text-foreground">{diff.gemini3Value}</span>
+                                ) : (
+                                  <span className="text-muted-foreground italic">empty</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

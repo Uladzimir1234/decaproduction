@@ -69,6 +69,13 @@ interface ModelResult {
   error?: string;
 }
 
+interface FieldDifference {
+  field: string;
+  constructionNumber?: string;
+  gemini25Value: string | null;
+  gemini3Value: string | null;
+}
+
 interface ComparisonData {
   gemini25: ModelResult;
   gemini3: ModelResult;
@@ -76,6 +83,7 @@ interface ComparisonData {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
+    fieldDifferences: FieldDifference[];
     gemini25Stats: { constructions: number; components: number; filledFields: number };
     gemini3Stats: { constructions: number; components: number; filledFields: number };
   };
