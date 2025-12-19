@@ -77,14 +77,6 @@ interface DeliveryBatchSectionProps {
   manufacturingProgress: number;
 }
 
-const SHIPPING_ITEM_TYPES = [
-  { key: 'handles', label: 'Handles in Box', defaultQty: 0 },
-  { key: 'hinges_covers', label: 'Hinges Covers', defaultQty: 0 },
-  { key: 'weeping_covers', label: 'Weeping Holes Covers', defaultQty: 0 },
-  { key: 'spec_labels', label: 'Spec Labels', defaultQty: 0 },
-  { key: 'nailing_fins', label: 'Nailing Fins Packed', defaultQty: 0 },
-  { key: 'brackets', label: 'Brackets Packed', defaultQty: 0 },
-];
 
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
@@ -99,7 +91,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
   const [deliveryPerson, setDeliveryPerson] = useState<string>("");
-  const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
+  
   
   // New visual selection state
   const [selectedConstructionIds, setSelectedConstructionIds] = useState<Set<string>>(new Set());
@@ -235,11 +227,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   const initNewBatch = () => {
     setEditingBatchId(null);
-    const shippingInit: Record<string, { selected: boolean; qty: number }> = {};
-    SHIPPING_ITEM_TYPES.forEach(item => {
-      shippingInit[item.key] = { selected: true, qty: 0 };
-    });
-    setSelectedShippingItems(shippingInit);
     setNewBatchDate(new Date());
     setDeliveryPerson("");
     setNewCustomShippingItems([]);
@@ -256,14 +243,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setEditingBatchId(batchId);
     setNewBatchDate(new Date(batch.delivery_date));
     setDeliveryPerson(batch.delivery_person || "");
-    
-    const shippingItems = batchShippingItems[batchId] || [];
-    const shippingInit: Record<string, { selected: boolean; qty: number }> = {};
-    SHIPPING_ITEM_TYPES.forEach(item => {
-      const existing = shippingItems.find(si => si.item_type === item.key);
-      shippingInit[item.key] = { selected: !!existing, qty: existing?.quantity || 0 };
-    });
-    setSelectedShippingItems(shippingInit);
     
     const customShipping = batchCustomShipping[batchId] || [];
     setNewCustomShippingItems(customShipping.map(cs => ({ name: cs.name, qty: cs.quantity })));
@@ -423,23 +402,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         batchId = batchData.id;
       }
 
-      // Insert shipping items
-      const shippingToInsert = Object.entries(selectedShippingItems)
-        .filter(([_, val]) => val.selected)
-        .map(([key, val]) => ({
-          batch_id: batchId,
-          item_type: key,
-          quantity: val.qty,
-          is_complete: false
-        }));
-
-      if (shippingToInsert.length > 0) {
-        const { error: shippingError } = await supabase
-          .from("batch_shipping_items")
-          .insert(shippingToInsert);
-        if (shippingError) throw shippingError;
-      }
-
       // Insert custom shipping items
       if (newCustomShippingItems.length > 0) {
         const customShipToInsert = newCustomShippingItems.map(item => ({
@@ -519,19 +481,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     }
   };
 
-  const toggleShippingItem = (key: string, selected: boolean) => {
-    setSelectedShippingItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], selected }
-    }));
-  };
-
-  const updateShippingQty = (key: string, qty: number) => {
-    setSelectedShippingItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], qty: Math.max(0, qty) }
-    }));
-  };
 
   const totalBatches = batches.length;
 
@@ -700,40 +649,24 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
                     <Separator />
 
-                    {/* Shipping Preparation Items */}
+                    {/* Custom Delivery Items */}
                     <div className="space-y-2">
-                      <Label>Shipping Preparation Items</Label>
+                      <Label>Custom Delivery Items</Label>
                       <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
-                        {SHIPPING_ITEM_TYPES.map(item => {
-                          const val = selectedShippingItems[item.key] || { selected: true, qty: 0 };
-                          return (
-                            <div key={item.key} className="flex items-center gap-3">
-                              <Checkbox
-                                checked={val.selected}
-                                onCheckedChange={(c) => toggleShippingItem(item.key, c as boolean)}
-                              />
-                              <span className="flex-1 text-sm">{item.label}</span>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={val.qty}
-                                onChange={(e) => updateShippingQty(item.key, parseInt(e.target.value) || 0)}
-                                className="w-16 h-7 text-xs text-center"
-                                placeholder="Qty"
-                              />
+                        {newCustomShippingItems.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-2">No custom items added</p>
+                        ) : (
+                          newCustomShippingItems.map((item, index) => (
+                            <div key={`custom-ship-${index}`} className="flex items-center gap-3">
+                              <Badge variant="secondary" className="text-xs">Custom</Badge>
+                              <span className="flex-1 text-sm">{item.name}</span>
+                              <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomShippingFromList(index)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
-                          );
-                        })}
-                        {newCustomShippingItems.map((item, index) => (
-                          <div key={`custom-ship-${index}`} className="flex items-center gap-3 border-t border-dashed pt-2">
-                            <Badge variant="secondary" className="text-xs">Custom</Badge>
-                            <span className="flex-1 text-sm">{item.name}</span>
-                            <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomShippingFromList(index)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Input
