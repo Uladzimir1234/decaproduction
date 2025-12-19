@@ -124,6 +124,7 @@ interface OrderConstruction {
 interface BatchConstructionItemDetail {
   construction_id: string;
   order_id: string;
+  quantity: number;
   include_glass: boolean;
   include_screens: boolean;
   include_blinds: boolean;
@@ -585,6 +586,7 @@ export default function Orders() {
         .from("batch_construction_items")
         .select(`
           construction_id,
+          quantity,
           include_glass,
           include_screens,
           include_blinds,
@@ -603,6 +605,7 @@ export default function Orders() {
         itemsByOrder[orderId].push({
           construction_id: item.construction_id,
           order_id: orderId,
+          quantity: item.quantity ?? 1,
           include_glass: item.include_glass ?? true,
           include_screens: item.include_screens ?? true,
           include_blinds: item.include_blinds ?? true,
@@ -1607,69 +1610,106 @@ export default function Orders() {
 
   // Helper to get remaining constructions not yet assigned to any delivery batch
   // Also tracks item categories (screens, blinds, glass, hardware) that were excluded from batches
+  // Now supports partial quantities - calculates remaining based on shipped quantities across all batches
   const getRemainingToShip = (orderId: string) => {
     const constructions = orderConstructions[orderId] || [];
     const batchItems = batchConstructionItems[orderId] || [];
     
-    // Create a map of construction_id -> batch item details
-    const assignedMap = new Map(batchItems.map(bi => [bi.construction_id, bi]));
+    // Calculate total shipped quantity per construction (sum across all batches)
+    const shippedQuantities: Record<string, number> = {};
+    batchItems.forEach(bi => {
+      shippedQuantities[bi.construction_id] = (shippedQuantities[bi.construction_id] || 0) + (bi.quantity || 1);
+    });
     
-    // 1. Find constructions not assigned to ANY batch
-    const unassigned = constructions.filter(c => !assignedMap.has(c.construction_id));
-    
-    const windowsCount = unassigned
-      .filter(c => c.construction_type === 'window')
-      .reduce((sum, c) => sum + c.quantity, 0);
-    const doorsCount = unassigned
-      .filter(c => c.construction_type === 'door')
-      .reduce((sum, c) => sum + c.quantity, 0);
-    const slidingDoorsCount = unassigned
-      .filter(c => c.construction_type === 'sliding_door')
-      .reduce((sum, c) => sum + c.quantity, 0);
-    
-    // Get construction numbers for unassigned items
-    const unassignedNumbers = unassigned.map(c => c.construction_number);
-    
-    // 2. Find item categories excluded from assigned batches
-    const excludedItems: { constructionNumber: string; items: string[] }[] = [];
+    // Track remaining quantities and partially shipped items
+    const partiallyShipped: { constructionNumber: string; remaining: number; type: string }[] = [];
+    let windowsCount = 0;
+    let doorsCount = 0;
+    let slidingDoorsCount = 0;
+    const unassignedNumbers: string[] = [];
     
     constructions.forEach(c => {
-      const batchItem = assignedMap.get(c.construction_id);
-      if (batchItem) {
-        const excluded: string[] = [];
-        // Check if screens were excluded but construction has screens
-        if (!batchItem.include_screens && c.screen_type) {
-          excluded.push('Screens');
-        }
-        // Check if blinds were excluded but construction has blinds
-        if (!batchItem.include_blinds && c.has_blinds) {
-          excluded.push('Blinds');
-        }
-        // Glass is always relevant - if excluded, it's missing
-        if (!batchItem.include_glass) {
-          excluded.push('Glass');
-        }
-        // Hardware is always relevant - if excluded, it's missing
-        if (!batchItem.include_hardware) {
-          excluded.push('Hardware');
+      const shipped = shippedQuantities[c.construction_id] || 0;
+      const remaining = c.quantity - shipped;
+      
+      if (remaining > 0) {
+        // Add to remaining counts
+        if (c.construction_type === 'window') {
+          windowsCount += remaining;
+        } else if (c.construction_type === 'door') {
+          doorsCount += remaining;
+        } else if (c.construction_type === 'sliding_door') {
+          slidingDoorsCount += remaining;
         }
         
-        if (excluded.length > 0) {
-          excludedItems.push({ constructionNumber: c.construction_number, items: excluded });
+        // Track if fully unassigned or partially shipped
+        if (shipped === 0) {
+          unassignedNumbers.push(c.construction_number);
+        } else {
+          // Partially shipped - show how many remain
+          partiallyShipped.push({ 
+            constructionNumber: c.construction_number, 
+            remaining, 
+            type: c.construction_type 
+          });
         }
       }
     });
     
-    const hasRemaining = unassigned.length > 0 || excludedItems.length > 0;
+    // Find item categories excluded from assigned batches
+    // Group by construction to avoid duplicates when same construction is in multiple batches
+    const excludedItemsMap: Record<string, Set<string>> = {};
+    
+    constructions.forEach(c => {
+      // Get all batch items for this construction
+      const constructionBatchItems = batchItems.filter(bi => bi.construction_id === c.construction_id);
+      
+      if (constructionBatchItems.length > 0) {
+        // Check if ANY batch item excluded each category
+        // (If any batch excluded it, it's still missing for that batch)
+        const excludedSet = new Set<string>();
+        
+        constructionBatchItems.forEach(batchItem => {
+          // Check if screens were excluded but construction has screens
+          if (!batchItem.include_screens && c.screen_type) {
+            excludedSet.add('Screens');
+          }
+          // Check if blinds were excluded but construction has blinds
+          if (!batchItem.include_blinds && c.has_blinds) {
+            excludedSet.add('Blinds');
+          }
+          // Glass is always relevant - if excluded, it's missing
+          if (!batchItem.include_glass) {
+            excludedSet.add('Glass');
+          }
+          // Hardware is always relevant - if excluded, it's missing
+          if (!batchItem.include_hardware) {
+            excludedSet.add('Hardware');
+          }
+        });
+        
+        if (excludedSet.size > 0) {
+          excludedItemsMap[c.construction_number] = excludedSet;
+        }
+      }
+    });
+    
+    const excludedItems = Object.entries(excludedItemsMap).map(([constructionNumber, items]) => ({
+      constructionNumber,
+      items: Array.from(items)
+    }));
+    
+    const hasRemaining = windowsCount > 0 || doorsCount > 0 || slidingDoorsCount > 0 || excludedItems.length > 0;
     
     return {
       windowsCount,
       doorsCount,
       slidingDoorsCount,
       unassignedNumbers,
+      partiallyShipped,
       excludedItems,
       hasRemaining,
-      totalRemaining: unassigned.length
+      totalRemaining: windowsCount + doorsCount + slidingDoorsCount
     };
   };
 

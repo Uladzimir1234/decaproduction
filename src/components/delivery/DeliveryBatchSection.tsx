@@ -58,6 +58,7 @@ interface BatchConstructionItem {
   id: string;
   batch_id: string;
   construction_id: string;
+  quantity: number;
   include_glass: boolean;
   include_screens: boolean;
   include_blinds: boolean;
@@ -271,6 +272,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     const constructionSelectionsInit: ConstructionSelection[] = existingConstructions.map(item => ({
       constructionId: item.construction_id,
       selected: true,
+      quantity: item.quantity || 1,
       includeGlass: item.include_glass,
       includeScreens: item.include_screens,
       includeBlinds: item.include_blinds,
@@ -383,6 +385,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       const constructionToInsert = selectedConstructions.map(sel => ({
         batch_id: batchId,
         construction_id: sel.constructionId,
+        quantity: sel.quantity,
         include_glass: sel.includeGlass,
         include_screens: sel.includeScreens,
         include_blinds: sel.includeBlinds,
@@ -428,28 +431,61 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   const totalBatches = batches.length;
 
-  // Calculate remaining constructions not yet assigned to any batch
-  const assignedConstructionIds = new Set(
-    Object.entries(batchConstructionItems)
-      .filter(([batchId]) => batches.some(b => b.id === batchId)) // Only count existing batches
-      .flatMap(([, items]) => items.map(item => item.construction_id))
-  );
+  // Calculate shipped quantities per construction (sum of quantities across all batches)
+  const getShippedQuantities = useCallback(() => {
+    const quantities: Record<string, number> = {};
+    const existingBatchIds = new Set(batches.map(b => b.id));
+    
+    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
+      // Only count items from batches that still exist
+      if (existingBatchIds.has(batchId)) {
+        items.forEach(item => {
+          quantities[item.construction_id] = (quantities[item.construction_id] || 0) + (item.quantity || 1);
+        });
+      }
+    });
+    return quantities;
+  }, [batchConstructionItems, batches]);
 
-  const remainingConstructions = allConstructions.filter(
-    c => !assignedConstructionIds.has(c.id)
-  );
+  const shippedQuantities = getShippedQuantities();
 
-  const remainingWindowsCount = remainingConstructions
-    .filter(c => c.construction_type === 'window')
-    .reduce((sum, c) => sum + c.quantity, 0);
+  // Calculate remaining constructions - now with partial quantity support
+  const getRemainingItems = () => {
+    const remaining: { 
+      windows: { count: number; items: { number: string; remaining: number }[] };
+      doors: { count: number; items: { number: string; remaining: number }[] };
+      slidingDoors: { count: number; items: { number: string; remaining: number }[] };
+    } = {
+      windows: { count: 0, items: [] },
+      doors: { count: 0, items: [] },
+      slidingDoors: { count: 0, items: [] },
+    };
 
-  const remainingDoorsCount = remainingConstructions
-    .filter(c => c.construction_type === 'door')
-    .reduce((sum, c) => sum + c.quantity, 0);
+    allConstructions.forEach(c => {
+      const shipped = shippedQuantities[c.id] || 0;
+      const remainingQty = c.quantity - shipped;
+      
+      if (remainingQty > 0) {
+        const item = { number: c.construction_number, remaining: remainingQty };
+        
+        if (c.construction_type === 'window') {
+          remaining.windows.count += remainingQty;
+          remaining.windows.items.push(item);
+        } else if (c.construction_type === 'door') {
+          remaining.doors.count += remainingQty;
+          remaining.doors.items.push(item);
+        } else if (c.construction_type === 'sliding_door') {
+          remaining.slidingDoors.count += remainingQty;
+          remaining.slidingDoors.items.push(item);
+        }
+      }
+    });
 
-  const remainingSlidingDoorsCount = remainingConstructions
-    .filter(c => c.construction_type === 'sliding_door')
-    .reduce((sum, c) => sum + c.quantity, 0);
+    return remaining;
+  };
+
+  const remainingItems = getRemainingItems();
+  const hasRemaining = remainingItems.windows.count > 0 || remainingItems.doors.count > 0 || remainingItems.slidingDoors.count > 0;
 
   return (
     <Card className="border-primary/20">
@@ -535,6 +571,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                           selections={constructionSelections}
                           onSelectionsChange={setConstructionSelections}
                           existingBatchConstructionIds={editingBatchId ? [] : getExistingBatchConstructionIds()}
+                          shippedQuantities={editingBatchId ? {} : shippedQuantities}
                         />
                       </div>
                     </div>
@@ -613,7 +650,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Remaining to Ship Summary */}
-        {remainingConstructions.length > 0 && batches.length > 0 && (
+        {hasRemaining && batches.length > 0 && (
           <Card className="border-amber-500/30 bg-amber-500/5">
             <CardContent className="py-3">
               <div className="flex items-center gap-2 mb-2">
@@ -621,23 +658,25 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                 <span className="text-sm font-medium">Remaining to Ship:</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {remainingWindowsCount > 0 && (
+                {remainingItems.windows.count > 0 && (
                   <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingWindowsCount} Window{remainingWindowsCount > 1 ? 's' : ''}
+                    {remainingItems.windows.count} Window{remainingItems.windows.count > 1 ? 's' : ''}
                   </Badge>
                 )}
-                {remainingDoorsCount > 0 && (
+                {remainingItems.doors.count > 0 && (
                   <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingDoorsCount} Door{remainingDoorsCount > 1 ? 's' : ''}
+                    {remainingItems.doors.count} Door{remainingItems.doors.count > 1 ? 's' : ''}
                   </Badge>
                 )}
-                {remainingSlidingDoorsCount > 0 && (
+                {remainingItems.slidingDoors.count > 0 && (
                   <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingSlidingDoorsCount} Sliding Door{remainingSlidingDoorsCount > 1 ? 's' : ''}
+                    {remainingItems.slidingDoors.count} Sliding Door{remainingItems.slidingDoors.count > 1 ? 's' : ''}
                   </Badge>
                 )}
                 <span className="text-xs text-muted-foreground ml-1">
-                  ({remainingConstructions.map(c => `#${c.construction_number}`).join(', ')})
+                  ({[...remainingItems.windows.items, ...remainingItems.doors.items, ...remainingItems.slidingDoors.items]
+                    .map(item => item.remaining === 1 ? `#${item.number}` : `#${item.number} (${item.remaining})`)
+                    .join(', ')})
                 </span>
               </div>
             </CardContent>

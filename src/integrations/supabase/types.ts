@@ -59,6 +59,7 @@ export type Database = {
           include_hardware: boolean
           include_screens: boolean
           is_delivered: boolean
+          quantity: number
         }
         Insert: {
           batch_id: string
@@ -71,6 +72,7 @@ export type Database = {
           include_hardware?: boolean
           include_screens?: boolean
           is_delivered?: boolean
+          quantity?: number
         }
         Update: {
           batch_id?: string
@@ -83,6 +85,7 @@ export type Database = {
           include_hardware?: boolean
           include_screens?: boolean
           is_delivered?: boolean
+          quantity?: number
         }
         Relationships: [
           {
