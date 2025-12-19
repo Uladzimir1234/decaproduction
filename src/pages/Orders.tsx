@@ -111,6 +111,12 @@ interface ConstructionManufacturing {
   order_id: string;
 }
 
+interface OrderConstruction {
+  order_id: string;
+  construction_type: string;
+  screen_type: string | null;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -198,6 +204,7 @@ export default function Orders() {
   const [customSteps, setCustomSteps] = useState<CustomStep[]>([]);
   const [deliveryBatches, setDeliveryBatches] = useState<DeliveryBatch[]>([]);
   const [ordersWithConstructions, setOrdersWithConstructions] = useState<Set<string>>(new Set());
+  const [orderConstructions, setOrderConstructions] = useState<Record<string, OrderConstruction[]>>({});
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
   
@@ -513,10 +520,24 @@ export default function Orders() {
     try {
       const { data, error } = await supabase
         .from("order_constructions")
-        .select("order_id");
+        .select("order_id, construction_type, screen_type");
       if (error) throw error;
       const orderIds = new Set(data?.map(c => c.order_id) || []);
       setOrdersWithConstructions(orderIds);
+      
+      // Group constructions by order_id
+      const constructionsByOrder: Record<string, OrderConstruction[]> = {};
+      data?.forEach((item) => {
+        if (!constructionsByOrder[item.order_id]) {
+          constructionsByOrder[item.order_id] = [];
+        }
+        constructionsByOrder[item.order_id].push({
+          order_id: item.order_id,
+          construction_type: item.construction_type,
+          screen_type: item.screen_type,
+        });
+      });
+      setOrderConstructions(constructionsByOrder);
     } catch (error) {
       console.error("Error fetching orders with constructions:", error);
     }
@@ -2124,6 +2145,10 @@ export default function Orders() {
                                 component_type: c.component_type,
                                 component_name: c.component_name,
                                 status: c.status,
+                              }))}
+                              constructions={(orderConstructions[order.id] || []).map(c => ({
+                                construction_type: c.construction_type,
+                                screen_type: c.screen_type,
                               }))}
                               canUpdateManufacturing={canUpdateManufacturing}
                               updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
