@@ -300,17 +300,25 @@ export function ShippingSelectionPanel({
             prodStatus = getComponentProductionStatus(key, mfgStatus);
           }
           
+          // Auto-select ready components that haven't been shipped
+          const shouldAutoSelect = isApplicable && prodStatus === "ready" && !isShipped;
+          
           componentStates[key] = {
             applicable: isApplicable,
             productionStatus: prodStatus,
             shipped: isShipped,
-            selected: false,
+            selected: shouldAutoSelect,
           };
         });
+
+        // Check if any component was auto-selected
+        const hasSelectedComponents = Object.values(componentStates).some(c => c.selected);
 
         let status: UnitStatus = unitProductionStatus;
         if (allShipped) {
           status = "shipped";
+        } else if (hasSelectedComponents) {
+          status = "selected"; // Auto-select the unit if it has ready components
         }
 
         return {
@@ -933,62 +941,63 @@ export function ShippingSelectionPanel({
                             </span>
                           )}
 
-                          {/* Component toggles for selected units */}
-                          {isSelected && (
-                            <div className="flex flex-wrap gap-1 flex-1" onClick={e => e.stopPropagation()}>
-                              {applicableComponents.map(key => {
-                                const comp = unit.components[key];
-                                const prodStatus = comp.productionStatus;
-                                
-                                if (comp.shipped) {
-                                  return (
-                                    <span
-                                      key={key}
-                                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
-                                    >
-                                      {COMPONENT_LABELS[key]} ✓
-                                    </span>
-                                  );
-                                }
-                                if (prodStatus === "not_available") {
-                                  return (
-                                    <span
-                                      key={key}
-                                      className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400"
-                                    >
-                                      {COMPONENT_LABELS[key]}
-                                    </span>
-                                  );
-                                }
-                                if (prodStatus === "in_production") {
-                                  return (
-                                    <span
-                                      key={key}
-                                      className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400"
-                                    >
-                                      {COMPONENT_LABELS[key]}
-                                    </span>
-                                  );
-                                }
-                                // Ready - selectable
+                          {/* Component badges - always visible */}
+                          <div className="flex flex-wrap gap-1 flex-1" onClick={e => e.stopPropagation()}>
+                            {applicableComponents.map(key => {
+                              const comp = unit.components[key];
+                              const prodStatus = comp.productionStatus;
+                              
+                              if (comp.shipped) {
                                 return (
-                                  <button
+                                  <span
                                     key={key}
-                                    type="button"
-                                    onClick={() => toggleComponentSelection(construction.id, unit.unitIndex, key)}
-                                    className={cn(
-                                      "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
-                                      comp.selected
-                                        ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
-                                        : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
-                                    )}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
+                                  >
+                                    {COMPONENT_LABELS[key]} ✓
+                                  </span>
+                                );
+                              }
+                              if (prodStatus === "not_available") {
+                                return (
+                                  <span
+                                    key={key}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400"
                                   >
                                     {COMPONENT_LABELS[key]}
-                                  </button>
+                                  </span>
                                 );
-                              })}
-                            </div>
-                          )}
+                              }
+                              if (prodStatus === "in_production") {
+                                return (
+                                  <span
+                                    key={key}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400"
+                                  >
+                                    {COMPONENT_LABELS[key]}
+                                  </span>
+                                );
+                              }
+                              // Ready - selectable (clickable when unit is selected)
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => isSelected && toggleComponentSelection(construction.id, unit.unitIndex, key)}
+                                  disabled={!isSelected}
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
+                                    comp.selected
+                                      ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
+                                      : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400",
+                                    isSelected && !comp.selected && "hover:bg-green-500/20 cursor-pointer",
+                                    !isSelected && "cursor-default opacity-70"
+                                  )}
+                                >
+                                  {COMPONENT_LABELS[key]}
+                                </button>
+                              );
+                            })}
+                          </div>
 
                           {/* Ready indicator */}
                           {isReady && (
