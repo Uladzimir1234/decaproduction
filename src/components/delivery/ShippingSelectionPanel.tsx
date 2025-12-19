@@ -81,14 +81,17 @@ const CONSTRUCTION_TYPE_LABELS: Record<string, string> = {
   sliding_door: "Sliding Door",
 };
 
-type UnitStatus = "not_ready" | "ready" | "selected" | "shipped";
+// Production status: not_available (red), in_production (yellow), ready (green), shipped (blue)
+type ProductionStatus = "not_available" | "in_production" | "ready";
+type UnitStatus = "not_available" | "in_production" | "ready" | "selected" | "shipped";
 
 interface UnitState {
   unitIndex: number;
   status: UnitStatus;
+  productionStatus: ProductionStatus; // Track underlying production status
   components: Record<keyof UnitComponentState, { 
     applicable: boolean; 
-    ready: boolean; 
+    productionStatus: ProductionStatus;
     shipped: boolean; 
     selected: boolean;
   }>;
@@ -101,33 +104,42 @@ interface ConstructionState {
   units: UnitState[];
 }
 
-function isUnitReady(manufacturingStatus: Record<string, string>, constructionType: string): boolean {
-  // Check if assembly is complete for this construction type
+function getUnitProductionStatus(manufacturingStatus: Record<string, string>): ProductionStatus {
   const assemblyStatus = manufacturingStatus["assembly"];
-  return assemblyStatus === "complete";
+  if (!assemblyStatus || assemblyStatus === "not_started") return "not_available";
+  if (assemblyStatus === "in_progress") return "in_production";
+  return "ready"; // complete
 }
 
-function isComponentReady(
+function getComponentProductionStatus(
   componentKey: keyof UnitComponentState,
-  manufacturingStatus: Record<string, string>,
-  constructionType: string
-): boolean {
+  manufacturingStatus: Record<string, string>
+): ProductionStatus {
   // Map component to manufacturing stage
+  let stageStatus: string | undefined;
+  
   switch (componentKey) {
     case "screen":
     case "plisseScreen":
-      return manufacturingStatus["screens"] === "complete";
+      stageStatus = manufacturingStatus["screens"];
+      break;
     case "blinds":
-      return manufacturingStatus["assembly"] === "complete";
+      stageStatus = manufacturingStatus["assembly"];
+      break;
     case "handles":
     case "weepingCovers":
     case "hingeCovers":
     case "nailFins":
     case "brackets":
-      return manufacturingStatus["assembly"] === "complete";
+      stageStatus = manufacturingStatus["assembly"];
+      break;
     default:
-      return true;
+      return "ready";
   }
+  
+  if (!stageStatus || stageStatus === "not_started") return "not_available";
+  if (stageStatus === "in_progress") return "in_production";
+  return "ready";
 }
 
 export function ShippingSelectionPanel({
@@ -234,7 +246,7 @@ export function ShippingSelectionPanel({
         u.components.forEach(c => shippedMap.get(u.unitIndex)!.add(c));
       });
 
-      const unitReady = isUnitReady(mfgStatus, construction.construction_type);
+      const unitProductionStatus = getUnitProductionStatus(mfgStatus);
 
       const units: UnitState[] = Array.from({ length: construction.quantity }, (_, i) => {
         const unitIdx = i + 1;
@@ -243,33 +255,31 @@ export function ShippingSelectionPanel({
         // Check if all applicable components are shipped
         const applicableKeys = (Object.keys(applicable) as (keyof UnitComponentState)[]).filter(k => applicable[k]);
         const allShipped = applicableKeys.every(k => shippedComponents.has(k));
-        const anyShipped = applicableKeys.some(k => shippedComponents.has(k));
 
-        const componentStates: Record<keyof UnitComponentState, { applicable: boolean; ready: boolean; shipped: boolean; selected: boolean }> = {} as any;
+        const componentStates: Record<keyof UnitComponentState, { applicable: boolean; productionStatus: ProductionStatus; shipped: boolean; selected: boolean }> = {} as any;
         
         (Object.keys(applicable) as (keyof UnitComponentState)[]).forEach(key => {
           const isApplicable = applicable[key];
-          const isReady = isApplicable && isComponentReady(key, mfgStatus, construction.construction_type);
+          const prodStatus = isApplicable ? getComponentProductionStatus(key, mfgStatus) : "not_available";
           const isShipped = shippedComponents.has(key);
           
           componentStates[key] = {
             applicable: isApplicable,
-            ready: isReady,
+            productionStatus: prodStatus,
             shipped: isShipped,
             selected: false,
           };
         });
 
-        let status: UnitStatus = "not_ready";
+        let status: UnitStatus = unitProductionStatus;
         if (allShipped) {
           status = "shipped";
-        } else if (unitReady) {
-          status = "ready";
         }
 
         return {
           unitIndex: unitIdx,
           status,
+          productionStatus: unitProductionStatus,
           components: componentStates,
         };
       });
@@ -301,7 +311,8 @@ export function ShippingSelectionPanel({
           ...cs,
           units: cs.units.map(u => {
             if (u.unitIndex !== unitIndex) return u;
-            if (u.status === "shipped" || u.status === "not_ready") return u;
+            // Only allow selection of ready (green) units
+            if (u.status === "shipped" || u.productionStatus !== "ready") return u;
             
             const newStatus: UnitStatus = u.status === "selected" ? "ready" : "selected";
             
@@ -309,7 +320,7 @@ export function ShippingSelectionPanel({
             const newComponents = { ...u.components };
             if (newStatus === "selected") {
               (Object.keys(newComponents) as (keyof UnitComponentState)[]).forEach(key => {
-                if (newComponents[key].applicable && newComponents[key].ready && !newComponents[key].shipped) {
+                if (newComponents[key].applicable && newComponents[key].productionStatus === "ready" && !newComponents[key].shipped) {
                   newComponents[key] = { ...newComponents[key], selected: true };
                 }
               });
@@ -342,7 +353,8 @@ export function ShippingSelectionPanel({
             if (u.status !== "selected") return u;
             
             const comp = u.components[componentKey];
-            if (!comp.applicable || !comp.ready || comp.shipped) return u;
+            // Only allow toggling ready (green) components
+            if (!comp.applicable || comp.productionStatus !== "ready" || comp.shipped) return u;
             
             return {
               ...u,
@@ -581,10 +593,11 @@ export function ShippingSelectionPanel({
         <div className="space-y-2">
           {constructionStates.map(cs => {
             const { construction, expanded, units } = cs;
-            const readyCount = units.filter(u => u.status === "ready").length;
+            const readyCount = units.filter(u => u.productionStatus === "ready" && u.status !== "shipped" && u.status !== "selected").length;
             const selectedInConstruction = units.filter(u => u.status === "selected").length;
             const shippedCount = units.filter(u => u.status === "shipped").length;
-            const notReadyCount = units.filter(u => u.status === "not_ready").length;
+            const inProductionCount = units.filter(u => u.productionStatus === "in_production" && u.status !== "shipped").length;
+            const notAvailableCount = units.filter(u => u.productionStatus === "not_available" && u.status !== "shipped").length;
 
             return (
               <div key={construction.id} className="border rounded-lg overflow-hidden">
@@ -621,19 +634,24 @@ export function ShippingSelectionPanel({
                         {selectedInConstruction} selected
                       </Badge>
                     )}
-                    {readyCount > 0 && (
-                      <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0">
-                        {readyCount} ready
-                      </Badge>
-                    )}
                     {shippedCount > 0 && (
-                      <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400 text-[10px] px-1.5 py-0">
+                      <Badge variant="outline" className="bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400 text-[10px] px-1.5 py-0">
                         {shippedCount} shipped
                       </Badge>
                     )}
-                    {notReadyCount > 0 && (
-                      <Badge variant="outline" className="border-muted-foreground/50 text-muted-foreground text-[10px] px-1.5 py-0">
-                        {notReadyCount} pending
+                    {readyCount > 0 && (
+                      <Badge variant="outline" className="bg-green-500/10 border-green-500/50 text-green-600 dark:text-green-400 text-[10px] px-1.5 py-0">
+                        {readyCount} ready
+                      </Badge>
+                    )}
+                    {inProductionCount > 0 && (
+                      <Badge variant="outline" className="bg-amber-500/10 border-amber-500/50 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        {inProductionCount} in production
+                      </Badge>
+                    )}
+                    {notAvailableCount > 0 && (
+                      <Badge variant="outline" className="bg-red-500/10 border-red-500/50 text-red-600 dark:text-red-400 text-[10px] px-1.5 py-0">
+                        {notAvailableCount} not available
                       </Badge>
                     )}
                   </div>
@@ -643,10 +661,12 @@ export function ShippingSelectionPanel({
                 {expanded && (
                   <div className="border-t bg-muted/10 p-2 space-y-1">
                     {units.map(unit => {
-                      const isNotReady = unit.status === "not_ready";
                       const isShipped = unit.status === "shipped";
                       const isSelected = unit.status === "selected";
-                      const isReady = unit.status === "ready";
+                      const isReady = unit.productionStatus === "ready" && !isShipped && !isSelected;
+                      const isInProduction = unit.productionStatus === "in_production" && !isShipped;
+                      const isNotAvailable = unit.productionStatus === "not_available" && !isShipped;
+                      const canSelect = unit.productionStatus === "ready" && !isShipped;
 
                       const applicableComponents = (Object.keys(unit.components) as (keyof UnitComponentState)[])
                         .filter(key => unit.components[key].applicable);
@@ -656,12 +676,14 @@ export function ShippingSelectionPanel({
                           key={unit.unitIndex}
                           className={cn(
                             "flex items-center gap-2 p-2 rounded-lg border transition-all",
-                            isNotReady && "opacity-50 bg-muted/30 cursor-not-allowed",
-                            isShipped && "bg-blue-500/10 border-blue-500/30",
-                            isSelected && "bg-primary/10 border-primary/50",
-                            isReady && "bg-background hover:bg-muted/30 cursor-pointer"
+                            // Color scheme: Red (not available), Yellow (in production), Green (ready), Blue (shipped)
+                            isNotAvailable && "bg-red-500/10 border-red-500/30 opacity-70",
+                            isInProduction && "bg-amber-500/10 border-amber-500/30",
+                            isReady && "bg-green-500/10 border-green-500/30 cursor-pointer hover:bg-green-500/20",
+                            isSelected && "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30",
+                            isShipped && "bg-blue-500/10 border-blue-500/30"
                           )}
-                          onClick={() => canEdit && !isNotReady && !isShipped && toggleUnitSelection(construction.id, unit.unitIndex)}
+                          onClick={() => canEdit && canSelect && toggleUnitSelection(construction.id, unit.unitIndex)}
                         >
                           {/* Status indicator */}
                           <div className="shrink-0">
@@ -671,8 +693,10 @@ export function ShippingSelectionPanel({
                               <Checkbox checked className="h-4 w-4" />
                             ) : isReady ? (
                               <Circle className="h-4 w-4 text-green-500" />
+                            ) : isInProduction ? (
+                              <Circle className="h-4 w-4 text-amber-500" />
                             ) : (
-                              <Circle className="h-4 w-4 text-muted-foreground/50" />
+                              <Circle className="h-4 w-4 text-red-500" />
                             )}
                           </div>
 
@@ -680,18 +704,25 @@ export function ShippingSelectionPanel({
                           <span
                             className={cn(
                               "text-xs font-medium min-w-[50px]",
-                              isSelected && "text-primary",
+                              isSelected && "text-green-700 dark:text-green-300",
                               isShipped && "text-blue-600 dark:text-blue-400",
-                              isNotReady && "text-muted-foreground"
+                              isInProduction && "text-amber-600 dark:text-amber-400",
+                              isNotAvailable && "text-red-600 dark:text-red-400",
+                              isReady && "text-green-600 dark:text-green-400"
                             )}
                           >
                             Unit {unit.unitIndex}/{construction.quantity}
                           </span>
 
-                          {/* Status label for not ready/shipped */}
-                          {isNotReady && (
-                            <span className="text-[10px] text-muted-foreground italic">
-                              Manufacturing incomplete
+                          {/* Status labels */}
+                          {isNotAvailable && (
+                            <span className="text-[10px] text-red-600 dark:text-red-400 italic">
+                              Not available
+                            </span>
+                          )}
+                          {isInProduction && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 italic">
+                              In production
                             </span>
                           )}
                           {isShipped && (
@@ -705,26 +736,39 @@ export function ShippingSelectionPanel({
                             <div className="flex flex-wrap gap-1 flex-1" onClick={e => e.stopPropagation()}>
                               {applicableComponents.map(key => {
                                 const comp = unit.components[key];
+                                const prodStatus = comp.productionStatus;
+                                
                                 if (comp.shipped) {
                                   return (
                                     <span
                                       key={key}
-                                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
                                     >
                                       {COMPONENT_LABELS[key]} ✓
                                     </span>
                                   );
                                 }
-                                if (!comp.ready) {
+                                if (prodStatus === "not_available") {
                                   return (
                                     <span
                                       key={key}
-                                      className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground opacity-50"
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400"
                                     >
                                       {COMPONENT_LABELS[key]}
                                     </span>
                                   );
                                 }
+                                if (prodStatus === "in_production") {
+                                  return (
+                                    <span
+                                      key={key}
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400"
+                                    >
+                                      {COMPONENT_LABELS[key]}
+                                    </span>
+                                  );
+                                }
+                                // Ready - selectable
                                 return (
                                   <button
                                     key={key}
@@ -733,8 +777,8 @@ export function ShippingSelectionPanel({
                                     className={cn(
                                       "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
                                       comp.selected
-                                        ? "bg-primary/20 border-primary/40 text-primary font-medium"
-                                        : "bg-muted/50 border-border text-muted-foreground hover:border-muted-foreground/50"
+                                        ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
+                                        : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
                                     )}
                                   >
                                     {COMPONENT_LABELS[key]}
@@ -746,7 +790,7 @@ export function ShippingSelectionPanel({
 
                           {/* Ready indicator */}
                           {isReady && (
-                            <span className="text-[10px] text-green-600 dark:text-green-400 ml-auto">
+                            <span className="text-[10px] text-green-600 dark:text-green-400 ml-auto font-medium">
                               Ready to ship
                             </span>
                           )}
