@@ -323,7 +323,7 @@ export function ShippingSelectionPanel({
 
       return {
         construction,
-        expanded: false,
+        expanded: construction.quantity > 1, // Auto-expand multi-unit constructions
         manufacturingStatus: mfgStatus,
         units,
       };
