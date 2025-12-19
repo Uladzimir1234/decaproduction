@@ -593,12 +593,177 @@ export function ShippingSelectionPanel({
         <div className="space-y-2">
           {constructionStates.map(cs => {
             const { construction, expanded, units } = cs;
+            const isSingleUnit = construction.quantity === 1;
+            const singleUnit = isSingleUnit ? units[0] : null;
+            
             const readyCount = units.filter(u => u.productionStatus === "ready" && u.status !== "shipped" && u.status !== "selected").length;
             const selectedInConstruction = units.filter(u => u.status === "selected").length;
             const shippedCount = units.filter(u => u.status === "shipped").length;
             const inProductionCount = units.filter(u => u.productionStatus === "in_production" && u.status !== "shipped").length;
             const notAvailableCount = units.filter(u => u.productionStatus === "not_available" && u.status !== "shipped").length;
 
+            // Single unit rendering - inline with components visible
+            if (isSingleUnit && singleUnit) {
+              const isShipped = singleUnit.status === "shipped";
+              const isSelected = singleUnit.status === "selected";
+              const isReady = singleUnit.productionStatus === "ready" && !isShipped && !isSelected;
+              const isInProduction = singleUnit.productionStatus === "in_production" && !isShipped;
+              const isNotAvailable = singleUnit.productionStatus === "not_available" && !isShipped;
+              const canSelect = singleUnit.productionStatus === "ready" && !isShipped;
+
+              const applicableComponents = (Object.keys(singleUnit.components) as (keyof UnitComponentState)[])
+                .filter(key => singleUnit.components[key].applicable);
+
+              return (
+                <div
+                  key={construction.id}
+                  className={cn(
+                    "border rounded-lg p-2.5 transition-all",
+                    isNotAvailable && "bg-red-500/10 border-red-500/30",
+                    isInProduction && "bg-amber-500/10 border-amber-500/30",
+                    isReady && "bg-green-500/10 border-green-500/30",
+                    isSelected && "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30",
+                    isShipped && "bg-blue-500/10 border-blue-500/30"
+                  )}
+                >
+                  {/* Construction header row */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-2",
+                      canSelect && canEdit && "cursor-pointer"
+                    )}
+                    onClick={() => canEdit && canSelect && toggleUnitSelection(construction.id, singleUnit.unitIndex)}
+                  >
+                    {/* Status indicator */}
+                    <div className="shrink-0">
+                      {isShipped ? (
+                        <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                      ) : isSelected ? (
+                        <Checkbox checked className="h-4 w-4" />
+                      ) : isReady ? (
+                        <Circle className="h-4 w-4 text-green-500" />
+                      ) : isInProduction ? (
+                        <Circle className="h-4 w-4 text-amber-500" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-red-500" />
+                      )}
+                    </div>
+
+                    <Package
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        construction.construction_type === "window" && "text-blue-500",
+                        construction.construction_type === "door" && "text-orange-500",
+                        construction.construction_type === "sliding_door" && "text-purple-500"
+                      )}
+                    />
+                    <span className="font-medium text-sm">#{construction.construction_number}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {CONSTRUCTION_TYPE_LABELS[construction.construction_type] || construction.construction_type}
+                    </span>
+                    
+                    <div className="flex-1" />
+                    
+                    {/* Status labels */}
+                    {isNotAvailable && (
+                      <span className="text-[10px] text-red-600 dark:text-red-400 italic">
+                        Not available
+                      </span>
+                    )}
+                    {isInProduction && (
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 italic">
+                        In production
+                      </span>
+                    )}
+                    {isReady && (
+                      <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                        Ready to ship
+                      </span>
+                    )}
+                    {isSelected && (
+                      <Badge className="text-[10px] px-1.5 py-0">
+                        Selected
+                      </Badge>
+                    )}
+                    {isShipped && (
+                      <Badge variant="outline" className="bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400 text-[10px] px-1.5 py-0">
+                        Shipped
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Component badges - always visible for single unit */}
+                  {applicableComponents.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-current/10" onClick={e => e.stopPropagation()}>
+                      {applicableComponents.map(key => {
+                        const comp = singleUnit.components[key];
+                        const prodStatus = comp.productionStatus;
+                        
+                        if (comp.shipped) {
+                          return (
+                            <span
+                              key={key}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
+                            >
+                              {COMPONENT_LABELS[key]} ✓
+                            </span>
+                          );
+                        }
+                        if (prodStatus === "not_available") {
+                          return (
+                            <span
+                              key={key}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400"
+                            >
+                              {COMPONENT_LABELS[key]}
+                            </span>
+                          );
+                        }
+                        if (prodStatus === "in_production") {
+                          return (
+                            <span
+                              key={key}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400"
+                            >
+                              {COMPONENT_LABELS[key]}
+                            </span>
+                          );
+                        }
+                        // Ready - selectable when unit is selected
+                        if (isSelected) {
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => toggleComponentSelection(construction.id, singleUnit.unitIndex, key)}
+                              className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
+                                comp.selected
+                                  ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
+                                  : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
+                              )}
+                            >
+                              {COMPONENT_LABELS[key]}
+                            </button>
+                          );
+                        }
+                        // Ready but not selected yet
+                        return (
+                          <span
+                            key={key}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400"
+                          >
+                            {COMPONENT_LABELS[key]}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Multi-unit rendering - expandable
             return (
               <div key={construction.id} className="border rounded-lg overflow-hidden">
                 {/* Construction header */}
@@ -625,7 +790,7 @@ export function ShippingSelectionPanel({
                     {CONSTRUCTION_TYPE_LABELS[construction.construction_type] || construction.construction_type}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    ({construction.quantity} total)
+                    ({construction.quantity} units)
                   </span>
                   <div className="flex-1" />
                   <div className="flex gap-1.5">
