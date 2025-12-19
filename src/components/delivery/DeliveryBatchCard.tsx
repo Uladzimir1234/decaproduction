@@ -62,7 +62,7 @@ interface DeliveryBatchCardProps {
   canEdit: boolean;
   isAdmin: boolean;
   onRefresh: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
   batchNumber: number;
 }
 
@@ -215,7 +215,7 @@ export function DeliveryBatchCard({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {canEdit && (
+            {canEdit && onEdit && (
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onEdit}>
                 <Pencil className="h-4 w-4" />
               </Button>
