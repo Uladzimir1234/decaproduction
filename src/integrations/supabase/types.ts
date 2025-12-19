@@ -47,6 +47,41 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_construction_components: {
+        Row: {
+          batch_construction_item_id: string
+          component_type: string
+          created_at: string
+          id: string
+          is_delivered: boolean
+          quantity: number
+        }
+        Insert: {
+          batch_construction_item_id: string
+          component_type: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          quantity?: number
+        }
+        Update: {
+          batch_construction_item_id?: string
+          component_type?: string
+          created_at?: string
+          id?: string
+          is_delivered?: boolean
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_construction_components_batch_construction_item_id_fkey"
+            columns: ["batch_construction_item_id"]
+            isOneToOne: false
+            referencedRelation: "batch_construction_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_construction_items: {
         Row: {
           batch_id: string

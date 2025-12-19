@@ -2074,6 +2074,8 @@ export default function OrderDetail() {
           sliding_doors_count: order.sliding_doors_count,
           has_sliding_doors: order.has_sliding_doors,
           screen_type: order.screen_type,
+          has_nailing_flanges: order.has_nailing_flanges,
+          has_plisse_screens: order.has_plisse_screens,
         }}
         manufacturingProgress={order.fulfillment_percentage}
       />
