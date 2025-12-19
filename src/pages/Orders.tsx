@@ -113,8 +113,16 @@ interface ConstructionManufacturing {
 
 interface OrderConstruction {
   order_id: string;
+  construction_id: string;
   construction_type: string;
+  construction_number: string;
+  quantity: number;
   screen_type: string | null;
+}
+
+interface BatchConstructionItem {
+  construction_id: string;
+  order_id: string;
 }
 
 interface Order {
@@ -207,6 +215,7 @@ export default function Orders() {
   const [orderConstructions, setOrderConstructions] = useState<Record<string, OrderConstruction[]>>({});
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
+  const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, string[]>>({});
   
   // Per-order toggle states - store COLLAPSED order maps (inverted: open by default)
   const [collapsedOrderMaps, setCollapsedOrderMaps] = useState<Set<string>>(() => {
@@ -282,7 +291,8 @@ export default function Orders() {
         fetchSellers(),
         fetchOrdersWithConstructions(),
         fetchConstructionComponents(),
-        fetchConstructionManufacturing()
+        fetchConstructionManufacturing(),
+        fetchBatchConstructionItems()
       ]);
       // Mark initial load as complete after data is fetched
       setTimeout(() => {
@@ -453,6 +463,22 @@ export default function Orders() {
       )
       .subscribe();
 
+    // Subscribe to real-time updates on batch_construction_items table
+    const batchConstructionChannel = supabase
+      .channel('batch-construction-items-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'batch_construction_items'
+        },
+        () => {
+          fetchBatchConstructionItems();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(fulfillmentChannel);
@@ -460,6 +486,7 @@ export default function Orders() {
       supabase.removeChannel(deliveryBatchesChannel);
       supabase.removeChannel(componentsChannel);
       supabase.removeChannel(manufacturingChannel);
+      supabase.removeChannel(batchConstructionChannel);
     };
   }, [orders, toast]);
 
@@ -520,7 +547,7 @@ export default function Orders() {
     try {
       const { data, error } = await supabase
         .from("order_constructions")
-        .select("order_id, construction_type, screen_type");
+        .select("id, order_id, construction_type, construction_number, quantity, screen_type");
       if (error) throw error;
       const orderIds = new Set(data?.map(c => c.order_id) || []);
       setOrdersWithConstructions(orderIds);
@@ -533,13 +560,41 @@ export default function Orders() {
         }
         constructionsByOrder[item.order_id].push({
           order_id: item.order_id,
+          construction_id: item.id,
           construction_type: item.construction_type,
+          construction_number: item.construction_number,
+          quantity: item.quantity,
           screen_type: item.screen_type,
         });
       });
       setOrderConstructions(constructionsByOrder);
     } catch (error) {
       console.error("Error fetching orders with constructions:", error);
+    }
+  };
+
+  const fetchBatchConstructionItems = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("batch_construction_items")
+        .select(`
+          construction_id,
+          delivery_batches!inner(order_id)
+        `);
+      if (error) throw error;
+      
+      // Group by order_id - array of construction_ids that are already in batches
+      const itemsByOrder: Record<string, string[]> = {};
+      data?.forEach((item: any) => {
+        const orderId = item.delivery_batches.order_id;
+        if (!itemsByOrder[orderId]) {
+          itemsByOrder[orderId] = [];
+        }
+        itemsByOrder[orderId].push(item.construction_id);
+      });
+      setBatchConstructionItems(itemsByOrder);
+    } catch (error) {
+      console.error("Error fetching batch construction items:", error);
     }
   };
 
@@ -1533,6 +1588,32 @@ export default function Orders() {
     return { prepared, total: SHIPPING_PREP_ITEMS.length, pending };
   };
 
+  // Helper to get remaining constructions not yet assigned to any delivery batch
+  const getRemainingToShip = (orderId: string) => {
+    const constructions = orderConstructions[orderId] || [];
+    const assignedIds = new Set(batchConstructionItems[orderId] || []);
+    
+    const remaining = constructions.filter(c => !assignedIds.has(c.construction_id));
+    
+    const windowsCount = remaining
+      .filter(c => c.construction_type === 'window')
+      .reduce((sum, c) => sum + c.quantity, 0);
+    const doorsCount = remaining
+      .filter(c => c.construction_type === 'door')
+      .reduce((sum, c) => sum + c.quantity, 0);
+    const slidingDoorsCount = remaining
+      .filter(c => c.construction_type === 'sliding_door')
+      .reduce((sum, c) => sum + c.quantity, 0);
+    
+    return {
+      windowsCount,
+      doorsCount,
+      slidingDoorsCount,
+      hasRemaining: remaining.length > 0,
+      totalRemaining: remaining.length
+    };
+  };
+
   // Helper function to check if order needs a specific component to be ordered
   const orderNeedsComponent = (order: Order, componentType: string): boolean => {
     const fileComponents = constructionComponents[order.id];
@@ -1739,13 +1820,11 @@ export default function Orders() {
             const manufacturingStages = getManufacturingStages(order);
             const customOrderingSteps = getCustomOrderingSteps(order.id);
             const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            const deliveryProgress = getDeliveryProgress(order);
-            const shippingPrepProgress = getShippingPrepProgress(order);
+            const remainingToShip = getRemainingToShip(order.id);
             const orderBatches = getOrderDeliveryBatches(order.id);
             const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
             const preparingBatches = orderBatches.filter(b => b.status === 'preparing').length;
-            const showDeliveryBadge = order.fulfillment_percentage >= 50;
-            const showShippingBadge = order.fulfillment_percentage >= 50;
+            const showRemainingToShip = ordersWithConstructions.has(order.id);
             const hasFileExtractedData = ordersWithConstructions.has(order.id);
             return <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
                     {/* Priority triangle indicator */}
@@ -2302,39 +2381,37 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                        {/* Shipping & Delivery Progress Badges */}
-                        {showShippingBadge && (
+                        {/* Remaining to Ship - constructions not yet in any delivery batch */}
+                        {showRemainingToShip && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            <BoxIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                            {shippingPrepProgress.pending.length > 0 ? (
+                            {remainingToShip.hasRemaining ? (
                               <>
-                                <span className="text-xs text-muted-foreground">To pack:</span>
-                                {shippingPrepProgress.pending.map(item => (
-                                  <Badge key={item} variant="outline" className="text-xs py-0 px-1.5 border-blue-500/50 text-blue-600 dark:text-blue-400">
-                                    {item}
+                                <BoxIcon className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span className="text-xs text-muted-foreground">Remaining to ship:</span>
+                                {remainingToShip.windowsCount > 0 && (
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                    {remainingToShip.windowsCount} Window{remainingToShip.windowsCount > 1 ? 's' : ''}
                                   </Badge>
-                                ))}
+                                )}
+                                {remainingToShip.doorsCount > 0 && (
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                    {remainingToShip.doorsCount} Door{remainingToShip.doorsCount > 1 ? 's' : ''}
+                                  </Badge>
+                                )}
+                                {remainingToShip.slidingDoorsCount > 0 && (
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                    {remainingToShip.slidingDoorsCount} Sliding Door{remainingToShip.slidingDoorsCount > 1 ? 's' : ''}
+                                  </Badge>
+                                )}
                               </>
-                            ) : (
-                              <Badge className="bg-blue-500 hover:bg-blue-500/90 text-xs py-0 px-1.5">
-                                ✓ All Packed
-                              </Badge>
-                            )}
-                            <Truck className="h-3.5 w-3.5 text-emerald-500 shrink-0 ml-2" />
-                            {deliveryProgress.pending.length > 0 ? (
+                            ) : orderBatches.length > 0 ? (
                               <>
-                                <span className="text-xs text-muted-foreground">To deliver:</span>
-                                {deliveryProgress.pending.map(item => (
-                                  <Badge key={item} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
-                                    {item}
-                                  </Badge>
-                                ))}
+                                <BoxIcon className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-xs py-0 px-1.5">
+                                  ✓ All Shipped
+                                </Badge>
                               </>
-                            ) : (
-                              <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-xs py-0 px-1.5">
-                                ✓ All Delivered
-                              </Badge>
-                            )}
+                            ) : null}
                           </div>
                         )}
                         {/* Delivery Batches Status */}
