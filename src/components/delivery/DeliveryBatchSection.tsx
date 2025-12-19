@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { DeliveryBatchCard } from "./DeliveryBatchCard";
 import { ConstructionChipSelector, type ConstructionData } from "./ConstructionChipSelector";
 import { ExpandedConstructionPanel, createDefaultUnitSelections, getDefaultUnitComponents } from "./ExpandedConstructionPanel";
+import { RemainingToShipPanel } from "./RemainingToShipPanel";
 import type { UnitSelection, UnitComponentState } from "./UnitCard";
 
 interface OrderInfo {
@@ -620,44 +621,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   const totalBatches = batches.length;
 
-  // Calculate remaining constructions
-  const getRemainingItems = () => {
-    const remaining: { 
-      windows: { count: number; items: { number: string; remaining: number }[] };
-      doors: { count: number; items: { number: string; remaining: number }[] };
-      slidingDoors: { count: number; items: { number: string; remaining: number }[] };
-    } = {
-      windows: { count: 0, items: [] },
-      doors: { count: 0, items: [] },
-      slidingDoors: { count: 0, items: [] },
-    };
-
-    allConstructions.forEach(c => {
-      const shipped = shippedQuantities[c.id] || 0;
-      const remainingQty = c.quantity - shipped;
-      
-      if (remainingQty > 0) {
-        const item = { number: c.construction_number, remaining: remainingQty };
-        
-        if (c.construction_type === 'window') {
-          remaining.windows.count += remainingQty;
-          remaining.windows.items.push(item);
-        } else if (c.construction_type === 'door') {
-          remaining.doors.count += remainingQty;
-          remaining.doors.items.push(item);
-        } else if (c.construction_type === 'sliding_door') {
-          remaining.slidingDoors.count += remainingQty;
-          remaining.slidingDoors.items.push(item);
-        }
-      }
-    });
-
-    return remaining;
-  };
-
-  const remainingItems = getRemainingItems();
-  const hasRemaining = remainingItems.windows.count > 0 || remainingItems.doors.count > 0 || remainingItems.slidingDoors.count > 0;
-
   // Get selected constructions for the panel display
   const selectedConstructions = allConstructions.filter(c => selectedConstructionIds.has(c.id));
 
@@ -837,38 +800,13 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Remaining to Ship Summary */}
-        {hasRemaining && batches.length > 0 && (
-          <Card className="border-amber-500/30 bg-amber-500/5">
-            <CardContent className="py-3">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-medium">Remaining to Ship:</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {remainingItems.windows.count > 0 && (
-                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingItems.windows.count} Window{remainingItems.windows.count > 1 ? 's' : ''}
-                  </Badge>
-                )}
-                {remainingItems.doors.count > 0 && (
-                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingItems.doors.count} Door{remainingItems.doors.count > 1 ? 's' : ''}
-                  </Badge>
-                )}
-                {remainingItems.slidingDoors.count > 0 && (
-                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                    {remainingItems.slidingDoors.count} Sliding Door{remainingItems.slidingDoors.count > 1 ? 's' : ''}
-                  </Badge>
-                )}
-                <span className="text-xs text-muted-foreground ml-1">
-                  ({[...remainingItems.windows.items, ...remainingItems.doors.items, ...remainingItems.slidingDoors.items]
-                    .map(item => item.remaining === 1 ? `#${item.number}` : `#${item.number} (${item.remaining})`)
-                    .join(', ')})
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Remaining to Ship - Per Unit Component Details */}
+        {batches.length > 0 && (
+          <RemainingToShipPanel
+            constructions={allConstructions}
+            shippedUnitsPerConstruction={shippedUnitsPerConstruction}
+            orderData={order}
+          />
         )}
         
         {batches.length === 0 ? (
