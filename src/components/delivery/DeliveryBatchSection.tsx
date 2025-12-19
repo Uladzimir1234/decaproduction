@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useRole } from "@/hooks/useRole";
-import { Truck, Plus, CalendarIcon, Trash2, Package } from "lucide-react";
+import { Truck, Plus, CalendarIcon, Trash2, Package, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -80,6 +80,13 @@ const SHIPPING_ITEM_TYPES = [
   { key: 'brackets', label: 'Brackets Packed', defaultQty: 0 },
 ];
 
+interface Construction {
+  id: string;
+  construction_number: string;
+  construction_type: string;
+  quantity: number;
+}
+
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
   const { canUpdateManufacturing, isSeller, isAdmin } = useRole();
@@ -87,6 +94,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [batchShippingItems, setBatchShippingItems] = useState<Record<string, BatchShippingItem[]>>({});
   const [batchCustomShipping, setBatchCustomShipping] = useState<Record<string, BatchCustomShippingItem[]>>({});
   const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, BatchConstructionItem[]>>({});
+  const [allConstructions, setAllConstructions] = useState<Construction[]>([]);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
@@ -118,6 +126,15 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     }
   }, [order.id]);
 
+  const fetchAllConstructions = useCallback(async () => {
+    const { data } = await supabase
+      .from("order_constructions")
+      .select("id, construction_number, construction_type, quantity")
+      .eq("order_id", order.id)
+      .order("position_index", { ascending: true });
+    if (data) setAllConstructions(data);
+  }, [order.id]);
+
   const fetchBatchItems = async (batchId: string) => {
     const [shippingRes, customShipRes, constructionRes] = await Promise.all([
       supabase.from("batch_shipping_items").select("*").eq("batch_id", batchId),
@@ -147,6 +164,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   useEffect(() => {
     fetchBatches();
+    fetchAllConstructions();
 
     const batchesChannel = supabase
       .channel(`deliverybatches-${order.id}`)
@@ -191,8 +209,24 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       )
       .subscribe();
 
+    // Subscribe to order_constructions changes too
+    const constructionsChannel = supabase
+      .channel(`constructions-${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_constructions',
+          filter: `order_id=eq.${order.id}`
+        },
+        () => fetchAllConstructions()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(batchesChannel);
+      supabase.removeChannel(constructionsChannel);
     };
   }, [fetchBatches, order.id]);
 
@@ -394,6 +428,29 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   const totalBatches = batches.length;
 
+  // Calculate remaining constructions not yet assigned to any batch
+  const assignedConstructionIds = new Set(
+    Object.entries(batchConstructionItems)
+      .filter(([batchId]) => batches.some(b => b.id === batchId)) // Only count existing batches
+      .flatMap(([, items]) => items.map(item => item.construction_id))
+  );
+
+  const remainingConstructions = allConstructions.filter(
+    c => !assignedConstructionIds.has(c.id)
+  );
+
+  const remainingWindowsCount = remainingConstructions
+    .filter(c => c.construction_type === 'window')
+    .reduce((sum, c) => sum + c.quantity, 0);
+
+  const remainingDoorsCount = remainingConstructions
+    .filter(c => c.construction_type === 'door')
+    .reduce((sum, c) => sum + c.quantity, 0);
+
+  const remainingSlidingDoorsCount = remainingConstructions
+    .filter(c => c.construction_type === 'sliding_door')
+    .reduce((sum, c) => sum + c.quantity, 0);
+
   return (
     <Card className="border-primary/20">
       <CardHeader>
@@ -555,6 +612,38 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Remaining to Ship Summary */}
+        {remainingConstructions.length > 0 && batches.length > 0 && (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-medium">Remaining to Ship:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {remainingWindowsCount > 0 && (
+                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                    {remainingWindowsCount} Window{remainingWindowsCount > 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {remainingDoorsCount > 0 && (
+                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                    {remainingDoorsCount} Door{remainingDoorsCount > 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {remainingSlidingDoorsCount > 0 && (
+                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                    {remainingSlidingDoorsCount} Sliding Door{remainingSlidingDoorsCount > 1 ? 's' : ''}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({remainingConstructions.map(c => `#${c.construction_number}`).join(', ')})
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         {batches.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Truck className="h-12 w-12 mx-auto mb-3 opacity-30" />
