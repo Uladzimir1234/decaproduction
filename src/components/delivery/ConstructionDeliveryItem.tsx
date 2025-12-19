@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Lock, MessageSquare, AlertTriangle } from "lucide-react";
 
@@ -35,12 +36,15 @@ interface ConstructionDeliveryItemProps {
   construction: Construction;
   manufacturingStatus?: ManufacturingStatus;
   selected: boolean;
+  shipQuantity: number;
+  maxQuantity: number;
   includeGlass: boolean;
   includeScreens: boolean;
   includeBlinds: boolean;
   includeHardware: boolean;
   notes: string;
   onSelectedChange: (selected: boolean) => void;
+  onQuantityChange: (quantity: number) => void;
   onGlassChange: (include: boolean) => void;
   onScreensChange: (include: boolean) => void;
   onBlindsChange: (include: boolean) => void;
@@ -55,12 +59,15 @@ export function ConstructionDeliveryItem({
   construction,
   manufacturingStatus,
   selected,
+  shipQuantity,
+  maxQuantity,
   includeGlass,
   includeScreens,
   includeBlinds,
   includeHardware,
   notes,
   onSelectedChange,
+  onQuantityChange,
   onGlassChange,
   onScreensChange,
   onBlindsChange,
@@ -202,6 +209,31 @@ export function ConstructionDeliveryItem({
             <div className="flex items-center gap-1.5 text-xs text-destructive">
               <AlertTriangle className="h-3 w-3" />
               <span>{deliveryBlockReason || "Cannot ship - not assembled"}</span>
+            </div>
+          )}
+
+          {/* Quantity input - show when construction has multiple units and is selected */}
+          {isDeliverable && selected && maxQuantity > 0 && (
+            <div className="flex items-center gap-2 text-xs bg-muted/50 rounded-md px-2 py-1.5">
+              <span className="text-muted-foreground">Shipping:</span>
+              <Input
+                type="number"
+                min={1}
+                max={maxQuantity}
+                value={shipQuantity}
+                onChange={(e) => {
+                  const val = Math.min(Math.max(1, parseInt(e.target.value) || 1), maxQuantity);
+                  onQuantityChange(val);
+                }}
+                className="w-14 h-6 text-xs text-center px-1"
+                disabled={disabled}
+              />
+              <span className="text-muted-foreground">of {maxQuantity} remaining</span>
+              {construction.quantity > maxQuantity && (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-green-500/50 text-green-600">
+                  {construction.quantity - maxQuantity} already shipped
+                </Badge>
+              )}
             </div>
           )}
 

@@ -41,6 +41,7 @@ interface OrderFulfillment {
 export interface ConstructionSelection {
   constructionId: string;
   selected: boolean;
+  quantity: number;  // How many units to ship in this batch
   includeGlass: boolean;
   includeScreens: boolean;
   includeBlinds: boolean;
@@ -54,6 +55,7 @@ interface ConstructionDeliveryListProps {
   onSelectionsChange: (selections: ConstructionSelection[]) => void;
   disabled?: boolean;
   existingBatchConstructionIds?: string[];
+  shippedQuantities?: Record<string, number>; // construction_id -> already shipped quantity
 }
 
 export function ConstructionDeliveryList({
@@ -62,6 +64,7 @@ export function ConstructionDeliveryList({
   onSelectionsChange,
   disabled = false,
   existingBatchConstructionIds = [],
+  shippedQuantities = {},
 }: ConstructionDeliveryListProps) {
   const [constructions, setConstructions] = useState<Construction[]>([]);
   const [manufacturingStages, setManufacturingStages] = useState<ManufacturingStageRow[]>([]);
@@ -109,11 +112,15 @@ export function ConstructionDeliveryList({
             const status = getManufacturingStatusForConstruction(c.id, c.construction_type, relevantStages, fulfillment);
             const deliverability = checkDeliverability(c.construction_type, status);
             const alreadyInBatch = existingBatchConstructionIds.includes(c.id);
+            const alreadyShipped = shippedQuantities[c.id] || 0;
+            const remainingQty = Math.max(0, c.quantity - alreadyShipped);
             
             return {
               constructionId: c.id,
-              // Only pre-select if deliverable AND not in another batch
-              selected: deliverability.isDeliverable && !alreadyInBatch,
+              // Only pre-select if deliverable AND not fully shipped
+              selected: deliverability.isDeliverable && !alreadyInBatch && remainingQty > 0,
+              // Default quantity to remaining quantity
+              quantity: remainingQty,
               // Default glass to false if not installed
               includeGlass: status.glass_installation === 'complete',
               includeScreens: !!c.screen_type,
@@ -290,37 +297,52 @@ export function ConstructionDeliveryList({
             const deliverability = checkDeliverability(construction.construction_type, status);
             const alreadyInBatch = existingBatchConstructionIds.includes(construction.id);
             
-            return (
-              <div key={construction.id} className="relative">
-                {alreadyInBatch && (
-                  <Badge 
-                    variant="outline" 
-                    className="absolute -top-2 right-2 text-[10px] bg-background z-10 border-amber-500/50 text-amber-600"
-                  >
-                    In another batch
-                  </Badge>
-                )}
-                <ConstructionDeliveryItem
-                  construction={construction}
-                  manufacturingStatus={status}
-                  selected={selection.selected}
-                  includeGlass={selection.includeGlass}
-                  includeScreens={selection.includeScreens}
-                  includeBlinds={selection.includeBlinds}
-                  includeHardware={selection.includeHardware}
-                  notes={selection.notes}
-                  onSelectedChange={(selected) => updateSelection(construction.id, { selected })}
-                  onGlassChange={(includeGlass) => updateSelection(construction.id, { includeGlass })}
-                  onScreensChange={(includeScreens) => updateSelection(construction.id, { includeScreens })}
-                  onBlindsChange={(includeBlinds) => updateSelection(construction.id, { includeBlinds })}
-                  onHardwareChange={(includeHardware) => updateSelection(construction.id, { includeHardware })}
-                  onNotesChange={(notes) => updateSelection(construction.id, { notes })}
-                  disabled={disabled || alreadyInBatch}
-                  isDeliverable={deliverability.isDeliverable}
-                  deliveryBlockReason={deliverability.reason}
-                />
-              </div>
-            );
+                const alreadyShipped = shippedQuantities[construction.id] || 0;
+                const maxQty = Math.max(0, construction.quantity - alreadyShipped);
+                const isFullyShipped = maxQty === 0;
+                
+                return (
+                  <div key={construction.id} className="relative">
+                    {alreadyInBatch && (
+                      <Badge 
+                        variant="outline" 
+                        className="absolute -top-2 right-2 text-[10px] bg-background z-10 border-amber-500/50 text-amber-600"
+                      >
+                        In another batch
+                      </Badge>
+                    )}
+                    {isFullyShipped && !alreadyInBatch && (
+                      <Badge 
+                        variant="outline" 
+                        className="absolute -top-2 right-2 text-[10px] bg-background z-10 border-green-500/50 text-green-600"
+                      >
+                        Fully shipped
+                      </Badge>
+                    )}
+                    <ConstructionDeliveryItem
+                      construction={construction}
+                      manufacturingStatus={status}
+                      selected={selection.selected}
+                      shipQuantity={selection.quantity}
+                      maxQuantity={maxQty}
+                      includeGlass={selection.includeGlass}
+                      includeScreens={selection.includeScreens}
+                      includeBlinds={selection.includeBlinds}
+                      includeHardware={selection.includeHardware}
+                      notes={selection.notes}
+                      onSelectedChange={(selected) => updateSelection(construction.id, { selected })}
+                      onQuantityChange={(quantity) => updateSelection(construction.id, { quantity })}
+                      onGlassChange={(includeGlass) => updateSelection(construction.id, { includeGlass })}
+                      onScreensChange={(includeScreens) => updateSelection(construction.id, { includeScreens })}
+                      onBlindsChange={(includeBlinds) => updateSelection(construction.id, { includeBlinds })}
+                      onHardwareChange={(includeHardware) => updateSelection(construction.id, { includeHardware })}
+                      onNotesChange={(notes) => updateSelection(construction.id, { notes })}
+                      disabled={disabled || alreadyInBatch || isFullyShipped}
+                      isDeliverable={deliverability.isDeliverable && !isFullyShipped}
+                      deliveryBlockReason={isFullyShipped ? "All units already shipped" : deliverability.reason}
+                    />
+                  </div>
+                );
           })}
         </div>
       </div>
