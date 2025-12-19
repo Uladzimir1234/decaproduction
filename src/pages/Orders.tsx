@@ -1518,16 +1518,19 @@ export default function Orders() {
 
   const getShippingPrepProgress = (order: Order) => {
     const f = fulfillments[order.id];
-    if (!f) return { prepared: 0, total: 6 };
+    if (!f) return { prepared: 0, total: 6, pending: SHIPPING_PREP_ITEMS.map(i => i.label) };
     
+    const pending: string[] = [];
     let prepared = 0;
     SHIPPING_PREP_ITEMS.forEach(item => {
       if ((f as any)[item.key] === true) {
         prepared++;
+      } else {
+        pending.push(item.label);
       }
     });
 
-    return { prepared, total: SHIPPING_PREP_ITEMS.length };
+    return { prepared, total: SHIPPING_PREP_ITEMS.length, pending };
   };
 
   // Helper function to check if order needs a specific component to be ordered
@@ -2303,31 +2306,35 @@ export default function Orders() {
                         {showShippingBadge && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             <BoxIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                            <Badge 
-                              variant={shippingPrepProgress.prepared === shippingPrepProgress.total ? "default" : "outline"}
-                              className={`text-xs py-0 px-1.5 ${
-                                shippingPrepProgress.prepared === shippingPrepProgress.total 
-                                  ? 'bg-blue-500 hover:bg-blue-500/90' 
-                                  : shippingPrepProgress.prepared > 0 
-                                    ? 'border-blue-500/50 text-blue-600 dark:text-blue-400'
-                                    : 'border-muted-foreground/30'
-                              }`}
-                            >
-                              {shippingPrepProgress.prepared}/{shippingPrepProgress.total} packed
-                            </Badge>
+                            {shippingPrepProgress.pending.length > 0 ? (
+                              <>
+                                <span className="text-xs text-muted-foreground">To pack:</span>
+                                {shippingPrepProgress.pending.map(item => (
+                                  <Badge key={item} variant="outline" className="text-xs py-0 px-1.5 border-blue-500/50 text-blue-600 dark:text-blue-400">
+                                    {item}
+                                  </Badge>
+                                ))}
+                              </>
+                            ) : (
+                              <Badge className="bg-blue-500 hover:bg-blue-500/90 text-xs py-0 px-1.5">
+                                ✓ All Packed
+                              </Badge>
+                            )}
                             <Truck className="h-3.5 w-3.5 text-emerald-500 shrink-0 ml-2" />
-                            <Badge 
-                              variant={deliveryProgress.delivered === deliveryProgress.total ? "default" : "outline"}
-                              className={`text-xs py-0 px-1.5 ${
-                                deliveryProgress.delivered === deliveryProgress.total 
-                                  ? 'bg-emerald-500 hover:bg-emerald-500/90' 
-                                  : deliveryProgress.delivered > 0 
-                                    ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
-                                    : 'border-muted-foreground/30'
-                              }`}
-                            >
-                              {deliveryProgress.delivered}/{deliveryProgress.total} delivered
-                            </Badge>
+                            {deliveryProgress.pending.length > 0 ? (
+                              <>
+                                <span className="text-xs text-muted-foreground">To deliver:</span>
+                                {deliveryProgress.pending.map(item => (
+                                  <Badge key={item} variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                                    {item}
+                                  </Badge>
+                                ))}
+                              </>
+                            ) : (
+                              <Badge className="bg-emerald-500 hover:bg-emerald-500/90 text-xs py-0 px-1.5">
+                                ✓ All Delivered
+                              </Badge>
+                            )}
                           </div>
                         )}
                         {/* Delivery Batches Status */}
