@@ -39,6 +39,13 @@ interface OrderData {
 interface ShippedUnitInfo {
   unitIndex: number;
   components: string[];
+  batchNumber?: number;
+}
+
+interface ComponentBatchInfo {
+  unitIndex: number;
+  componentType: string;
+  batchNumber: number;
 }
 
 interface ManufacturingStage {
@@ -96,6 +103,7 @@ interface UnitState {
     productionStatus: ProductionStatus;
     shipped: boolean; 
     selected: boolean;
+    batchNumber?: number; // Which delivery batch this was shipped in
   }>;
 }
 
@@ -104,6 +112,11 @@ interface ConstructionState {
   expanded: boolean;
   manufacturingStatus: Record<string, string>;
   units: UnitState[];
+}
+
+interface BatchInfo {
+  batchId: string;
+  batchNumber: number;
 }
 
 function getUnitProductionStatus(
@@ -177,6 +190,8 @@ export function ShippingSelectionPanel({
   const [constructionStates, setConstructionStates] = useState<ConstructionState[]>([]);
   const [manufacturingData, setManufacturingData] = useState<Record<string, ManufacturingStage[]>>({});
   const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillmentStatus | null>(null);
+  const [componentBatchMap, setComponentBatchMap] = useState<Map<string, number>>(new Map()); // Map of "constructionId-unitIndex-componentType" -> batchNumber
+  const [nextBatchNumber, setNextBatchNumber] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -195,8 +210,8 @@ export function ShippingSelectionPanel({
       return;
     }
 
-    // Fetch both construction-level and order-level manufacturing data in parallel
-    const [constructionResult, fulfillmentResult] = await Promise.all([
+    // Fetch construction manufacturing, order fulfillment, and batch info in parallel
+    const [constructionResult, fulfillmentResult, batchesResult, batchComponentsResult] = await Promise.all([
       supabase
         .from("construction_manufacturing")
         .select("construction_id, stage, status")
@@ -205,7 +220,23 @@ export function ShippingSelectionPanel({
         .from("order_fulfillment")
         .select("assembly_status, glass_status, screens_cutting, welding_status, profile_cutting, reinforcement_cutting, doors_status, sliding_doors_status")
         .eq("order_id", orderId)
-        .maybeSingle()
+        .maybeSingle(),
+      supabase
+        .from("delivery_batches")
+        .select("id, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("batch_construction_items")
+        .select(`
+          construction_id,
+          batch_id,
+          batch_construction_components (
+            unit_index,
+            component_type
+          )
+        `)
+        .in("construction_id", constructionIds)
     ]);
 
     if (!constructionResult.error && constructionResult.data) {
@@ -221,6 +252,27 @@ export function ShippingSelectionPanel({
 
     if (!fulfillmentResult.error && fulfillmentResult.data) {
       setOrderFulfillment(fulfillmentResult.data);
+    }
+
+    // Build batch number map
+    if (!batchesResult.error && batchesResult.data && !batchComponentsResult.error && batchComponentsResult.data) {
+      const batchToNumber = new Map<string, number>();
+      batchesResult.data.forEach((batch, idx) => {
+        batchToNumber.set(batch.id, idx + 1);
+      });
+      setNextBatchNumber(batchesResult.data.length + 1);
+
+      const compBatchMap = new Map<string, number>();
+      batchComponentsResult.data.forEach(item => {
+        const batchNum = batchToNumber.get(item.batch_id);
+        if (batchNum && item.batch_construction_components) {
+          (item.batch_construction_components as any[]).forEach(comp => {
+            const key = `${item.construction_id}-${comp.unit_index}-${comp.component_type}`;
+            compBatchMap.set(key, batchNum);
+          });
+        }
+      });
+      setComponentBatchMap(compBatchMap);
     }
 
     setLoading(false);
@@ -281,11 +333,15 @@ export function ShippingSelectionPanel({
         const applicableKeys = (Object.keys(applicable) as (keyof UnitComponentState)[]).filter(k => applicable[k]);
         const allShipped = applicableKeys.every(k => shippedComponents.has(k));
 
-        const componentStates: Record<keyof UnitComponentState, { applicable: boolean; productionStatus: ProductionStatus; shipped: boolean; selected: boolean }> = {} as any;
+        const componentStates: Record<keyof UnitComponentState, { applicable: boolean; productionStatus: ProductionStatus; shipped: boolean; selected: boolean; batchNumber?: number }> = {} as any;
         
         (Object.keys(applicable) as (keyof UnitComponentState)[]).forEach(key => {
           const isApplicable = applicable[key];
           const isShipped = shippedComponents.has(key);
+          
+          // Get batch number for shipped components
+          const batchKey = `${construction.id}-${unitIdx}-${key}`;
+          const batchNumber = componentBatchMap.get(batchKey);
           
           // If the unit's production (assembly) is not ready, all components inherit that status
           // Components are only individually ready when the overall construction is ready
@@ -308,6 +364,7 @@ export function ShippingSelectionPanel({
             productionStatus: prodStatus,
             shipped: isShipped,
             selected: shouldAutoSelect,
+            batchNumber,
           };
         });
 
@@ -338,7 +395,7 @@ export function ShippingSelectionPanel({
     });
 
     setConstructionStates(states);
-  }, [constructions, manufacturingData, orderFulfillment, shippedUnitsPerConstruction, orderData]);
+  }, [constructions, manufacturingData, orderFulfillment, shippedUnitsPerConstruction, orderData, componentBatchMap]);
 
   const toggleExpanded = (constructionId: string) => {
     setConstructionStates(prev =>
@@ -748,9 +805,14 @@ export function ShippingSelectionPanel({
                           return (
                             <span
                               key={key}
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
+                              className="relative text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
                             >
                               {COMPONENT_LABELS[key]} ✓
+                              {comp.batchNumber && (
+                                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                                  {comp.batchNumber}
+                                </span>
+                              )}
                             </span>
                           );
                         }
@@ -782,13 +844,18 @@ export function ShippingSelectionPanel({
                               type="button"
                               onClick={() => toggleComponentSelection(construction.id, singleUnit.unitIndex, key)}
                               className={cn(
-                                "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
+                                "relative text-[10px] px-1.5 py-0.5 rounded border transition-colors",
                                 comp.selected
                                   ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
                                   : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
                               )}
                             >
                               {COMPONENT_LABELS[key]}
+                              {comp.selected && (
+                                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                                  {nextBatchNumber}
+                                </span>
+                              )}
                             </button>
                           );
                         }
@@ -951,9 +1018,14 @@ export function ShippingSelectionPanel({
                                 return (
                                   <span
                                     key={key}
-                                    className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
+                                    className="relative text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-blue-600 dark:text-blue-400"
                                   >
                                     {COMPONENT_LABELS[key]} ✓
+                                    {comp.batchNumber && (
+                                      <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                                        {comp.batchNumber}
+                                      </span>
+                                    )}
                                   </span>
                                 );
                               }
@@ -985,7 +1057,7 @@ export function ShippingSelectionPanel({
                                   onClick={() => isSelected && toggleComponentSelection(construction.id, unit.unitIndex, key)}
                                   disabled={!isSelected}
                                   className={cn(
-                                    "text-[10px] px-1.5 py-0.5 rounded border transition-colors",
+                                    "relative text-[10px] px-1.5 py-0.5 rounded border transition-colors",
                                     comp.selected
                                       ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
                                       : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400",
@@ -994,6 +1066,11 @@ export function ShippingSelectionPanel({
                                   )}
                                 >
                                   {COMPONENT_LABELS[key]}
+                                  {comp.selected && (
+                                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                                      {nextBatchNumber}
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })}
