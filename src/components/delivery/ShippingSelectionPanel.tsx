@@ -46,6 +46,15 @@ interface ManufacturingStage {
   status: string;
 }
 
+interface OrderFulfillmentStatus {
+  assembly_status: string | null;
+  glass_status: string | null;
+  screens_cutting: string | null;
+  welding_status: string | null;
+  profile_cutting: string | null;
+  reinforcement_cutting: string | null;
+}
+
 interface ShippingSelectionPanelProps {
   orderId: string;
   orderData: OrderData;
@@ -132,6 +141,7 @@ export function ShippingSelectionPanel({
   const { toast } = useToast();
   const [constructionStates, setConstructionStates] = useState<ConstructionState[]>([]);
   const [manufacturingData, setManufacturingData] = useState<Record<string, ManufacturingStage[]>>({});
+  const [orderFulfillment, setOrderFulfillment] = useState<OrderFulfillmentStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -142,7 +152,7 @@ export function ShippingSelectionPanel({
   const [customItemName, setCustomItemName] = useState("");
   const [customItemQty, setCustomItemQty] = useState(1);
 
-  // Fetch manufacturing status for all constructions
+  // Fetch manufacturing status for all constructions and order fulfillment as fallback
   const fetchManufacturingStatus = useCallback(async () => {
     const constructionIds = constructions.map(c => c.id);
     if (constructionIds.length === 0) {
@@ -150,14 +160,22 @@ export function ShippingSelectionPanel({
       return;
     }
 
-    const { data, error } = await supabase
-      .from("construction_manufacturing")
-      .select("construction_id, stage, status")
-      .in("construction_id", constructionIds);
+    // Fetch both construction-level and order-level manufacturing data in parallel
+    const [constructionResult, fulfillmentResult] = await Promise.all([
+      supabase
+        .from("construction_manufacturing")
+        .select("construction_id, stage, status")
+        .in("construction_id", constructionIds),
+      supabase
+        .from("order_fulfillment")
+        .select("assembly_status, glass_status, screens_cutting, welding_status, profile_cutting, reinforcement_cutting")
+        .eq("order_id", orderId)
+        .maybeSingle()
+    ]);
 
-    if (!error && data) {
+    if (!constructionResult.error && constructionResult.data) {
       const grouped: Record<string, ManufacturingStage[]> = {};
-      data.forEach(row => {
+      constructionResult.data.forEach(row => {
         if (!grouped[row.construction_id]) {
           grouped[row.construction_id] = [];
         }
@@ -165,8 +183,13 @@ export function ShippingSelectionPanel({
       });
       setManufacturingData(grouped);
     }
+
+    if (!fulfillmentResult.error && fulfillmentResult.data) {
+      setOrderFulfillment(fulfillmentResult.data);
+    }
+
     setLoading(false);
-  }, [constructions]);
+  }, [constructions, orderId]);
 
   useEffect(() => {
     fetchManufacturingStatus();
@@ -174,10 +197,32 @@ export function ShippingSelectionPanel({
 
   // Initialize construction states when data changes
   useEffect(() => {
-    const states: ConstructionState[] = constructions.map(construction => {
-      const stages = manufacturingData[construction.id] || [];
+    // Helper to get effective manufacturing status using order_fulfillment as fallback
+    const getEffectiveStatus = (stages: ManufacturingStage[]): Record<string, string> => {
       const mfgStatus: Record<string, string> = {};
       stages.forEach(s => { mfgStatus[s.stage] = s.status; });
+      
+      // Check if all construction-level stages are not_started (indicates data wasn't populated)
+      const allNotStarted = stages.length > 0 && stages.every(s => s.status === 'not_started');
+      
+      // If construction-level data is missing or all not_started, use order_fulfillment as fallback
+      if ((stages.length === 0 || allNotStarted) && orderFulfillment) {
+        return {
+          assembly: orderFulfillment.assembly_status || 'not_started',
+          glass: orderFulfillment.glass_status || 'not_started',
+          screens: orderFulfillment.screens_cutting || 'not_started',
+          welding: orderFulfillment.welding_status || 'not_started',
+          profile_cutting: orderFulfillment.profile_cutting || 'not_started',
+          reinforcement_cutting: orderFulfillment.reinforcement_cutting || 'not_started',
+        };
+      }
+      
+      return mfgStatus;
+    };
+
+    const states: ConstructionState[] = constructions.map(construction => {
+      const stages = manufacturingData[construction.id] || [];
+      const mfgStatus = getEffectiveStatus(stages);
 
       const applicable = getApplicableComponents(construction, orderData);
       const shippedUnits = shippedUnitsPerConstruction[construction.id] || [];
@@ -238,7 +283,7 @@ export function ShippingSelectionPanel({
     });
 
     setConstructionStates(states);
-  }, [constructions, manufacturingData, shippedUnitsPerConstruction, orderData]);
+  }, [constructions, manufacturingData, orderFulfillment, shippedUnitsPerConstruction, orderData]);
 
   const toggleExpanded = (constructionId: string) => {
     setConstructionStates(prev =>
