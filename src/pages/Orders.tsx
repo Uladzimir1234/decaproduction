@@ -118,11 +118,16 @@ interface OrderConstruction {
   construction_number: string;
   quantity: number;
   screen_type: string | null;
+  has_blinds: boolean;
 }
 
-interface BatchConstructionItem {
+interface BatchConstructionItemDetail {
   construction_id: string;
   order_id: string;
+  include_glass: boolean;
+  include_screens: boolean;
+  include_blinds: boolean;
+  include_hardware: boolean;
 }
 
 interface Order {
@@ -215,7 +220,7 @@ export default function Orders() {
   const [orderConstructions, setOrderConstructions] = useState<Record<string, OrderConstruction[]>>({});
   const [constructionComponents, setConstructionComponents] = useState<Record<string, ConstructionComponent[]>>({});
   const [constructionManufacturing, setConstructionManufacturing] = useState<Record<string, ConstructionManufacturing[]>>({});
-  const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, string[]>>({});
+  const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, BatchConstructionItemDetail[]>>({});
   
   // Per-order toggle states - store COLLAPSED order maps (inverted: open by default)
   const [collapsedOrderMaps, setCollapsedOrderMaps] = useState<Set<string>>(() => {
@@ -547,7 +552,7 @@ export default function Orders() {
     try {
       const { data, error } = await supabase
         .from("order_constructions")
-        .select("id, order_id, construction_type, construction_number, quantity, screen_type");
+        .select("id, order_id, construction_type, construction_number, quantity, screen_type, has_blinds");
       if (error) throw error;
       const orderIds = new Set(data?.map(c => c.order_id) || []);
       setOrdersWithConstructions(orderIds);
@@ -565,6 +570,7 @@ export default function Orders() {
           construction_number: item.construction_number,
           quantity: item.quantity,
           screen_type: item.screen_type,
+          has_blinds: item.has_blinds || false,
         });
       });
       setOrderConstructions(constructionsByOrder);
@@ -579,18 +585,29 @@ export default function Orders() {
         .from("batch_construction_items")
         .select(`
           construction_id,
+          include_glass,
+          include_screens,
+          include_blinds,
+          include_hardware,
           delivery_batches!inner(order_id)
         `);
       if (error) throw error;
       
-      // Group by order_id - array of construction_ids that are already in batches
-      const itemsByOrder: Record<string, string[]> = {};
+      // Group by order_id - array of batch item details
+      const itemsByOrder: Record<string, BatchConstructionItemDetail[]> = {};
       data?.forEach((item: any) => {
         const orderId = item.delivery_batches.order_id;
         if (!itemsByOrder[orderId]) {
           itemsByOrder[orderId] = [];
         }
-        itemsByOrder[orderId].push(item.construction_id);
+        itemsByOrder[orderId].push({
+          construction_id: item.construction_id,
+          order_id: orderId,
+          include_glass: item.include_glass ?? true,
+          include_screens: item.include_screens ?? true,
+          include_blinds: item.include_blinds ?? true,
+          include_hardware: item.include_hardware ?? true,
+        });
       });
       setBatchConstructionItems(itemsByOrder);
     } catch (error) {
@@ -1589,28 +1606,70 @@ export default function Orders() {
   };
 
   // Helper to get remaining constructions not yet assigned to any delivery batch
+  // Also tracks item categories (screens, blinds, glass, hardware) that were excluded from batches
   const getRemainingToShip = (orderId: string) => {
     const constructions = orderConstructions[orderId] || [];
-    const assignedIds = new Set(batchConstructionItems[orderId] || []);
+    const batchItems = batchConstructionItems[orderId] || [];
     
-    const remaining = constructions.filter(c => !assignedIds.has(c.construction_id));
+    // Create a map of construction_id -> batch item details
+    const assignedMap = new Map(batchItems.map(bi => [bi.construction_id, bi]));
     
-    const windowsCount = remaining
+    // 1. Find constructions not assigned to ANY batch
+    const unassigned = constructions.filter(c => !assignedMap.has(c.construction_id));
+    
+    const windowsCount = unassigned
       .filter(c => c.construction_type === 'window')
       .reduce((sum, c) => sum + c.quantity, 0);
-    const doorsCount = remaining
+    const doorsCount = unassigned
       .filter(c => c.construction_type === 'door')
       .reduce((sum, c) => sum + c.quantity, 0);
-    const slidingDoorsCount = remaining
+    const slidingDoorsCount = unassigned
       .filter(c => c.construction_type === 'sliding_door')
       .reduce((sum, c) => sum + c.quantity, 0);
+    
+    // Get construction numbers for unassigned items
+    const unassignedNumbers = unassigned.map(c => c.construction_number);
+    
+    // 2. Find item categories excluded from assigned batches
+    const excludedItems: { constructionNumber: string; items: string[] }[] = [];
+    
+    constructions.forEach(c => {
+      const batchItem = assignedMap.get(c.construction_id);
+      if (batchItem) {
+        const excluded: string[] = [];
+        // Check if screens were excluded but construction has screens
+        if (!batchItem.include_screens && c.screen_type) {
+          excluded.push('Screens');
+        }
+        // Check if blinds were excluded but construction has blinds
+        if (!batchItem.include_blinds && c.has_blinds) {
+          excluded.push('Blinds');
+        }
+        // Glass is always relevant - if excluded, it's missing
+        if (!batchItem.include_glass) {
+          excluded.push('Glass');
+        }
+        // Hardware is always relevant - if excluded, it's missing
+        if (!batchItem.include_hardware) {
+          excluded.push('Hardware');
+        }
+        
+        if (excluded.length > 0) {
+          excludedItems.push({ constructionNumber: c.construction_number, items: excluded });
+        }
+      }
+    });
+    
+    const hasRemaining = unassigned.length > 0 || excludedItems.length > 0;
     
     return {
       windowsCount,
       doorsCount,
       slidingDoorsCount,
-      hasRemaining: remaining.length > 0,
-      totalRemaining: remaining.length
+      unassignedNumbers,
+      excludedItems,
+      hasRemaining,
+      totalRemaining: unassigned.length
     };
   };
 
@@ -2381,16 +2440,20 @@ export default function Orders() {
                             ))}
                           </div>
                         )}
-                        {/* Remaining to Ship - constructions not yet in any delivery batch */}
+                        {/* Remaining to Ship - constructions not yet in any delivery batch AND excluded items */}
                         {showRemainingToShip && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {remainingToShip.hasRemaining ? (
                               <>
                                 <BoxIcon className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                 <span className="text-xs text-muted-foreground">Remaining to ship:</span>
+                                {/* Unassigned constructions by type */}
                                 {remainingToShip.windowsCount > 0 && (
                                   <Badge variant="outline" className="text-xs py-0 px-1.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
-                                    {remainingToShip.windowsCount} Window{remainingToShip.windowsCount > 1 ? 's' : ''}
+                                    {remainingToShip.windowsCount} Window{remainingToShip.windowsCount > 1 ? 's' : ''} ({remainingToShip.unassignedNumbers.filter((_, i) => {
+                                      const c = (orderConstructions[order.id] || [])[i];
+                                      return c?.construction_type === 'window';
+                                    }).join(', ') || remainingToShip.unassignedNumbers.join(', ')})
                                   </Badge>
                                 )}
                                 {remainingToShip.doorsCount > 0 && (
@@ -2403,6 +2466,18 @@ export default function Orders() {
                                     {remainingToShip.slidingDoorsCount} Sliding Door{remainingToShip.slidingDoorsCount > 1 ? 's' : ''}
                                   </Badge>
                                 )}
+                                {/* Excluded items from assigned batches */}
+                                {remainingToShip.excludedItems.map(({ constructionNumber, items }) => (
+                                  items.map(item => (
+                                    <Badge 
+                                      key={`${constructionNumber}-${item}`} 
+                                      variant="outline" 
+                                      className="text-xs py-0 px-1.5 border-orange-500/50 text-orange-600 dark:text-orange-400"
+                                    >
+                                      {item} for #{constructionNumber}
+                                    </Badge>
+                                  ))
+                                ))}
                               </>
                             ) : orderBatches.length > 0 ? (
                               <>
