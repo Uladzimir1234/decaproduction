@@ -72,6 +72,8 @@ const compactLabels: Record<string, string> = {
   'SD Weld': 'W',
   'SD Assy': 'A',
   'SD Glass': 'G',
+  'Screens': 'Sc',
+  'SD Scr.': 'Sc',
 };
 
 export function ManufacturingPipeline({
@@ -236,6 +238,10 @@ interface ManufacturingPipelineSectionProps {
     component_name: string | null;
     status: string;
   }>;
+  constructions?: Array<{
+    construction_type: string;
+    screen_type: string | null;
+  }>;
   canUpdateManufacturing: boolean;
   updateFulfillment: (field: string, value: any) => void;
   size?: "default" | "compact";
@@ -247,6 +253,7 @@ export function ManufacturingPipelineSection({
   order,
   fulfillment,
   aggregatedComponents,
+  constructions = [],
   canUpdateManufacturing,
   updateFulfillment,
   size = "default",
@@ -282,24 +289,54 @@ export function ManufacturingPipelineSection({
   const isSlidingDoorsProfileAvailable = () => order?.sliding_doors_profile_status === 'available';
   const isSlidingDoorsHardwareAvailable = () => order?.sliding_doors_hardware_status === 'available';
 
+  // Check if screen material is ordered or available
+  const isScreensAvailable = () => {
+    const screensComponents = aggregatedComponents.filter(c => c.component_type === 'screens');
+    if (screensComponents.length > 0) {
+      return screensComponents.some(c => c.status === 'available' || c.status === 'ordered');
+    }
+    return order?.screens_status === 'available' || order?.screens_status === 'ordered';
+  };
+
+  // Check which tracks have screens based on construction data
+  const windowsHaveScreens = constructions.some(
+    c => c.construction_type === 'window' && c.screen_type != null && c.screen_type !== ''
+  );
+  const doorsHaveScreens = constructions.some(
+    c => c.construction_type === 'door' && c.screen_type != null && c.screen_type !== ''
+  );
+  const slidingDoorsHaveScreens = constructions.some(
+    c => c.construction_type === 'sliding_door' && c.screen_type != null && c.screen_type !== ''
+  );
+
   // Check stage completion
   const isReinforcementCut = () => fulfillment?.reinforcement_cutting === 'complete';
   const isProfileCut = () => fulfillment?.profile_cutting === 'complete';
   const isWelded = () => fulfillment?.welding_status === 'complete';
   const isAssembled = () => fulfillment?.assembly_status === 'complete';
+  const isGlassInstalled = () => fulfillment?.glass_status === 'complete';
   const isDoorsAssembled = () => fulfillment?.doors_status === 'complete';
+  const isDoorsGlassInstalled = () => fulfillment?.doors_glass_installed === true || fulfillment?.doors_glass_installed === 'complete';
   const isSlidingDoorsReinforcementCut = () => fulfillment?.sliding_doors_reinforcement_cutting === 'complete';
   const isSlidingDoorsProfileCut = () => fulfillment?.sliding_doors_profile_cutting === 'complete';
   const isSlidingDoorsWelded = () => fulfillment?.sliding_doors_welding_status === 'complete';
   const isSlidingDoorsAssembled = () => fulfillment?.sliding_doors_status === 'complete';
+  const isSlidingDoorsGlassInstalled = () => fulfillment?.sliding_doors_glass_installed === true || fulfillment?.sliding_doors_glass_installed === 'complete';
 
   const getComponentLockReason = (available: boolean, name: string, status: string | null) => {
     if (available) return undefined;
     return status === 'ordered' ? `${name} ordered` : `${name} not ordered`;
   };
 
+  const getScreensLockReason = () => {
+    if (isScreensAvailable()) return undefined;
+    return order?.screens_status === 'not_ordered' || !order?.screens_status 
+      ? 'Screen material not ordered' 
+      : 'Screen material not available';
+  };
+
   // Windows/General track stages
-  const windowsStages = [
+  const windowsStages: Stage[] = [
     {
       id: 'reinforcement',
       label: 'Reinforcement Cutting',
@@ -352,10 +389,19 @@ export function ManufacturingPipelineSection({
           ? 'Glass not available' 
           : undefined,
     },
+    // Add Screens stage only if windows have screens
+    ...(windowsHaveScreens ? [{
+      id: 'windows-screens',
+      label: 'Window Screens',
+      shortLabel: 'Screens',
+      fulfillmentField: 'screens_cutting',
+      isLocked: !isScreensAvailable(),
+      lockReason: getScreensLockReason(),
+    }] : []),
   ];
 
   // Doors track stages
-  const doorsStages = [
+  const doorsStages: Stage[] = [
     {
       id: 'doors-reinforcement',
       label: 'Reinforcement Cutting',
@@ -408,10 +454,19 @@ export function ManufacturingPipelineSection({
           ? 'Glass not available' 
           : undefined,
     },
+    // Add Screens stage only if doors have screens
+    ...(doorsHaveScreens ? [{
+      id: 'doors-screens',
+      label: 'Door Screens',
+      shortLabel: 'Screens',
+      fulfillmentField: 'screens_cutting',
+      isLocked: !isScreensAvailable(),
+      lockReason: getScreensLockReason(),
+    }] : []),
   ];
 
   // Sliding doors independent track stages
-  const slidingDoorsStages = [
+  const slidingDoorsStages: Stage[] = [
     {
       id: 'sd-reinforcement',
       label: 'SD Reinforcement Cutting',
@@ -464,6 +519,15 @@ export function ManufacturingPipelineSection({
           ? 'Glass not available' 
           : undefined,
     },
+    // Add Screens stage only if sliding doors have screens
+    ...(slidingDoorsHaveScreens ? [{
+      id: 'sd-screens',
+      label: 'Sliding Door Screens',
+      shortLabel: 'SD Scr.',
+      fulfillmentField: 'screens_cutting',
+      isLocked: !isScreensAvailable(),
+      lockReason: getScreensLockReason(),
+    }] : []),
   ];
 
   const hasWindows = (order?.windows_count ?? 0) > 0;
