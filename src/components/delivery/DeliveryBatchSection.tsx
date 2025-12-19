@@ -16,7 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DeliveryBatchCard } from "./DeliveryBatchCard";
-import { ConstructionDeliveryList, ConstructionSelection } from "./ConstructionDeliveryList";
+import { ConstructionChipSelector, type ConstructionData } from "./ConstructionChipSelector";
+import { ConstructionComponentPanel, getDefaultComponents, type ComponentSelection, type ConstructionComponentSelection } from "./ConstructionComponentPanel";
 
 interface OrderInfo {
   id: string;
@@ -26,6 +27,10 @@ interface OrderInfo {
   sliding_doors_count: number;
   has_sliding_doors: boolean;
   screen_type: string | null;
+  has_nailing_flanges?: boolean | null;
+  has_plisse_screens?: boolean | null;
+  visible_hinges_count?: number | null;
+  hidden_hinges_count?: number | null;
 }
 
 interface DeliveryBatch {
@@ -81,13 +86,6 @@ const SHIPPING_ITEM_TYPES = [
   { key: 'brackets', label: 'Brackets Packed', defaultQty: 0 },
 ];
 
-interface Construction {
-  id: string;
-  construction_number: string;
-  construction_type: string;
-  quantity: number;
-}
-
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
   const { canUpdateManufacturing, isSeller, isAdmin } = useRole();
@@ -95,14 +93,18 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [batchShippingItems, setBatchShippingItems] = useState<Record<string, BatchShippingItem[]>>({});
   const [batchCustomShipping, setBatchCustomShipping] = useState<Record<string, BatchCustomShippingItem[]>>({});
   const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, BatchConstructionItem[]>>({});
-  const [allConstructions, setAllConstructions] = useState<Construction[]>([]);
+  const [allConstructions, setAllConstructions] = useState<ConstructionData[]>([]);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
   const [deliveryPerson, setDeliveryPerson] = useState<string>("");
   const [selectedShippingItems, setSelectedShippingItems] = useState<Record<string, { selected: boolean; qty: number }>>({});
-  const [constructionSelections, setConstructionSelections] = useState<ConstructionSelection[]>([]);
+  
+  // New visual selection state
+  const [selectedConstructionIds, setSelectedConstructionIds] = useState<Set<string>>(new Set());
+  const [componentSelections, setComponentSelections] = useState<Record<string, ConstructionComponentSelection>>({});
+  
   const [saving, setSaving] = useState(false);
   
   // Custom shipping items for new batch
@@ -130,10 +132,10 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const fetchAllConstructions = useCallback(async () => {
     const { data } = await supabase
       .from("order_constructions")
-      .select("id, construction_number, construction_type, quantity")
+      .select("id, construction_number, construction_type, quantity, screen_type, has_blinds, handle_type, glass_type")
       .eq("order_id", order.id)
       .order("position_index", { ascending: true });
-    if (data) setAllConstructions(data);
+    if (data) setAllConstructions(data as ConstructionData[]);
   }, [order.id]);
 
   const fetchBatchItems = async (batchId: string) => {
@@ -147,21 +149,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setBatchCustomShipping(prev => ({ ...prev, [batchId]: customShipRes.data || [] }));
     setBatchConstructionItems(prev => ({ ...prev, [batchId]: constructionRes.data || [] }));
   };
-
-  // Get all construction IDs already in batches (for marking in UI)
-  // Only includes items from batches that currently exist (not deleted ones)
-  const getExistingBatchConstructionIds = useCallback(() => {
-    const ids: string[] = [];
-    const existingBatchIds = new Set(batches.map(b => b.id));
-    
-    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
-      // Only include items from batches that still exist
-      if (existingBatchIds.has(batchId)) {
-        items.forEach(item => ids.push(item.construction_id));
-      }
-    });
-    return ids;
-  }, [batchConstructionItems, batches]);
 
   useEffect(() => {
     fetchBatches();
@@ -189,7 +176,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
             setBatches(prev => prev.filter(batch => batch.id !== deletedId));
-            // Clear all items for the deleted batch so constructions become available again
             setBatchConstructionItems(prev => {
               const updated = { ...prev };
               delete updated[deletedId];
@@ -210,7 +196,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       )
       .subscribe();
 
-    // Subscribe to order_constructions changes too
     const constructionsChannel = supabase
       .channel(`constructions-${order.id}`)
       .on(
@@ -229,7 +214,24 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       supabase.removeChannel(batchesChannel);
       supabase.removeChannel(constructionsChannel);
     };
-  }, [fetchBatches, order.id]);
+  }, [fetchBatches, order.id, fetchAllConstructions]);
+
+  // Calculate shipped quantities per construction
+  const getShippedQuantities = useCallback(() => {
+    const quantities: Record<string, number> = {};
+    const existingBatchIds = new Set(batches.map(b => b.id));
+    
+    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
+      if (existingBatchIds.has(batchId)) {
+        items.forEach(item => {
+          quantities[item.construction_id] = (quantities[item.construction_id] || 0) + (item.quantity || 1);
+        });
+      }
+    });
+    return quantities;
+  }, [batchConstructionItems, batches]);
+
+  const shippedQuantities = getShippedQuantities();
 
   const initNewBatch = () => {
     setEditingBatchId(null);
@@ -238,12 +240,13 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       shippingInit[item.key] = { selected: true, qty: 0 };
     });
     setSelectedShippingItems(shippingInit);
-    setNewBatchDate(new Date()); // Auto-set to today
+    setNewBatchDate(new Date());
     setDeliveryPerson("");
     setNewCustomShippingItems([]);
     setCustomShippingName("");
     setCustomShippingQty(1);
-    setConstructionSelections([]); // Will be populated by ConstructionDeliveryList
+    setSelectedConstructionIds(new Set());
+    setComponentSelections({});
   };
 
   const initEditBatch = async (batchId: string) => {
@@ -254,7 +257,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setNewBatchDate(new Date(batch.delivery_date));
     setDeliveryPerson(batch.delivery_person || "");
     
-    // Initialize shipping items from existing batch data
     const shippingItems = batchShippingItems[batchId] || [];
     const shippingInit: Record<string, { selected: boolean; qty: number }> = {};
     SHIPPING_ITEM_TYPES.forEach(item => {
@@ -263,28 +265,102 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     });
     setSelectedShippingItems(shippingInit);
     
-    // Initialize custom shipping items
     const customShipping = batchCustomShipping[batchId] || [];
     setNewCustomShippingItems(customShipping.map(cs => ({ name: cs.name, qty: cs.quantity })));
     
-    // Initialize construction selections from existing batch data
+    // Initialize construction selections from existing batch
     const existingConstructions = batchConstructionItems[batchId] || [];
-    const constructionSelectionsInit: ConstructionSelection[] = existingConstructions.map(item => ({
-      constructionId: item.construction_id,
-      selected: true,
-      quantity: item.quantity || 1,
-      includeGlass: item.include_glass,
-      includeScreens: item.include_screens,
-      includeBlinds: item.include_blinds,
-      includeHardware: item.include_hardware,
-      notes: item.delivery_notes || "",
-    }));
-    setConstructionSelections(constructionSelectionsInit);
+    const newSelectedIds = new Set<string>();
+    const newComponentSelections: Record<string, ConstructionComponentSelection> = {};
+    
+    existingConstructions.forEach(item => {
+      newSelectedIds.add(item.construction_id);
+      const construction = allConstructions.find(c => c.id === item.construction_id);
+      if (construction) {
+        // Use existing data or defaults
+        newComponentSelections[item.construction_id] = {
+          constructionId: item.construction_id,
+          quantity: item.quantity || 1,
+          components: getDefaultComponents(construction, order, item.quantity || 1),
+        };
+      }
+    });
+    
+    setSelectedConstructionIds(newSelectedIds);
+    setComponentSelections(newComponentSelections);
     
     setCustomShippingName("");
     setCustomShippingQty(1);
     
     setDialogOpen(true);
+  };
+
+  const handleConstructionToggle = (constructionId: string) => {
+    setSelectedConstructionIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(constructionId)) {
+        newSet.delete(constructionId);
+        // Remove component selection too
+        setComponentSelections(prevSel => {
+          const updated = { ...prevSel };
+          delete updated[constructionId];
+          return updated;
+        });
+      } else {
+        newSet.add(constructionId);
+        // Initialize component selection
+        const construction = allConstructions.find(c => c.id === constructionId);
+        if (construction) {
+          const shipped = shippedQuantities[constructionId] || 0;
+          const remaining = construction.quantity - shipped;
+          setComponentSelections(prevSel => ({
+            ...prevSel,
+            [constructionId]: {
+              constructionId,
+              quantity: remaining,
+              components: getDefaultComponents(construction, order, remaining),
+            }
+          }));
+        }
+      }
+      return newSet;
+    });
+  };
+
+  const handleQuantityChange = (constructionId: string, qty: number) => {
+    setComponentSelections(prev => ({
+      ...prev,
+      [constructionId]: {
+        ...prev[constructionId],
+        quantity: qty,
+      }
+    }));
+  };
+
+  const handleComponentToggle = (constructionId: string, component: keyof ComponentSelection, value: boolean) => {
+    setComponentSelections(prev => ({
+      ...prev,
+      [constructionId]: {
+        ...prev[constructionId],
+        components: {
+          ...prev[constructionId].components,
+          [component]: { ...prev[constructionId].components[component], include: value }
+        }
+      }
+    }));
+  };
+
+  const handleComponentQtyChange = (constructionId: string, component: keyof ComponentSelection, qty: number) => {
+    setComponentSelections(prev => ({
+      ...prev,
+      [constructionId]: {
+        ...prev[constructionId],
+        components: {
+          ...prev[constructionId].components,
+          [component]: { ...prev[constructionId].components[component], qty }
+        }
+      }
+    }));
   };
 
   const addCustomShippingToList = () => {
@@ -304,8 +380,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       return;
     }
 
-    const selectedConstructions = constructionSelections.filter(s => s.selected);
-    if (selectedConstructions.length === 0) {
+    if (selectedConstructionIds.size === 0) {
       toast({ title: "Error", description: "Please select at least one construction to deliver", variant: "destructive" });
       return;
     }
@@ -317,11 +392,10 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       let batchId: string;
       
       if (editingBatchId) {
-        // Update existing batch
         const { error: batchError } = await supabase
           .from("delivery_batches")
           .update({
-            delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+            delivery_date: format(newBatchDate!, "yyyy-MM-dd"),
             delivery_person: deliveryPerson.trim(),
           })
           .eq("id", editingBatchId);
@@ -333,12 +407,11 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         await supabase.from("batch_custom_shipping_items").delete().eq("batch_id", batchId);
         await supabase.from("batch_construction_items").delete().eq("batch_id", batchId);
       } else {
-        // Create the batch
         const { data: batchData, error: batchError } = await supabase
           .from("delivery_batches")
           .insert({
             order_id: order.id,
-            delivery_date: format(newBatchDate, "yyyy-MM-dd"),
+            delivery_date: format(newBatchDate!, "yyyy-MM-dd"),
             delivery_person: deliveryPerson.trim(),
             status: 'preparing',
             created_by: userData.user?.id
@@ -381,29 +454,60 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (customShipError) throw customShipError;
       }
 
-      // Insert construction items
-      const constructionToInsert = selectedConstructions.map(sel => ({
-        batch_id: batchId,
-        construction_id: sel.constructionId,
-        quantity: sel.quantity,
-        include_glass: sel.includeGlass,
-        include_screens: sel.includeScreens,
-        include_blinds: sel.includeBlinds,
-        include_hardware: sel.includeHardware,
-        is_delivered: false,
-        delivery_notes: sel.notes || null,
-      }));
+      // Insert construction items with component data
+      const constructionToInsert = Array.from(selectedConstructionIds).map(id => {
+        const sel = componentSelections[id];
+        return {
+          batch_id: batchId,
+          construction_id: id,
+          quantity: sel?.quantity || 1,
+          include_glass: true,
+          include_screens: sel?.components.screens.include || false,
+          include_blinds: sel?.components.blinds.include || false,
+          include_hardware: sel?.components.handles.include || false,
+          is_delivered: false,
+          delivery_notes: null,
+        };
+      });
 
       if (constructionToInsert.length > 0) {
-        const { error: constructionError } = await supabase
+        const { data: insertedItems, error: constructionError } = await supabase
           .from("batch_construction_items")
-          .insert(constructionToInsert);
+          .insert(constructionToInsert)
+          .select();
         if (constructionError) throw constructionError;
+
+        // Insert component details into batch_construction_components
+        if (insertedItems) {
+          const componentsToInsert: { batch_construction_item_id: string; component_type: string; quantity: number }[] = [];
+          
+          insertedItems.forEach(item => {
+            const sel = componentSelections[item.construction_id];
+            if (sel) {
+              Object.entries(sel.components).forEach(([key, val]) => {
+                if (val.include && val.qty > 0) {
+                  componentsToInsert.push({
+                    batch_construction_item_id: item.id,
+                    component_type: key,
+                    quantity: val.qty
+                  });
+                }
+              });
+            }
+          });
+
+          if (componentsToInsert.length > 0) {
+            const { error: compError } = await supabase
+              .from("batch_construction_components")
+              .insert(componentsToInsert);
+            if (compError) throw compError;
+          }
+        }
       }
 
       toast({ 
         title: editingBatchId ? "Batch updated" : "Batch created", 
-        description: `${selectedConstructions.length} construction(s) added to delivery batch` 
+        description: `${selectedConstructionIds.size} construction(s) added to delivery batch` 
       });
       setDialogOpen(false);
       setEditingBatchId(null);
@@ -431,25 +535,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
   const totalBatches = batches.length;
 
-  // Calculate shipped quantities per construction (sum of quantities across all batches)
-  const getShippedQuantities = useCallback(() => {
-    const quantities: Record<string, number> = {};
-    const existingBatchIds = new Set(batches.map(b => b.id));
-    
-    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
-      // Only count items from batches that still exist
-      if (existingBatchIds.has(batchId)) {
-        items.forEach(item => {
-          quantities[item.construction_id] = (quantities[item.construction_id] || 0) + (item.quantity || 1);
-        });
-      }
-    });
-    return quantities;
-  }, [batchConstructionItems, batches]);
-
-  const shippedQuantities = getShippedQuantities();
-
-  // Calculate remaining constructions - now with partial quantity support
+  // Calculate remaining constructions
   const getRemainingItems = () => {
     const remaining: { 
       windows: { count: number; items: { number: string; remaining: number }[] };
@@ -487,6 +573,9 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const remainingItems = getRemainingItems();
   const hasRemaining = remainingItems.windows.count > 0 || remainingItems.doors.count > 0 || remainingItems.slidingDoors.count > 0;
 
+  // Get selected constructions for the panel display
+  const selectedConstructions = allConstructions.filter(c => selectedConstructionIds.has(c.id));
+
   return (
     <Card className="border-primary/20">
       <CardHeader>
@@ -511,70 +600,103 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                     New Delivery
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingBatchId ? "Edit Delivery Batch" : "Create Delivery Batch"}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
                     {/* Delivery Person Name */}
-                    <div className="space-y-2">
-                      <Label>Person in Charge of Delivery</Label>
-                      <Input 
-                        value={deliveryPerson} 
-                        onChange={(e) => setDeliveryPerson(e.target.value)} 
-                        placeholder="Enter name of person checking delivery"
-                      />
-                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Person in Charge</Label>
+                        <Input 
+                          value={deliveryPerson} 
+                          onChange={(e) => setDeliveryPerson(e.target.value)} 
+                          placeholder="Enter name"
+                        />
+                      </div>
 
-                    {/* Date - Auto-set but editable */}
-                    <div className="space-y-2">
-                      <Label>Delivery Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !newBatchDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {newBatchDate ? format(newBatchDate, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={newBatchDate}
-                            onSelect={setNewBatchDate}
-                            initialFocus
-                            className={cn("p-3 pointer-events-auto")}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      {/* Date */}
+                      <div className="space-y-2">
+                        <Label>Delivery Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !newBatchDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newBatchDate ? format(newBatchDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={newBatchDate}
+                              onSelect={setNewBatchDate}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
 
                     <Separator />
 
-                    {/* Construction Items Selection */}
-                    <div className="space-y-2">
+                    {/* Visual Construction Selection */}
+                    <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-primary" />
-                        <Label className="text-base font-medium">Select Items for Delivery</Label>
+                        <Label className="text-base font-medium">Select Constructions</Label>
+                        {selectedConstructionIds.size > 0 && (
+                          <Badge variant="secondary" className="ml-auto">
+                            {selectedConstructionIds.size} selected
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        All items are pre-selected. Deselect items that are not ready for this delivery.
-                      </p>
-                      <div className="border rounded-lg p-3 max-h-[300px] overflow-y-auto">
-                        <ConstructionDeliveryList
-                          orderId={order.id}
-                          selections={constructionSelections}
-                          onSelectionsChange={setConstructionSelections}
-                          existingBatchConstructionIds={editingBatchId ? [] : getExistingBatchConstructionIds()}
-                          shippedQuantities={editingBatchId ? {} : shippedQuantities}
-                        />
-                      </div>
+                      
+                      <ConstructionChipSelector
+                        constructions={allConstructions}
+                        selectedIds={selectedConstructionIds}
+                        shippedQuantities={editingBatchId ? {} : shippedQuantities}
+                        onToggle={handleConstructionToggle}
+                      />
                     </div>
+
+                    {/* Component Panels for Selected Constructions */}
+                    {selectedConstructions.length > 0 && (
+                      <div className="space-y-3">
+                        <Label className="text-sm text-muted-foreground">
+                          Configure components for each selected construction:
+                        </Label>
+                        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                          {selectedConstructions.map(construction => {
+                            const shipped = shippedQuantities[construction.id] || 0;
+                            const maxQty = construction.quantity - shipped;
+                            const selection = componentSelections[construction.id];
+                            
+                            if (!selection) return null;
+                            
+                            return (
+                              <ConstructionComponentPanel
+                                key={construction.id}
+                                construction={construction}
+                                orderData={order}
+                                selection={selection}
+                                maxQuantity={maxQty}
+                                onQuantityChange={(qty) => handleQuantityChange(construction.id, qty)}
+                                onComponentToggle={(comp, val) => handleComponentToggle(construction.id, comp, val)}
+                                onComponentQtyChange={(comp, qty) => handleComponentQtyChange(construction.id, comp, qty)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <Separator />
 
@@ -602,7 +724,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                             </div>
                           );
                         })}
-                        {/* Custom shipping items added */}
                         {newCustomShippingItems.map((item, index) => (
                           <div key={`custom-ship-${index}`} className="flex items-center gap-3 border-t border-dashed pt-2">
                             <Badge variant="secondary" className="text-xs">Custom</Badge>
@@ -614,7 +735,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                           </div>
                         ))}
                       </div>
-                      {/* Add custom shipping item */}
                       <div className="flex gap-2">
                         <Input
                           placeholder="Custom item name"
@@ -645,7 +765,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
           </div>
         </div>
         <CardDescription>
-          Pre-populated from order constructions - select/deselect items for each delivery
+          Click construction chips to select items for delivery
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
