@@ -214,11 +214,9 @@ export function ShippingSelectionPanel({
       const mfgStatus: Record<string, string> = {};
       stages.forEach(s => { mfgStatus[s.stage] = s.status; });
       
-      // Check if all construction-level stages are not_started (indicates data wasn't populated)
-      const allNotStarted = stages.length > 0 && stages.every(s => s.status === 'not_started');
-      
-      // If construction-level data is missing or all not_started, use order_fulfillment as fallback
-      if ((stages.length === 0 || allNotStarted) && orderFulfillment) {
+      // Only use order_fulfillment as fallback when there are NO construction-level records
+      // If construction records exist (even if all not_started), use them as the source of truth
+      if (stages.length === 0 && orderFulfillment) {
         return {
           assembly: orderFulfillment.assembly_status || 'not_started',
           glass: orderFulfillment.glass_status || 'not_started',
