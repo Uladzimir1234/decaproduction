@@ -55,6 +55,7 @@ export type Database = {
           id: string
           is_delivered: boolean
           quantity: number
+          unit_index: number
         }
         Insert: {
           batch_construction_item_id: string
@@ -63,6 +64,7 @@ export type Database = {
           id?: string
           is_delivered?: boolean
           quantity?: number
+          unit_index?: number
         }
         Update: {
           batch_construction_item_id?: string
@@ -71,6 +73,7 @@ export type Database = {
           id?: string
           is_delivered?: boolean
           quantity?: number
+          unit_index?: number
         }
         Relationships: [
           {

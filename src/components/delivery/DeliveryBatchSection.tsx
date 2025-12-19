@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DeliveryBatchCard } from "./DeliveryBatchCard";
 import { ConstructionChipSelector, type ConstructionData } from "./ConstructionChipSelector";
-import { ConstructionComponentPanel, getDefaultComponents, type ComponentSelection, type ConstructionComponentSelection } from "./ConstructionComponentPanel";
+import { ExpandedConstructionPanel, createDefaultUnitSelections, getDefaultUnitComponents } from "./ExpandedConstructionPanel";
+import type { UnitSelection, UnitComponentState } from "./UnitCard";
 
 interface OrderInfo {
   id: string;
@@ -72,11 +72,30 @@ interface BatchConstructionItem {
   delivery_notes: string | null;
 }
 
+interface BatchConstructionComponent {
+  id: string;
+  batch_construction_item_id: string;
+  component_type: string;
+  quantity: number;
+  is_delivered: boolean;
+  unit_index: number;
+}
+
+interface ShippedUnitInfo {
+  unitIndex: number;
+  components: string[];
+}
+
 interface DeliveryBatchSectionProps {
   order: OrderInfo;
   manufacturingProgress: number;
 }
 
+// Per-construction unit selections
+interface ConstructionUnitSelections {
+  constructionId: string;
+  units: UnitSelection[];
+}
 
 export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryBatchSectionProps) {
   const { toast } = useToast();
@@ -85,6 +104,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [batchShippingItems, setBatchShippingItems] = useState<Record<string, BatchShippingItem[]>>({});
   const [batchCustomShipping, setBatchCustomShipping] = useState<Record<string, BatchCustomShippingItem[]>>({});
   const [batchConstructionItems, setBatchConstructionItems] = useState<Record<string, BatchConstructionItem[]>>({});
+  const [batchConstructionComponents, setBatchConstructionComponents] = useState<Record<string, BatchConstructionComponent[]>>({});
   const [allConstructions, setAllConstructions] = useState<ConstructionData[]>([]);
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,10 +112,9 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
   const [newBatchDate, setNewBatchDate] = useState<Date | undefined>(new Date());
   const [deliveryPerson, setDeliveryPerson] = useState<string>("");
   
-  
-  // New visual selection state
+  // Per-unit selection state
   const [selectedConstructionIds, setSelectedConstructionIds] = useState<Set<string>>(new Set());
-  const [componentSelections, setComponentSelections] = useState<Record<string, ConstructionComponentSelection>>({});
+  const [unitSelections, setUnitSelections] = useState<Record<string, UnitSelection[]>>({});
   
   const [saving, setSaving] = useState(false);
   
@@ -139,7 +158,20 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
 
     setBatchShippingItems(prev => ({ ...prev, [batchId]: shippingRes.data || [] }));
     setBatchCustomShipping(prev => ({ ...prev, [batchId]: customShipRes.data || [] }));
-    setBatchConstructionItems(prev => ({ ...prev, [batchId]: constructionRes.data || [] }));
+    
+    const constructionItems = constructionRes.data || [];
+    setBatchConstructionItems(prev => ({ ...prev, [batchId]: constructionItems }));
+
+    // Fetch components for each construction item
+    if (constructionItems.length > 0) {
+      const itemIds = constructionItems.map(item => item.id);
+      const { data: componentsData } = await supabase
+        .from("batch_construction_components")
+        .select("*")
+        .in("batch_construction_item_id", itemIds);
+      
+      setBatchConstructionComponents(prev => ({ ...prev, [batchId]: componentsData || [] }));
+    }
   };
 
   useEffect(() => {
@@ -183,6 +215,11 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
               delete updated[deletedId];
               return updated;
             });
+            setBatchConstructionComponents(prev => {
+              const updated = { ...prev };
+              delete updated[deletedId];
+              return updated;
+            });
           }
         }
       )
@@ -208,20 +245,56 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     };
   }, [fetchBatches, order.id, fetchAllConstructions]);
 
-  // Calculate shipped quantities per construction
+  // Calculate shipped units per construction from all batches
+  const getShippedUnitsPerConstruction = useCallback(() => {
+    const shippedUnits: Record<string, ShippedUnitInfo[]> = {};
+    const existingBatchIds = new Set(batches.map(b => b.id));
+
+    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
+      if (!existingBatchIds.has(batchId)) return;
+      
+      items.forEach(item => {
+        const constructionId = item.construction_id;
+        if (!shippedUnits[constructionId]) {
+          shippedUnits[constructionId] = [];
+        }
+        
+        // Get components for this batch construction item
+        const components = batchConstructionComponents[batchId]?.filter(
+          c => c.batch_construction_item_id === item.id
+        ) || [];
+        
+        // Group by unit_index
+        const unitMap = new Map<number, string[]>();
+        components.forEach(comp => {
+          if (!unitMap.has(comp.unit_index)) {
+            unitMap.set(comp.unit_index, []);
+          }
+          unitMap.get(comp.unit_index)!.push(comp.component_type);
+        });
+        
+        unitMap.forEach((compTypes, unitIdx) => {
+          shippedUnits[constructionId].push({
+            unitIndex: unitIdx,
+            components: compTypes,
+          });
+        });
+      });
+    });
+
+    return shippedUnits;
+  }, [batchConstructionItems, batchConstructionComponents, batches]);
+
+  const shippedUnitsPerConstruction = getShippedUnitsPerConstruction();
+
+  // Legacy shipped quantities for chip selector
   const getShippedQuantities = useCallback(() => {
     const quantities: Record<string, number> = {};
-    const existingBatchIds = new Set(batches.map(b => b.id));
-    
-    Object.entries(batchConstructionItems).forEach(([batchId, items]) => {
-      if (existingBatchIds.has(batchId)) {
-        items.forEach(item => {
-          quantities[item.construction_id] = (quantities[item.construction_id] || 0) + (item.quantity || 1);
-        });
-      }
+    Object.entries(shippedUnitsPerConstruction).forEach(([constructionId, units]) => {
+      quantities[constructionId] = units.length;
     });
     return quantities;
-  }, [batchConstructionItems, batches]);
+  }, [shippedUnitsPerConstruction]);
 
   const shippedQuantities = getShippedQuantities();
 
@@ -233,7 +306,7 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     setCustomShippingName("");
     setCustomShippingQty(1);
     setSelectedConstructionIds(new Set());
-    setComponentSelections({});
+    setUnitSelections({});
   };
 
   const initEditBatch = async (batchId: string) => {
@@ -247,26 +320,55 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     const customShipping = batchCustomShipping[batchId] || [];
     setNewCustomShippingItems(customShipping.map(cs => ({ name: cs.name, qty: cs.quantity })));
     
-    // Initialize construction selections from existing batch
+    // Initialize unit selections from existing batch
     const existingConstructions = batchConstructionItems[batchId] || [];
+    const existingComponents = batchConstructionComponents[batchId] || [];
+    
     const newSelectedIds = new Set<string>();
-    const newComponentSelections: Record<string, ConstructionComponentSelection> = {};
+    const newUnitSelections: Record<string, UnitSelection[]> = {};
     
     existingConstructions.forEach(item => {
       newSelectedIds.add(item.construction_id);
       const construction = allConstructions.find(c => c.id === item.construction_id);
       if (construction) {
-        // Use existing data or defaults
-        newComponentSelections[item.construction_id] = {
-          constructionId: item.construction_id,
-          quantity: item.quantity || 1,
-          components: getDefaultComponents(construction, order, item.quantity || 1),
-        };
+        // Get components for this item grouped by unit_index
+        const itemComponents = existingComponents.filter(c => c.batch_construction_item_id === item.id);
+        const unitMap = new Map<number, Set<string>>();
+        
+        itemComponents.forEach(comp => {
+          if (!unitMap.has(comp.unit_index)) {
+            unitMap.set(comp.unit_index, new Set());
+          }
+          unitMap.get(comp.unit_index)!.add(comp.component_type);
+        });
+        
+        // Create unit selections
+        const defaultComponents = getDefaultUnitComponents(construction, order);
+        newUnitSelections[item.construction_id] = Array.from({ length: construction.quantity }, (_, i) => {
+          const unitIdx = i + 1;
+          const hasComponents = unitMap.has(unitIdx);
+          const componentTypes = unitMap.get(unitIdx) || new Set();
+          
+          return {
+            unitIndex: unitIdx,
+            selected: hasComponents,
+            components: hasComponents ? {
+              screen: componentTypes.has('screen'),
+              blinds: componentTypes.has('blinds'),
+              handles: componentTypes.has('handles'),
+              weepingCovers: componentTypes.has('weepingCovers'),
+              hingeCovers: componentTypes.has('hingeCovers'),
+              nailFins: componentTypes.has('nailFins'),
+              brackets: componentTypes.has('brackets'),
+              plisseScreen: componentTypes.has('plisseScreen'),
+            } : { ...defaultComponents },
+          };
+        });
       }
     });
     
     setSelectedConstructionIds(newSelectedIds);
-    setComponentSelections(newComponentSelections);
+    setUnitSelections(newUnitSelections);
     
     setCustomShippingName("");
     setCustomShippingQty(1);
@@ -279,26 +381,19 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       const newSet = new Set(prev);
       if (newSet.has(constructionId)) {
         newSet.delete(constructionId);
-        // Remove component selection too
-        setComponentSelections(prevSel => {
+        setUnitSelections(prevSel => {
           const updated = { ...prevSel };
           delete updated[constructionId];
           return updated;
         });
       } else {
         newSet.add(constructionId);
-        // Initialize component selection
         const construction = allConstructions.find(c => c.id === constructionId);
         if (construction) {
-          const shipped = shippedQuantities[constructionId] || 0;
-          const remaining = construction.quantity - shipped;
-          setComponentSelections(prevSel => ({
+          const shippedUnits = shippedUnitsPerConstruction[constructionId] || [];
+          setUnitSelections(prevSel => ({
             ...prevSel,
-            [constructionId]: {
-              constructionId,
-              quantity: remaining,
-              components: getDefaultComponents(construction, order, remaining),
-            }
+            [constructionId]: createDefaultUnitSelections(construction, order, shippedUnits),
           }));
         }
       }
@@ -306,39 +401,59 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
     });
   };
 
-  const handleQuantityChange = (constructionId: string, qty: number) => {
-    setComponentSelections(prev => ({
+  const handleUnitToggle = (constructionId: string, unitIndex: number, selected: boolean) => {
+    setUnitSelections(prev => ({
       ...prev,
-      [constructionId]: {
-        ...prev[constructionId],
-        quantity: qty,
-      }
+      [constructionId]: prev[constructionId]?.map(unit =>
+        unit.unitIndex === unitIndex ? { ...unit, selected } : unit
+      ) || [],
     }));
   };
 
-  const handleComponentToggle = (constructionId: string, component: keyof ComponentSelection, value: boolean) => {
-    setComponentSelections(prev => ({
+  const handleUnitComponentToggle = (
+    constructionId: string,
+    unitIndex: number,
+    component: keyof UnitComponentState,
+    value: boolean
+  ) => {
+    setUnitSelections(prev => ({
       ...prev,
-      [constructionId]: {
-        ...prev[constructionId],
-        components: {
-          ...prev[constructionId].components,
-          [component]: { ...prev[constructionId].components[component], include: value }
-        }
-      }
+      [constructionId]: prev[constructionId]?.map(unit =>
+        unit.unitIndex === unitIndex
+          ? { ...unit, components: { ...unit.components, [component]: value } }
+          : unit
+      ) || [],
     }));
   };
 
-  const handleComponentQtyChange = (constructionId: string, component: keyof ComponentSelection, qty: number) => {
-    setComponentSelections(prev => ({
+  const handleSelectAllUnits = (constructionId: string) => {
+    const shippedIndexes = new Set((shippedUnitsPerConstruction[constructionId] || []).map(u => u.unitIndex));
+    setUnitSelections(prev => ({
       ...prev,
-      [constructionId]: {
-        ...prev[constructionId],
-        components: {
-          ...prev[constructionId].components,
-          [component]: { ...prev[constructionId].components[component], qty }
-        }
-      }
+      [constructionId]: prev[constructionId]?.map(unit =>
+        shippedIndexes.has(unit.unitIndex) ? unit : { ...unit, selected: true }
+      ) || [],
+    }));
+  };
+
+  const handleDeselectAllUnits = (constructionId: string) => {
+    setUnitSelections(prev => ({
+      ...prev,
+      [constructionId]: prev[constructionId]?.map(unit => ({ ...unit, selected: false })) || [],
+    }));
+  };
+
+  const handleApplyToAll = (constructionId: string, sourceUnitIndex: number) => {
+    const shippedIndexes = new Set((shippedUnitsPerConstruction[constructionId] || []).map(u => u.unitIndex));
+    const sourceUnit = unitSelections[constructionId]?.find(u => u.unitIndex === sourceUnitIndex);
+    if (!sourceUnit) return;
+    
+    setUnitSelections(prev => ({
+      ...prev,
+      [constructionId]: prev[constructionId]?.map(unit => {
+        if (shippedIndexes.has(unit.unitIndex) || unit.unitIndex === sourceUnitIndex) return unit;
+        return unit.selected ? { ...unit, components: { ...sourceUnit.components } } : unit;
+      }) || [],
     }));
   };
 
@@ -364,6 +479,18 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       return;
     }
 
+    // Check that at least one unit is selected
+    let hasSelectedUnits = false;
+    selectedConstructionIds.forEach(id => {
+      const units = unitSelections[id] || [];
+      if (units.some(u => u.selected)) hasSelectedUnits = true;
+    });
+    
+    if (!hasSelectedUnits) {
+      toast({ title: "Error", description: "Please select at least one unit to deliver", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -381,7 +508,13 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (batchError) throw batchError;
         batchId = editingBatchId;
         
-        // Delete existing items and re-insert
+        // Delete existing items and components
+        const existingItems = batchConstructionItems[batchId] || [];
+        if (existingItems.length > 0) {
+          await supabase.from("batch_construction_components")
+            .delete()
+            .in("batch_construction_item_id", existingItems.map(i => i.id));
+        }
         await supabase.from("batch_shipping_items").delete().eq("batch_id", batchId);
         await supabase.from("batch_custom_shipping_items").delete().eq("batch_id", batchId);
         await supabase.from("batch_construction_items").delete().eq("batch_id", batchId);
@@ -416,60 +549,64 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
         if (customShipError) throw customShipError;
       }
 
-      // Insert construction items with component data
-      const constructionToInsert = Array.from(selectedConstructionIds).map(id => {
-        const sel = componentSelections[id];
-        return {
-          batch_id: batchId,
-          construction_id: id,
-          quantity: sel?.quantity || 1,
-          include_glass: true,
-          include_screens: sel?.components.screens.include || false,
-          include_blinds: sel?.components.blinds.include || false,
-          include_hardware: sel?.components.handles.include || false,
-          is_delivered: false,
-          delivery_notes: null,
-        };
-      });
+      // Insert construction items and components
+      for (const constructionId of Array.from(selectedConstructionIds)) {
+        const units = unitSelections[constructionId] || [];
+        const selectedUnits = units.filter(u => u.selected);
+        
+        if (selectedUnits.length === 0) continue;
 
-      if (constructionToInsert.length > 0) {
-        const { data: insertedItems, error: constructionError } = await supabase
+        // Insert the construction item
+        const { data: insertedItem, error: constructionError } = await supabase
           .from("batch_construction_items")
-          .insert(constructionToInsert)
-          .select();
+          .insert({
+            batch_id: batchId,
+            construction_id: constructionId,
+            quantity: selectedUnits.length,
+            include_glass: true,
+            include_screens: selectedUnits.some(u => u.components.screen),
+            include_blinds: selectedUnits.some(u => u.components.blinds),
+            include_hardware: selectedUnits.some(u => u.components.handles),
+            is_delivered: false,
+            delivery_notes: null,
+          })
+          .select()
+          .single();
+        
         if (constructionError) throw constructionError;
 
-        // Insert component details into batch_construction_components
-        if (insertedItems) {
-          const componentsToInsert: { batch_construction_item_id: string; component_type: string; quantity: number }[] = [];
-          
-          insertedItems.forEach(item => {
-            const sel = componentSelections[item.construction_id];
-            if (sel) {
-              Object.entries(sel.components).forEach(([key, val]) => {
-                if (val.include && val.qty > 0) {
-                  componentsToInsert.push({
-                    batch_construction_item_id: item.id,
-                    component_type: key,
-                    quantity: val.qty
-                  });
-                }
+        // Insert component details for each selected unit
+        const componentsToInsert: { 
+          batch_construction_item_id: string; 
+          component_type: string; 
+          quantity: number;
+          unit_index: number;
+        }[] = [];
+
+        selectedUnits.forEach(unit => {
+          Object.entries(unit.components).forEach(([key, included]) => {
+            if (included) {
+              componentsToInsert.push({
+                batch_construction_item_id: insertedItem.id,
+                component_type: key,
+                quantity: 1,
+                unit_index: unit.unitIndex,
               });
             }
           });
+        });
 
-          if (componentsToInsert.length > 0) {
-            const { error: compError } = await supabase
-              .from("batch_construction_components")
-              .insert(componentsToInsert);
-            if (compError) throw compError;
-          }
+        if (componentsToInsert.length > 0) {
+          const { error: compError } = await supabase
+            .from("batch_construction_components")
+            .insert(componentsToInsert);
+          if (compError) throw compError;
         }
       }
 
       toast({ 
         title: editingBatchId ? "Batch updated" : "Batch created", 
-        description: `${selectedConstructionIds.size} construction(s) added to delivery batch` 
+        description: `Delivery batch saved successfully` 
       });
       setDialogOpen(false);
       setEditingBatchId(null);
@@ -480,7 +617,6 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
       setSaving(false);
     }
   };
-
 
   const totalBatches = batches.length;
 
@@ -616,30 +752,29 @@ export function DeliveryBatchSection({ order, manufacturingProgress }: DeliveryB
                       />
                     </div>
 
-                    {/* Component Panels for Selected Constructions */}
+                    {/* Expanded Unit Selection Panels */}
                     {selectedConstructions.length > 0 && (
                       <div className="space-y-3">
                         <Label className="text-sm text-muted-foreground">
-                          Configure components for each selected construction:
+                          Select individual units and their components:
                         </Label>
-                        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                           {selectedConstructions.map(construction => {
-                            const shipped = shippedQuantities[construction.id] || 0;
-                            const maxQty = construction.quantity - shipped;
-                            const selection = componentSelections[construction.id];
-                            
-                            if (!selection) return null;
+                            const shippedUnits = editingBatchId ? [] : (shippedUnitsPerConstruction[construction.id] || []);
+                            const units = unitSelections[construction.id] || [];
                             
                             return (
-                              <ConstructionComponentPanel
+                              <ExpandedConstructionPanel
                                 key={construction.id}
                                 construction={construction}
                                 orderData={order}
-                                selection={selection}
-                                maxQuantity={maxQty}
-                                onQuantityChange={(qty) => handleQuantityChange(construction.id, qty)}
-                                onComponentToggle={(comp, val) => handleComponentToggle(construction.id, comp, val)}
-                                onComponentQtyChange={(comp, qty) => handleComponentQtyChange(construction.id, comp, qty)}
+                                unitSelections={units}
+                                shippedUnits={shippedUnits}
+                                onUnitToggle={(idx, sel) => handleUnitToggle(construction.id, idx, sel)}
+                                onUnitComponentToggle={(idx, comp, val) => handleUnitComponentToggle(construction.id, idx, comp, val)}
+                                onSelectAll={() => handleSelectAllUnits(construction.id)}
+                                onDeselectAll={() => handleDeselectAllUnits(construction.id)}
+                                onApplyToAll={(srcIdx) => handleApplyToAll(construction.id, srcIdx)}
                               />
                             );
                           })}
