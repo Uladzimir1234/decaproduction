@@ -260,8 +260,20 @@ export function ShippingSelectionPanel({
         
         (Object.keys(applicable) as (keyof UnitComponentState)[]).forEach(key => {
           const isApplicable = applicable[key];
-          const prodStatus = isApplicable ? getComponentProductionStatus(key, mfgStatus) : "not_available";
           const isShipped = shippedComponents.has(key);
+          
+          // If the unit's production (assembly) is not ready, all components inherit that status
+          // Components are only individually ready when the overall construction is ready
+          let prodStatus: ProductionStatus;
+          if (!isApplicable) {
+            prodStatus = "not_available";
+          } else if (unitProductionStatus !== "ready") {
+            // Construction not finished = all components not available for shipping
+            prodStatus = unitProductionStatus;
+          } else {
+            // Construction is ready, check individual component status
+            prodStatus = getComponentProductionStatus(key, mfgStatus);
+          }
           
           componentStates[key] = {
             applicable: isApplicable,
