@@ -53,6 +53,8 @@ interface OrderFulfillmentStatus {
   welding_status: string | null;
   profile_cutting: string | null;
   reinforcement_cutting: string | null;
+  doors_status: string | null;
+  sliding_doors_status: string | null;
 }
 
 interface ShippingSelectionPanelProps {
@@ -104,10 +106,31 @@ interface ConstructionState {
   units: UnitState[];
 }
 
-function getUnitProductionStatus(manufacturingStatus: Record<string, string>): ProductionStatus {
+function getUnitProductionStatus(
+  manufacturingStatus: Record<string, string>,
+  constructionType: string,
+  orderFulfillment: OrderFulfillmentStatus | null
+): ProductionStatus {
+  // For doors, check doors_status specifically from order_fulfillment
+  if (constructionType === 'door' && orderFulfillment) {
+    const doorsStatus = orderFulfillment.doors_status;
+    if (doorsStatus === 'complete') return "ready";
+    if (doorsStatus === 'partial' || doorsStatus === 'in_progress') return "in_production";
+    return "not_available";
+  }
+  
+  // For sliding doors, check sliding_doors_status from order_fulfillment
+  if (constructionType === 'sliding_door' && orderFulfillment) {
+    const slidingStatus = orderFulfillment.sliding_doors_status;
+    if (slidingStatus === 'complete') return "ready";
+    if (slidingStatus === 'partial' || slidingStatus === 'in_progress') return "in_production";
+    return "not_available";
+  }
+  
+  // For windows, check assembly_status
   const assemblyStatus = manufacturingStatus["assembly"];
   if (!assemblyStatus || assemblyStatus === "not_started") return "not_available";
-  if (assemblyStatus === "in_progress") return "in_production";
+  if (assemblyStatus === "in_progress" || assemblyStatus === "partial") return "in_production";
   return "ready"; // complete
 }
 
@@ -180,7 +203,7 @@ export function ShippingSelectionPanel({
         .in("construction_id", constructionIds),
       supabase
         .from("order_fulfillment")
-        .select("assembly_status, glass_status, screens_cutting, welding_status, profile_cutting, reinforcement_cutting")
+        .select("assembly_status, glass_status, screens_cutting, welding_status, profile_cutting, reinforcement_cutting, doors_status, sliding_doors_status")
         .eq("order_id", orderId)
         .maybeSingle()
     ]);
@@ -209,14 +232,18 @@ export function ShippingSelectionPanel({
 
   // Initialize construction states when data changes
   useEffect(() => {
-    // Helper to get effective manufacturing status using order_fulfillment as fallback
+    // Helper to get effective manufacturing status using order_fulfillment as source of truth
     const getEffectiveStatus = (stages: ManufacturingStage[]): Record<string, string> => {
       const mfgStatus: Record<string, string> = {};
       stages.forEach(s => { mfgStatus[s.stage] = s.status; });
       
-      // Only use order_fulfillment as fallback when there are NO construction-level records
-      // If construction records exist (even if all not_started), use them as the source of truth
-      if (stages.length === 0 && orderFulfillment) {
+      // Check if construction-level data has any real updates (not all "not_started")
+      const hasRealUpdates = stages.some(s => s.status !== 'not_started');
+      
+      // Use order_fulfillment as source of truth when:
+      // - No construction records exist, OR
+      // - All construction records are "not_started" (placeholders that were never updated)
+      if (!hasRealUpdates && orderFulfillment) {
         return {
           assembly: orderFulfillment.assembly_status || 'not_started',
           glass: orderFulfillment.glass_status || 'not_started',
@@ -244,7 +271,7 @@ export function ShippingSelectionPanel({
         u.components.forEach(c => shippedMap.get(u.unitIndex)!.add(c));
       });
 
-      const unitProductionStatus = getUnitProductionStatus(mfgStatus);
+      const unitProductionStatus = getUnitProductionStatus(mfgStatus, construction.construction_type, orderFulfillment);
 
       const units: UnitState[] = Array.from({ length: construction.quantity }, (_, i) => {
         const unitIdx = i + 1;
