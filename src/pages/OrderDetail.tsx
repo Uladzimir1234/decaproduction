@@ -707,7 +707,43 @@ export default function OrderDetail() {
   const updateFulfillment = async (key: keyof OrderFulfillment, value: any) => {
     if (!fulfillment || !order) return;
 
-    const updatedFulfillment = { ...fulfillment, [key]: value };
+    // Boolean fields in order_fulfillment table that expect true/false, not status strings
+    const booleanFields = [
+      'sliding_doors_glass_installed',
+      'doors_glass_installed',
+      'glass_installed',
+      'frames_welded',
+      'doors_assembled',
+      'doors_glass_available',
+      'sliding_doors_assembled',
+      'sliding_doors_glass_available',
+      'frame_sash_assembled',
+      'glass_delivered',
+      'screens_made',
+      'screens_delivered',
+      'windows_delivered',
+      'doors_delivered',
+      'sliding_doors_delivered',
+      'screens_delivered_final',
+      'handles_delivered',
+      'glass_delivered_final',
+      'nailing_fins_delivered',
+      'brackets_delivered',
+      'shipping_handles_boxed',
+      'shipping_hinges_covers',
+      'shipping_weeping_covers',
+      'shipping_spec_labels',
+      'shipping_nailing_fins',
+      'shipping_brackets',
+    ];
+
+    // Convert string status to boolean for boolean columns
+    let processedValue = value;
+    if (booleanFields.includes(key as string) && typeof value === 'string') {
+      processedValue = value === 'complete' || value === 'partial';
+    }
+
+    const updatedFulfillment = { ...fulfillment, [key]: processedValue };
     setFulfillment(updatedFulfillment);
 
     // Auto-save on change
