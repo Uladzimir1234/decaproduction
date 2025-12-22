@@ -1838,35 +1838,6 @@ export default function OrderDetail() {
                             </div>
                           )}
                           
-                          {/* Sliding Doors Glass Installation - locked until sliding doors assembled */}
-                          <div className="border-t pt-4 mt-4">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Label>Glass Installed</Label>
-                              {fulfillment.sliding_doors_status !== 'complete' ? (
-                                <Badge variant="outline" className="text-muted-foreground gap-1">
-                                  <Lock className="h-3 w-3" />
-                                  SD Not Assembled
-                                </Badge>
-                              ) : !isGlassAvailable() && (
-                                <Badge variant="outline" className="text-muted-foreground gap-1">
-                                  <Lock className="h-3 w-3" />
-                                  Glass {getGlassLockText()}
-                                </Badge>
-                              )}
-                            </div>
-                            {fulfillment.sliding_doors_status !== 'complete' ? (
-                              <p className="text-sm text-muted-foreground">Sliding doors must be assembled before glass can be installed.</p>
-                            ) : !isGlassAvailable() ? (
-                              <p className="text-sm text-muted-foreground">Glass must be available before installation.</p>
-                            ) : (
-                              <Switch 
-                                checked={fulfillment.sliding_doors_glass_installed || false} 
-                                onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)}
-                                disabled={!canUpdateManufacturing}
-                              />
-                            )}
-                          </div>
-                          
                           <div className="space-y-2">
                             <Label>Photo</Label>
                             <ImageUpload
@@ -1877,6 +1848,50 @@ export default function OrderDetail() {
                             />
                           </div>
                         </>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                  
+                  {/* SD Glass Installed - Requires: SD Assembled Complete AND Glass Available */}
+                  <AccordionItem value="sd-glass">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={fulfillment.sliding_doors_glass_installed ? 'complete' : 'not_started'} />
+                        <span>SD Glass Installed</span>
+                        {order.production_status === 'hold' ? (
+                          <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 gap-1 border-amber-500/50">
+                            <Pause className="h-3 w-3" />
+                            On Hold
+                          </Badge>
+                        ) : fulfillment.sliding_doors_status !== 'complete' ? (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            SD Not Assembled
+                          </Badge>
+                        ) : !isGlassAvailable() && (
+                          <Badge variant="outline" className="ml-2 text-muted-foreground gap-1">
+                            <Lock className="h-3 w-3" />
+                            Glass {getGlassLockText()}
+                          </Badge>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                      {order.production_status === 'hold' ? (
+                        <p className="text-sm text-muted-foreground">Order is on hold.</p>
+                      ) : fulfillment.sliding_doors_status !== 'complete' ? (
+                        <p className="text-sm text-muted-foreground">Sliding doors must be assembled before glass can be installed.</p>
+                      ) : !isGlassAvailable() ? (
+                        <p className="text-sm text-muted-foreground">Glass must be available before installation.</p>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <Label>Glass Installed</Label>
+                          <Switch 
+                            checked={fulfillment.sliding_doors_glass_installed || false} 
+                            onCheckedChange={checked => updateFulfillment("sliding_doors_glass_installed", checked)}
+                            disabled={!canUpdateManufacturing}
+                          />
+                        </div>
                       )}
                     </AccordionContent>
                   </AccordionItem>
