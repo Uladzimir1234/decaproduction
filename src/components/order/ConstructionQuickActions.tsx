@@ -3,6 +3,7 @@ import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2, FileText
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -291,16 +292,11 @@ export function ConstructionQuickActions({
   };
 
   const [viewingPdf, setViewingPdf] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
 
   const handleViewPdf = async () => {
     if (!construction.pdf_file_path || viewingPdf) return;
-
-    // Open popup synchronously to avoid browser blocking
-    const popup = window.open('', '_blank');
-    if (!popup) {
-      toast({ title: "Error", description: "Popup blocked. Please allow popups.", variant: "destructive" });
-      return;
-    }
 
     setViewingPdf(true);
 
@@ -316,9 +312,9 @@ export function ConstructionQuickActions({
       .createSignedUrl(filePath, 3600);
 
     if (data?.signedUrl) {
-      popup.location.href = data.signedUrl;
+      setPdfSignedUrl(data.signedUrl);
+      setPdfDialogOpen(true);
     } else {
-      popup.close();
       toast({ title: "Error", description: error?.message || "Could not load PDF", variant: "destructive" });
     }
 
@@ -505,6 +501,26 @@ export function ConstructionQuickActions({
         <span>Full Details</span>
         <ChevronRight className="h-3 w-3" />
       </button>
+
+      {/* PDF Viewer Dialog */}
+      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+        <DialogContent className="max-w-4xl w-[90vw] h-[85vh] p-0 flex flex-col">
+          <DialogHeader className="p-4 pb-2 border-b">
+            <DialogTitle className="text-sm">
+              {getTypePrefix(construction.construction_type)}{construction.construction_number} — PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfSignedUrl && (
+              <iframe
+                src={pdfSignedUrl}
+                className="w-full h-full border-0"
+                title="PDF Viewer"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
