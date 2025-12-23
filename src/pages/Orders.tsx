@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, CheckCircle2, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, Undo2 } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
@@ -1853,33 +1853,14 @@ export default function Orders() {
                 <Wrench className="h-4 w-4" />
                 Active Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => {
-                    const batches = getOrderDeliveryBatches(o.id);
-                    const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-                    return !o.delivery_complete && !allShipped;
-                  }).length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="ready" className="gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                100% Fulfillment
-                <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => {
-                    const batches = getOrderDeliveryBatches(o.id);
-                    const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-                    return (o.fulfillment_percentage || 0) === 100 && !o.delivery_complete && !allShipped;
-                  }).length}
+                  {filteredOrders.filter(o => !o.delivery_complete).length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="finished" className="gap-2">
                 <Archive className="h-4 w-4" />
                 Finished Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => {
-                    const batches = getOrderDeliveryBatches(o.id);
-                    const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-                    return o.delivery_complete || allShipped;
-                  }).length}
+                  {filteredOrders.filter(o => o.delivery_complete).length}
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -1910,15 +1891,9 @@ export default function Orders() {
               }
             });
             
-            // Split orders by delivery status (check both delivery_complete flag AND if all batches are shipped)
-            const isOrderFinished = (order: Order) => {
-              const batches = getOrderDeliveryBatches(order.id);
-              const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-              return order.delivery_complete || allShipped;
-            };
-            const activeOrders = sortOrders(filteredOrders.filter(o => !isOrderFinished(o) && (o.fulfillment_percentage || 0) < 100));
-            const readyOrders = sortOrders(filteredOrders.filter(o => !isOrderFinished(o) && (o.fulfillment_percentage || 0) === 100));
-            const finishedOrders = sortOrders(filteredOrders.filter(o => isOrderFinished(o)));
+            // Split orders by delivery status
+            const activeOrders = sortOrders(filteredOrders.filter(o => !o.delivery_complete));
+            const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
             
             // Render orders list helper
             const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
@@ -2676,270 +2651,10 @@ export default function Orders() {
             );
           })()}
             </TabsContent>
-            <TabsContent value="ready">
-          {(() => {
-            // Sort orders helper
-            const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-              if (a.is_priority && !b.is_priority) return -1;
-              if (!a.is_priority && b.is_priority) return 1;
-              
-              switch (sortBy) {
-                case 'time_left_asc':
-                  return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                case 'time_left_desc':
-                  return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                case 'order_date_asc':
-                  return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                case 'order_date_desc':
-                  return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                case 'fulfillment_asc':
-                  return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                case 'fulfillment_desc':
-                  return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                default:
-                  return 0;
-              }
-            });
-            
-            const isOrderFinished = (order: Order) => {
-              const batches = getOrderDeliveryBatches(order.id);
-              const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-              return order.delivery_complete || allShipped;
-            };
-            const readyOrders = sortOrders(filteredOrders.filter(o => !isOrderFinished(o) && (o.fulfillment_percentage || 0) === 100));
-            
-            // Render orders list helper (same as active tab)
-            const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
-              if (ordersList.length === 0) {
-                return (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <p>{emptyMessage}</p>
-                  </div>
-                );
-              }
-              
-              return (
-                <div className="space-y-3">
-                  {ordersList.map(order => {
-            const daysUntil = getDaysUntilDelivery(order.delivery_date);
-            const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
-            const notOrderedComponents = getNotOrderedComponents(order);
-            const orderedComponents = getOrderedComponents(order);
-            const availableComponents = getAvailableComponents(order);
-            const manufacturingStages = getManufacturingStages(order);
-            const customOrderingSteps = getCustomOrderingSteps(order.id);
-            const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-            const remainingToShip = getRemainingToShip(order.id);
-            const orderBatches = getOrderDeliveryBatches(order.id);
-            const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-            const preparingBatches = orderBatches.filter(b => b.status === 'preparing').length;
-            const showRemainingToShip = ordersWithConstructions.has(order.id);
-            const hasFileExtractedData = ordersWithConstructions.has(order.id);
-            return <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                    {order.is_priority && (
-                      <div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />
-                    )}
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          {(isAdmin || isManager) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePriorityToggle(order.id, !order.is_priority);
-                              }}
-                              className="shrink-0 hover:scale-110 transition-transform"
-                              title={order.is_priority ? "Remove priority" : "Set as priority"}
-                            >
-                              <Star className={`h-5 w-5 ${order.is_priority ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
-                            </button>
-                          )}
-                          <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
-                            #{order.order_number}
-                          </span>
-                          <span className="font-medium truncate">
-                            {order.customer_name}
-                          </span>
-                          {hasFileExtractedData && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              {(order.windows_count ?? 0) > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <BoxIcon className="h-3 w-3" />
-                                  {order.windows_count}W
-                                </span>
-                              )}
-                              {(order.doors_count ?? 0) > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <BoxIcon className="h-3 w-3" />
-                                  {order.doors_count}D
-                                </span>
-                              )}
-                              {(order.sliding_doors_count ?? 0) > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <BoxIcon className="h-3 w-3" />
-                                  {order.sliding_doors_count}SD
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {orderBatches.length > 0 && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <Truck className="h-3 w-3" />
-                              <span className="text-green-600">{shippedBatches}</span>
-                              {preparingBatches > 0 && (
-                                <span className="text-muted-foreground">+{preparingBatches}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {daysUntil < 0 ? (
-                              <span className="text-destructive font-medium">
-                                {Math.abs(daysUntil)}d overdue
-                              </span>
-                            ) : daysUntil === 0 ? (
-                              <span className="text-warning font-medium">Due today</span>
-                            ) : (
-                              <span className={daysUntil <= 3 ? 'text-warning font-medium' : ''}>
-                                {daysUntil}d left
-                              </span>
-                            )}
-                          </span>
-                          <span>
-                            Ordered: {format(new Date(order.order_date), 'MMM d, yyyy')}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col items-center">
-                            <ProgressCircle 
-                              value={order.fulfillment_percentage || 0} 
-                              size="sm"
-                              showValue
-                              className={order.fulfillment_percentage === 100 ? 'text-green-500' : ''}
-                            />
-                            <span className="text-xs text-muted-foreground mt-1">Fulfillment</span>
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <ProgressCircle 
-                              value={timeLeft} 
-                              size="sm"
-                              showValue
-                              className={daysUntil < 0 ? 'text-destructive' : daysUntil <= 3 ? 'text-warning' : ''}
-                            />
-                            <span className="text-xs text-muted-foreground mt-1">Time</span>
-                          </div>
-                          {ordersWithConstructions.has(order.id) && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => toggleOrderMap(order.id, e)}
-                                  className={`shrink-0 ${!collapsedOrderMaps.has(order.id) ? 'text-primary bg-primary/10' : ''}`}
-                                >
-                                  <Grid3X3 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{collapsedOrderMaps.has(order.id) ? 'Show' : 'Hide'} Order Map</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                          {(isAdmin || isManager) && (
-                            <>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const { error } = await supabase
-                                          .from('orders')
-                                          .update({ fulfillment_percentage: 99 })
-                                          .eq('id', order.id);
-                                        if (error) throw error;
-                                        toast({
-                                          title: "Order moved back",
-                                          description: `Order #${order.order_number} moved to Active Orders`,
-                                        });
-                                        fetchOrders();
-                                      } catch (err) {
-                                        console.error('Error moving order back:', err);
-                                        toast({
-                                          title: "Error",
-                                          description: "Failed to move order back to Active Orders",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    }}
-                                    className="shrink-0 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                                  >
-                                    <Undo2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Move back to Active Orders</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => handleEditClick(e, order)}
-                                className="shrink-0"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => handleDeleteClick(e, order)}
-                                className="shrink-0 text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {!collapsedOrderMaps.has(order.id) && ordersWithConstructions.has(order.id) && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <OrderMapInline
-                          orderId={order.id}
-                          orderNumber={order.order_number}
-                          isProductionReady={order.production_status === 'production_ready'}
-                        />
-                      </div>
-                    )}
-                  </div>;
-                  })}
-                </div>
-              );
-            };
-            
-            return (
-              <>
-                {renderOrdersList(readyOrders, "No orders at 100% fulfillment.")}
-              </>
-            );
-          })()}
-            </TabsContent>
             <TabsContent value="finished">
               {(() => {
                 // Sort orders helper
                 const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  // Priority orders always come first
-                  if (a.is_priority && !b.is_priority) return -1;
-                  if (!a.is_priority && b.is_priority) return 1;
-                  
                   switch (sortBy) {
                     case 'time_left_asc':
                       return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
@@ -2958,13 +2673,7 @@ export default function Orders() {
                   }
                 });
                 
-                // Check if order is finished
-                const isOrderFinished = (order: Order) => {
-                  const batches = getOrderDeliveryBatches(order.id);
-                  const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-                  return order.delivery_complete || allShipped;
-                };
-                const finishedOrders = sortOrders(filteredOrders.filter(o => isOrderFinished(o)));
+                const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
                 
                 if (finishedOrders.length === 0) {
                   return (
@@ -2978,152 +2687,51 @@ export default function Orders() {
                   <div className="space-y-3">
                     {finishedOrders.map(order => {
                       const daysUntil = getDaysUntilDelivery(order.delivery_date);
-                      const timeLeft = getTimePercentage(order.order_date, order.delivery_date);
-                      const notOrderedComponents = getNotOrderedComponents(order);
-                      const orderedComponents = getOrderedComponents(order);
-                      const availableComponents = getAvailableComponents(order);
-                      const manufacturingStages = getManufacturingStages(order);
-                      const customOrderingSteps = getCustomOrderingSteps(order.id);
-                      const customManufacturingSteps = getCustomManufacturingSteps(order.id);
-                      const remainingToShip = getRemainingToShip(order.id);
                       const orderBatches = getOrderDeliveryBatches(order.id);
                       const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      const preparingBatches = orderBatches.filter(b => b.status === 'preparing').length;
-                      const showRemainingToShip = ordersWithConstructions.has(order.id);
-                      const hasFileExtractedData = ordersWithConstructions.has(order.id);
+                      const deliveredBatches = orderBatches.filter(b => b.status === 'delivered').length;
                       
                       return (
-                        <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                          {order.is_priority && (
-                            <div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />
-                          )}
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-3 mb-2">
-                                {(isAdmin || isManager) && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePriorityToggle(order.id, !order.is_priority);
-                                    }}
-                                    className="shrink-0 hover:scale-110 transition-transform"
-                                    title={order.is_priority ? "Remove priority" : "Set as priority"}
-                                  >
-                                    <Star className={`h-5 w-5 ${order.is_priority ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
-                                  </button>
-                                )}
-                                <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
-                                  #{order.order_number}
-                                </span>
-                                <span className="font-medium truncate">
-                                  {order.customer_name}
-                                </span>
-                                <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
-                                  <CheckCircle className="h-3 w-3" />
-                                  Shipped
+                        <div 
+                          key={order.id} 
+                          id={`order-${order.id}`} 
+                          className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} 
+                          onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
+                                #{order.order_number}
+                              </span>
+                              <span className="font-medium truncate">
+                                {order.customer_name}
+                              </span>
+                              <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
+                                <CheckCircle className="h-3 w-3" />
+                                Delivered
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
+                              {shippedBatches > 0 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
                                 </Badge>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                                <span className="text-success font-medium">
-                                  {order.windows_count} Windows
-                                </span>
-                                <span>•</span>
-                                <span className="text-success font-medium">
-                                  {order.doors_count} Doors
-                                </span>
-                                {order.sliding_doors_count > 0 && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-success font-medium">
-                                      {order.sliding_doors_count} Sliding
-                                    </span>
-                                  </>
-                                )}
-                                {(isAdmin || isManager || isWorker) && order.user_id && sellers[order.user_id] && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-primary font-medium">
-                                      {sellers[order.user_id].full_name || sellers[order.user_id].email}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                              
-                              {/* Show shipped batches info */}
-                              {orderBatches.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                  <Truck className="h-3.5 w-3.5 text-success shrink-0" />
-                                  <span className="text-xs text-success font-medium mr-1">Shipped:</span>
-                                  <Badge className="text-xs py-0 px-1.5 bg-success/20 text-success border-success/50">
-                                    {shippedBatches} batch{shippedBatches !== 1 ? 'es' : ''} shipped
-                                  </Badge>
-                                </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-2 text-sm whitespace-nowrap">
-                                    <span className="text-muted-foreground">
-                                      Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}
-                                    </span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Delivery date: {format(new Date(order.delivery_date), 'MMM d, yyyy')}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <div className="flex items-center gap-1">
-                                {ordersWithConstructions.has(order.id) && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => toggleOrderMap(order.id, e)}
-                                        className={`shrink-0 ${!collapsedOrderMaps.has(order.id) ? 'text-primary bg-primary/10' : ''}`}
-                                      >
-                                        <Grid3X3 className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{collapsedOrderMaps.has(order.id) ? 'Show' : 'Hide'} Order Map</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                                {(isAdmin || isManager) && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => handleEditClick(e, order)}
-                                      className="shrink-0"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => handleDeleteClick(e, order)}
-                                      className="shrink-0 text-destructive hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
+                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              {(isAdmin || isManager) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => handleEditClick(e, order)}
+                                  className="shrink-0"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                          
-                          {!collapsedOrderMaps.has(order.id) && ordersWithConstructions.has(order.id) && (
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <OrderMapInline
-                                orderId={order.id}
-                                orderNumber={order.order_number}
-                                isProductionReady={order.production_status === 'production_ready'}
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
