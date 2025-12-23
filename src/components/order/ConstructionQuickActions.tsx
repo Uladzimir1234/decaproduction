@@ -290,18 +290,39 @@ export function ConstructionQuickActions({
     }
   };
 
-  const handleViewPdf = async () => {
-    if (!construction.pdf_file_path) return;
+  const [viewingPdf, setViewingPdf] = useState(false);
 
-    const { data } = await supabase.storage
+  const handleViewPdf = async () => {
+    if (!construction.pdf_file_path || viewingPdf) return;
+
+    // Open popup synchronously to avoid browser blocking
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      toast({ title: "Error", description: "Popup blocked. Please allow popups.", variant: "destructive" });
+      return;
+    }
+
+    setViewingPdf(true);
+
+    // Extract file path if it's a full URL
+    let filePath = construction.pdf_file_path;
+    if (filePath.includes('/')) {
+      const parts = filePath.split('/');
+      filePath = parts[parts.length - 1];
+    }
+
+    const { data, error } = await supabase.storage
       .from('construction-pdfs')
-      .createSignedUrl(construction.pdf_file_path, 3600);
+      .createSignedUrl(filePath, 3600);
 
     if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
+      popup.location.href = data.signedUrl;
     } else {
-      toast({ title: "Error", description: "Could not load PDF", variant: "destructive" });
+      popup.close();
+      toast({ title: "Error", description: error?.message || "Could not load PDF", variant: "destructive" });
     }
+
+    setViewingPdf(false);
   };
 
   const dimensions = construction.width_inches && construction.height_inches
@@ -441,10 +462,11 @@ export function ConstructionQuickActions({
         {construction.pdf_file_path ? (
           <button
             onClick={handleViewPdf}
-            className="flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+            disabled={viewingPdf}
+            className="flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
           >
-            <Eye className="h-2.5 w-2.5" />
-            View PDF
+            {viewingPdf ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Eye className="h-2.5 w-2.5" />}
+            {viewingPdf ? 'Opening...' : 'View PDF'}
           </button>
         ) : (
           <button
