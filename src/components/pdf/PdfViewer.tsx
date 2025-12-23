@@ -15,6 +15,16 @@ export function PdfViewer({ data, className }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(900);
   const [numPages, setNumPages] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // IMPORTANT: pdf.js transfers ArrayBuffers to the worker which detaches them.
+  // Create a fresh copy + keep a stable reference to avoid DataCloneError on re-renders.
+  const file = useMemo(() => ({ data: data.slice(0) }), [data]);
+
+  useEffect(() => {
+    setNumPages(0);
+    setLoadError(null);
+  }, [data]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -44,7 +54,7 @@ export function PdfViewer({ data, className }: PdfViewerProps) {
     >
       <div className="mx-auto w-fit p-4">
         <Document
-          file={{ data }}
+          file={file}
           loading={
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -52,10 +62,22 @@ export function PdfViewer({ data, className }: PdfViewerProps) {
           }
           error={
             <div className="py-10 text-center text-sm text-muted-foreground">
-              Could not render this PDF.
+              <div>Could not render this PDF.</div>
+              {loadError ? (
+                <div className="mt-2 break-words text-xs text-muted-foreground">
+                  {loadError}
+                </div>
+              ) : null}
             </div>
           }
-          onLoadSuccess={(info) => setNumPages(info.numPages)}
+          onLoadSuccess={(info) => {
+            setLoadError(null);
+            setNumPages((prev) => (prev === info.numPages ? prev : info.numPages));
+          }}
+          onLoadError={(err) => {
+            console.error("[PdfViewer] react-pdf load error", err);
+            setLoadError(err instanceof Error ? err.message : "Unknown PDF error");
+          }}
         >
           {Array.from({ length: numPages }, (_, idx) => (
             <div key={`page_${idx + 1}`} className="mb-4 last:mb-0">
