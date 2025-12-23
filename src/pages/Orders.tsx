@@ -5,9 +5,8 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -230,7 +229,6 @@ export default function Orders() {
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   const [expandedAvailableComponents, setExpandedAvailableComponents] = useState<Set<string>>(new Set());
-  const [expandedFinishedOrders, setExpandedFinishedOrders] = useState<Set<string>>(new Set());
   
   // Sort state with localStorage persistence
   const [sortBy, setSortBy] = useState<string>(() => {
@@ -2667,180 +2665,7 @@ export default function Orders() {
           })()}
             </TabsContent>
             <TabsContent value="finished">
-              {(() => {
-                // Sort orders helper
-                const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  switch (sortBy) {
-                    case 'time_left_asc':
-                      return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                    case 'time_left_desc':
-                      return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                    case 'order_date_asc':
-                      return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                    case 'order_date_desc':
-                      return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                    case 'fulfillment_asc':
-                      return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                    case 'fulfillment_desc':
-                      return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                    default:
-                      return 0;
-                  }
-                });
-                
-                // Check if order is finished (delivery_complete OR all batches shipped)
-                const isOrderFinished = (order: Order) => {
-                  const batches = getOrderDeliveryBatches(order.id);
-                  const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
-                  return order.delivery_complete || allShipped;
-                };
-                const finishedOrders = sortOrders(filteredOrders.filter(o => isOrderFinished(o)));
-                
-                if (finishedOrders.length === 0) {
-                  return (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <p>No finished orders found.</p>
-                    </div>
-                  );
-                }
-                
-                return (
-                  <div className="space-y-3">
-                    {finishedOrders.map(order => {
-                      const orderBatches = getOrderDeliveryBatches(order.id);
-                      const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      const isExpanded = expandedFinishedOrders.has(order.id);
-                      
-                      const toggleExpanded = (e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        setExpandedFinishedOrders(prev => {
-                          const newSet = new Set(prev);
-                          if (newSet.has(order.id)) {
-                            newSet.delete(order.id);
-                          } else {
-                            newSet.add(order.id);
-                          }
-                          return newSet;
-                        });
-                      };
-                      
-                      return (
-                        <Collapsible 
-                          key={order.id} 
-                          open={isExpanded}
-                          onOpenChange={() => {}}
-                        >
-                          <div 
-                            id={`order-${order.id}`} 
-                            className="relative block p-4 rounded-lg border bg-card transition-colors"
-                          >
-                            <CollapsibleTrigger asChild>
-                              <div 
-                                className="flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer hover:bg-muted/30 -m-2 p-2 rounded-md transition-colors"
-                                onClick={toggleExpanded}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
-                                    #{order.order_number}
-                                  </span>
-                                  <span className="font-medium truncate">
-                                    {order.customer_name}
-                                  </span>
-                                  <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
-                                    <CheckCircle className="h-3 w-3" />
-                                    Delivered
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
-                                  {shippedBatches > 0 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                  {(isAdmin || isManager) && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditClick(e, order);
-                                      }}
-                                      className="shrink-0"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="pt-4 mt-3 border-t">
-                              <div className="flex flex-wrap items-center gap-4 text-sm">
-                                {(order.windows_count ?? 0) > 0 && (
-                                  <span className="flex items-center gap-1.5 text-success font-medium">
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                    {order.windows_count} Windows
-                                  </span>
-                                )}
-                                {(order.doors_count ?? 0) > 0 && (
-                                  <span className="flex items-center gap-1.5 text-success font-medium">
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                    {order.doors_count} Doors
-                                  </span>
-                                )}
-                                {(order.sliding_doors_count ?? 0) > 0 && (
-                                  <span className="flex items-center gap-1.5 text-success font-medium">
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                    {order.sliding_doors_count} Sliding Doors
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* Order Map for file-extracted orders */}
-                              {ordersWithConstructions.has(order.id) && orderConstructions[order.id]?.length > 0 && (
-                                <div className="mt-4">
-                                  <OrderMapInline 
-                                    orderId={order.id}
-                                    orderNumber={order.order_number}
-                                    isProductionReady={true}
-                                  />
-                                </div>
-                              )}
-                              
-                              {/* Link to order detail for admins/managers */}
-                              {(isAdmin || isManager) && (
-                                <div className="mt-4 pt-3 border-t">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/orders/${order.id}`);
-                                    }}
-                                    className="text-xs"
-                                  >
-                                    View Full Details
-                                  </Button>
-                                </div>
-                              )}
-                            </CollapsibleContent>
-                          </div>
-                        </Collapsible>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+              {renderOrdersList(finishedOrders, "No finished orders found.")}
             </TabsContent>
           </Tabs>
         </CardContent>
