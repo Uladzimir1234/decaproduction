@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, CheckCircle2, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, CheckCircle2, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, Undo2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
@@ -2852,6 +2852,42 @@ export default function Orders() {
                           )}
                           {(isAdmin || isManager) && (
                             <>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        const { error } = await supabase
+                                          .from('orders')
+                                          .update({ fulfillment_percentage: 99 })
+                                          .eq('id', order.id);
+                                        if (error) throw error;
+                                        toast({
+                                          title: "Order moved back",
+                                          description: `Order #${order.order_number} moved to Active Orders`,
+                                        });
+                                        fetchOrders();
+                                      } catch (err) {
+                                        console.error('Error moving order back:', err);
+                                        toast({
+                                          title: "Error",
+                                          description: "Failed to move order back to Active Orders",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}
+                                    className="shrink-0 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                  >
+                                    <Undo2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Move back to Active Orders</p>
+                                </TooltipContent>
+                              </Tooltip>
                               <Button
                                 variant="ghost"
                                 size="icon"
