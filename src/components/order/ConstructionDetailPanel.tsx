@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Square, DoorOpen, PanelLeftOpen, Plus, MessageSquare, Truck, Check, Package } from "lucide-react";
+import { X, Square, DoorOpen, PanelLeftOpen, Plus, MessageSquare, Truck, Check, Package, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { format } from "date-fns";
 import { ConstructionIssuesPanel, ConstructionIssue } from "./ConstructionIssuesPanel";
+import { PdfUpload } from "@/components/ui/pdf-upload";
 
 interface ConstructionManufacturing {
   id: string;
@@ -69,6 +70,7 @@ interface Construction {
   center_seal: boolean;
   comments: string | null;
   quantity: number;
+  pdf_file_path?: string | null;
 }
 
 interface ConstructionDetailPanelProps {
@@ -112,6 +114,7 @@ export function ConstructionDetailPanel({
   const [issues, setIssues] = useState<ConstructionIssue[]>([]);
   const [newNoteText, setNewNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [pdfPath, setPdfPath] = useState<string | null>(construction.pdf_file_path || null);
 
   const canEdit = isAdmin || isManager || isWorker;
 
@@ -309,6 +312,19 @@ export function ConstructionDetailPanel({
     }
   };
 
+  const handlePdfUpdate = async (path: string | null) => {
+    const { error } = await supabase
+      .from('order_constructions')
+      .update({ pdf_file_path: path })
+      .eq('id', construction.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setPdfPath(path);
+    }
+  };
+
   const manufacturingMap = new Map(manufacturing.map(m => [m.stage, m]));
 
   return (
@@ -417,6 +433,21 @@ export function ConstructionDetailPanel({
                 <span className="text-muted-foreground">Notes:</span> {construction.comments}
               </div>
             )}
+          </div>
+
+          {/* Manufacturing Details PDF */}
+          <Separator />
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Manufacturing Details PDF
+            </h3>
+            <PdfUpload
+              value={pdfPath}
+              onChange={handlePdfUpdate}
+              folder={`constructions/${construction.id}`}
+              disabled={!canEdit}
+            />
           </div>
 
           {/* Ordering Stages (Components) */}
