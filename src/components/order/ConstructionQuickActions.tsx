@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2, FileText, Upload, Eye } from "lucide-react";
+import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PdfViewer } from "@/components/pdf/PdfViewer";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
 
 interface ConstructionManufacturing {
   stage: string;
@@ -292,24 +294,20 @@ export function ConstructionQuickActions({
   };
 
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   const cleanupPdfState = () => {
-    if (pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-    }
-    setPdfBlobUrl(null);
     setPdfSignedUrl(null);
+    setPdfData(null);
     setPdfError(null);
   };
 
   const handleViewPdf = async () => {
     if (!construction.pdf_file_path || pdfLoading) return;
 
-    // Open dialog immediately for instant feedback
     cleanupPdfState();
     setPdfDialogOpen(true);
     setPdfLoading(true);
@@ -322,7 +320,6 @@ export function ConstructionQuickActions({
         filePath = parts[parts.length - 1];
       }
 
-      // Get signed URL (for fallback "Open in new tab")
       const { data, error } = await supabase.storage
         .from('construction-pdfs')
         .createSignedUrl(filePath, 3600);
@@ -333,28 +330,27 @@ export function ConstructionQuickActions({
 
       setPdfSignedUrl(data.signedUrl);
 
-      // Download the PDF content to create a blob URL
       const response = await fetch(data.signedUrl);
       if (!response.ok) {
         throw new Error("Failed to download PDF");
       }
 
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      setPdfBlobUrl(blobUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
     } catch (err: any) {
-      setPdfError(err.message || "Could not load PDF");
+      const message = err?.message || "Could not load PDF";
+      setPdfError(message);
+      toast({ title: "PDF error", description: message, variant: "destructive" });
     } finally {
       setPdfLoading(false);
     }
   };
 
   const handleDialogClose = (open: boolean) => {
-    if (!open) {
-      cleanupPdfState();
-    }
+    if (!open) cleanupPdfState();
     setPdfDialogOpen(open);
   };
+
 
   const dimensions = construction.width_inches && construction.height_inches
     ? `${construction.width_inches.toFixed(0)}×${construction.height_inches.toFixed(0)}"`
@@ -549,9 +545,11 @@ export function ConstructionQuickActions({
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => window.open(pdfSignedUrl, '_blank')}
+                asChild
               >
-                Open in new tab
+                <a href={pdfSignedUrl} target="_blank" rel="noreferrer">
+                  Open in new tab
+                </a>
               </Button>
             )}
           </DialogHeader>
@@ -565,21 +563,16 @@ export function ConstructionQuickActions({
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
                 <p className="text-sm text-destructive">{pdfError}</p>
                 {pdfSignedUrl && (
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open(pdfSignedUrl, '_blank')}
-                  >
-                    Open in new tab instead
+                  <Button variant="outline" asChild>
+                    <a href={pdfSignedUrl} target="_blank" rel="noreferrer">
+                      Open in new tab instead
+                    </a>
                   </Button>
                 )}
               </div>
             )}
-            {pdfBlobUrl && !pdfError && (
-              <iframe
-                src={pdfBlobUrl}
-                className="w-full h-full border-0"
-                title="PDF Viewer"
-              />
+            {pdfData && !pdfError && (
+              <PdfViewer data={pdfData} />
             )}
           </div>
         </DialogContent>
