@@ -291,34 +291,69 @@ export function ConstructionQuickActions({
     }
   };
 
-  const [viewingPdf, setViewingPdf] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const cleanupPdfState = () => {
+    if (pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+    }
+    setPdfBlobUrl(null);
+    setPdfSignedUrl(null);
+    setPdfError(null);
+  };
 
   const handleViewPdf = async () => {
-    if (!construction.pdf_file_path || viewingPdf) return;
+    if (!construction.pdf_file_path || pdfLoading) return;
 
-    setViewingPdf(true);
+    // Open dialog immediately for instant feedback
+    cleanupPdfState();
+    setPdfDialogOpen(true);
+    setPdfLoading(true);
 
-    // Extract file path if it's a full URL
-    let filePath = construction.pdf_file_path;
-    if (filePath.includes('/')) {
-      const parts = filePath.split('/');
-      filePath = parts[parts.length - 1];
-    }
+    try {
+      // Extract file path if it's a full URL
+      let filePath = construction.pdf_file_path;
+      if (filePath.includes('/')) {
+        const parts = filePath.split('/');
+        filePath = parts[parts.length - 1];
+      }
 
-    const { data, error } = await supabase.storage
-      .from('construction-pdfs')
-      .createSignedUrl(filePath, 3600);
+      // Get signed URL (for fallback "Open in new tab")
+      const { data, error } = await supabase.storage
+        .from('construction-pdfs')
+        .createSignedUrl(filePath, 3600);
 
-    if (data?.signedUrl) {
+      if (!data?.signedUrl) {
+        throw new Error(error?.message || "Could not generate URL");
+      }
+
       setPdfSignedUrl(data.signedUrl);
-      setPdfDialogOpen(true);
-    } else {
-      toast({ title: "Error", description: error?.message || "Could not load PDF", variant: "destructive" });
-    }
 
-    setViewingPdf(false);
+      // Download the PDF content to create a blob URL
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPdfBlobUrl(blobUrl);
+    } catch (err: any) {
+      setPdfError(err.message || "Could not load PDF");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      cleanupPdfState();
+    }
+    setPdfDialogOpen(open);
   };
 
   const dimensions = construction.width_inches && construction.height_inches
@@ -458,11 +493,11 @@ export function ConstructionQuickActions({
         {construction.pdf_file_path ? (
           <button
             onClick={handleViewPdf}
-            disabled={viewingPdf}
+            disabled={pdfLoading}
             className="flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
           >
-            {viewingPdf ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Eye className="h-2.5 w-2.5" />}
-            {viewingPdf ? 'Opening...' : 'View PDF'}
+            {pdfLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Eye className="h-2.5 w-2.5" />}
+            {pdfLoading ? 'Loading...' : 'View PDF'}
           </button>
         ) : (
           <button
@@ -503,17 +538,45 @@ export function ConstructionQuickActions({
       </button>
 
       {/* PDF Viewer Dialog */}
-      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+      <Dialog open={pdfDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-4xl w-[90vw] h-[85vh] p-0 flex flex-col">
-          <DialogHeader className="p-4 pb-2 border-b">
+          <DialogHeader className="p-4 pb-2 border-b flex flex-row items-center justify-between">
             <DialogTitle className="text-sm">
               {getTypePrefix(construction.construction_type)}{construction.construction_number} — PDF
             </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
             {pdfSignedUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => window.open(pdfSignedUrl, '_blank')}
+              >
+                Open in new tab
+              </Button>
+            )}
+          </DialogHeader>
+          <div className="flex-1 min-h-0 relative">
+            {pdfLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {pdfError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
+                <p className="text-sm text-destructive">{pdfError}</p>
+                {pdfSignedUrl && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(pdfSignedUrl, '_blank')}
+                  >
+                    Open in new tab instead
+                  </Button>
+                )}
+              </div>
+            )}
+            {pdfBlobUrl && !pdfError && (
               <iframe
-                src={pdfSignedUrl}
+                src={pdfBlobUrl}
                 className="w-full h-full border-0"
                 title="PDF Viewer"
               />
