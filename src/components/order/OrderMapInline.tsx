@@ -27,6 +27,7 @@ interface Construction {
   comments: string | null;
   quantity: number;
   position_index: number;
+  pdf_file_path: string | null;
 }
 
 interface ConstructionNote {
