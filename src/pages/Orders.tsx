@@ -1853,14 +1853,22 @@ export default function Orders() {
                 <Wrench className="h-4 w-4" />
                 Active Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => !o.delivery_complete).length}
+                  {filteredOrders.filter(o => {
+                    const batches = getOrderDeliveryBatches(o.id);
+                    const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
+                    return !o.delivery_complete && !allShipped;
+                  }).length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="finished" className="gap-2">
                 <Archive className="h-4 w-4" />
                 Finished Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => o.delivery_complete).length}
+                  {filteredOrders.filter(o => {
+                    const batches = getOrderDeliveryBatches(o.id);
+                    const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
+                    return o.delivery_complete || allShipped;
+                  }).length}
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -1891,9 +1899,14 @@ export default function Orders() {
               }
             });
             
-            // Split orders by delivery status
-            const activeOrders = sortOrders(filteredOrders.filter(o => !o.delivery_complete));
-            const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+            // Split orders by delivery status (check both delivery_complete flag AND if all batches are shipped)
+            const isOrderFinished = (order: Order) => {
+              const batches = getOrderDeliveryBatches(order.id);
+              const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
+              return order.delivery_complete || allShipped;
+            };
+            const activeOrders = sortOrders(filteredOrders.filter(o => !isOrderFinished(o)));
+            const finishedOrders = sortOrders(filteredOrders.filter(o => isOrderFinished(o)));
             
             // Render orders list helper
             const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
@@ -2673,7 +2686,13 @@ export default function Orders() {
                   }
                 });
                 
-                const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+                // Check if order is finished (delivery_complete OR all batches shipped)
+                const isOrderFinished = (order: Order) => {
+                  const batches = getOrderDeliveryBatches(order.id);
+                  const allShipped = batches.length > 0 && batches.every(b => b.status === 'shipped');
+                  return order.delivery_complete || allShipped;
+                };
+                const finishedOrders = sortOrders(filteredOrders.filter(o => isOrderFinished(o)));
                 
                 if (finishedOrders.length === 0) {
                   return (
