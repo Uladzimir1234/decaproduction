@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertTriangle, MessageSquare } from "lucide-react";
+import { AlertTriangle, MessageSquare, FileText } from "lucide-react";
 import { ConstructionQuickActions } from "./ConstructionQuickActions";
 
 interface ConstructionManufacturing {
@@ -45,6 +45,7 @@ interface Construction {
   is_delivered?: boolean;
   open_issues_count?: number;
   issues?: ConstructionIssue[];
+  pdf_file_path?: string | null;
 }
 
 interface ConstructionCardProps {
@@ -146,6 +147,7 @@ export function ConstructionCard({
   const typePrefix = getTypePrefix(construction.construction_type);
   const hasOpenIssues = (construction.open_issues_count || 0) > 0;
   const hasNotes = (construction.notes_count || 0) > 0;
+  const hasPdf = !!construction.pdf_file_path;
 
   // Detect status changes and trigger pulse animation
   useEffect(() => {
@@ -243,6 +245,25 @@ export function ConstructionCard({
                     <p className="text-muted-foreground text-[10px]">+{construction.notes.length - 3} more...</p>
                   )}
                 </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* PDF indicator - bottom left */}
+        {hasPdf && (
+          <TooltipProvider>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <div 
+                  className="absolute -bottom-1 -left-1 bg-purple-500 rounded-full h-3 w-3 flex items-center justify-center cursor-pointer hover:bg-purple-600 transition-colors shadow-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText className="h-2 w-2 text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs z-[9999]">
+                <p className="font-medium">PDF attached</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
