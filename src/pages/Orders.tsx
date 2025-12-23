@@ -1891,9 +1891,9 @@ export default function Orders() {
               }
             });
             
-            // Split orders by delivery status
-            const activeOrders = sortOrders(filteredOrders.filter(o => !o.delivery_complete));
-            const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+            // Split orders by fulfillment status - 100% fulfilled = finished
+            const activeOrders = sortOrders(filteredOrders.filter(o => o.fulfillment_percentage < 100));
+            const finishedOrders = sortOrders(filteredOrders.filter(o => o.fulfillment_percentage === 100));
             
             // Render orders list helper
             const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
@@ -2673,7 +2673,7 @@ export default function Orders() {
                   }
                 });
                 
-                const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+                const finishedOrders = sortOrders(filteredOrders.filter(o => o.fulfillment_percentage === 100));
                 
                 if (finishedOrders.length === 0) {
                   return (
