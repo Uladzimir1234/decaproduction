@@ -5,8 +5,9 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, ChevronDown, ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
 import { Badge } from "@/components/ui/badge";
@@ -229,6 +230,7 @@ export default function Orders() {
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   const [expandedAvailableComponents, setExpandedAvailableComponents] = useState<Set<string>>(new Set());
+  const [expandedFinishedOrders, setExpandedFinishedOrders] = useState<Set<string>>(new Set());
   
   // Sort state with localStorage persistence
   const [sortBy, setSortBy] = useState<string>(() => {
@@ -2705,53 +2707,135 @@ export default function Orders() {
                 return (
                   <div className="space-y-3">
                     {finishedOrders.map(order => {
-                      const daysUntil = getDaysUntilDelivery(order.delivery_date);
                       const orderBatches = getOrderDeliveryBatches(order.id);
                       const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      const deliveredBatches = orderBatches.filter(b => b.status === 'delivered').length;
+                      const isExpanded = expandedFinishedOrders.has(order.id);
+                      
+                      const toggleExpanded = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        setExpandedFinishedOrders(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(order.id)) {
+                            newSet.delete(order.id);
+                          } else {
+                            newSet.add(order.id);
+                          }
+                          return newSet;
+                        });
+                      };
                       
                       return (
-                        <div 
+                        <Collapsible 
                           key={order.id} 
-                          id={`order-${order.id}`} 
-                          className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} 
-                          onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}
+                          open={isExpanded}
+                          onOpenChange={() => {}}
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
-                                #{order.order_number}
-                              </span>
-                              <span className="font-medium truncate">
-                                {order.customer_name}
-                              </span>
-                              <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
-                                <CheckCircle className="h-3 w-3" />
-                                Delivered
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
-                              {shippedBatches > 0 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
-                                </Badge>
+                          <div 
+                            id={`order-${order.id}`} 
+                            className="relative block p-4 rounded-lg border bg-card transition-colors"
+                          >
+                            <CollapsibleTrigger asChild>
+                              <div 
+                                className="flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer hover:bg-muted/30 -m-2 p-2 rounded-md transition-colors"
+                                onClick={toggleExpanded}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
+                                    #{order.order_number}
+                                  </span>
+                                  <span className="font-medium truncate">
+                                    {order.customer_name}
+                                  </span>
+                                  <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Delivered
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                  <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
+                                  {shippedBatches > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                  {(isAdmin || isManager) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditClick(e, order);
+                                      }}
+                                      className="shrink-0"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </CollapsibleTrigger>
+                            
+                            <CollapsibleContent className="pt-4 mt-3 border-t">
+                              <div className="flex flex-wrap items-center gap-4 text-sm">
+                                {(order.windows_count ?? 0) > 0 && (
+                                  <span className="flex items-center gap-1.5 text-success font-medium">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    {order.windows_count} Windows
+                                  </span>
+                                )}
+                                {(order.doors_count ?? 0) > 0 && (
+                                  <span className="flex items-center gap-1.5 text-success font-medium">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    {order.doors_count} Doors
+                                  </span>
+                                )}
+                                {(order.sliding_doors_count ?? 0) > 0 && (
+                                  <span className="flex items-center gap-1.5 text-success font-medium">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    {order.sliding_doors_count} Sliding Doors
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Order Map for file-extracted orders */}
+                              {ordersWithConstructions.has(order.id) && orderConstructions[order.id]?.length > 0 && (
+                                <div className="mt-4">
+                                  <OrderMapInline 
+                                    orderId={order.id}
+                                    orderNumber={order.order_number}
+                                    isProductionReady={true}
+                                  />
+                                </div>
                               )}
-                            </div>
-                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              
+                              {/* Link to order detail for admins/managers */}
                               {(isAdmin || isManager) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => handleEditClick(e, order)}
-                                  className="shrink-0"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
+                                <div className="mt-4 pt-3 border-t">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/orders/${order.id}`);
+                                    }}
+                                    className="text-xs"
+                                  >
+                                    View Full Details
+                                  </Button>
+                                </div>
                               )}
-                            </div>
+                            </CollapsibleContent>
                           </div>
-                        </div>
+                        </Collapsible>
                       );
                     })}
                   </div>
