@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, X, AlertTriangle, MessageSquare, ChevronRight, Loader2, FileText, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ interface Construction {
   manufacturing?: ConstructionManufacturing[];
   notes_count?: number;
   open_issues_count?: number;
+  pdf_file_path?: string | null;
 }
 
 interface ConstructionQuickActionsProps {
@@ -72,6 +73,8 @@ export function ConstructionQuickActions({
   const [noteText, setNoteText] = useState("");
   const [savingIssue, setSavingIssue] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Optimistic local state for instant feedback
   const [localGlassStatus, setLocalGlassStatus] = useState<string>('not_started');
@@ -244,6 +247,63 @@ export function ConstructionQuickActions({
     setSavingNote(false);
   };
 
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast({ title: "Error", description: "Please select a PDF file", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Error", description: "File must be less than 10MB", variant: "destructive" });
+      return;
+    }
+
+    setUploadingPdf(true);
+    try {
+      const fileExt = 'pdf';
+      const fileName = `${construction.id}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('construction-pdfs')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from('order_constructions')
+        .update({ pdf_file_path: filePath })
+        .eq('id', construction.id);
+
+      if (updateError) throw updateError;
+
+      toast({ title: "PDF uploaded" });
+      onRefresh();
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingPdf(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleViewPdf = async () => {
+    if (!construction.pdf_file_path) return;
+
+    const { data } = await supabase.storage
+      .from('construction-pdfs')
+      .createSignedUrl(construction.pdf_file_path, 3600);
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast({ title: "Error", description: "Could not load PDF", variant: "destructive" });
+    }
+  };
+
   const dimensions = construction.width_inches && construction.height_inches
     ? `${construction.width_inches.toFixed(0)}×${construction.height_inches.toFixed(0)}"`
     : null;
@@ -367,6 +427,49 @@ export function ConstructionQuickActions({
         >
           {savingNote ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <MessageSquare className="h-2.5 w-2.5" />}
         </Button>
+      </div>
+
+      {/* PDF Quick Access */}
+      <div className="flex gap-1">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handlePdfUpload}
+          className="hidden"
+        />
+        {construction.pdf_file_path ? (
+          <button
+            onClick={handleViewPdf}
+            className="flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+          >
+            <Eye className="h-2.5 w-2.5" />
+            View PDF
+          </button>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingPdf}
+            className="flex-1 h-6 rounded text-[10px] font-medium flex items-center justify-center gap-1 bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+          >
+            {uploadingPdf ? (
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            ) : (
+              <Upload className="h-2.5 w-2.5" />
+            )}
+            {uploadingPdf ? 'Uploading...' : 'Upload PDF'}
+          </button>
+        )}
+        {construction.pdf_file_path && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingPdf}
+            className="h-6 w-6 rounded text-[10px] flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+            title="Replace PDF"
+          >
+            {uploadingPdf ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
+          </button>
+        )}
       </div>
 
       {/* View Details Link */}
