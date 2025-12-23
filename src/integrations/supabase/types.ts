@@ -732,6 +732,7 @@ export type Database = {
           model: string | null
           opening_type: string | null
           order_id: string
+          pdf_file_path: string | null
           position_index: number
           quantity: number
           raw_data: Json | null
@@ -760,6 +761,7 @@ export type Database = {
           model?: string | null
           opening_type?: string | null
           order_id: string
+          pdf_file_path?: string | null
           position_index?: number
           quantity?: number
           raw_data?: Json | null
@@ -788,6 +790,7 @@ export type Database = {
           model?: string | null
           opening_type?: string | null
           order_id?: string
+          pdf_file_path?: string | null
           position_index?: number
           quantity?: number
           raw_data?: Json | null
