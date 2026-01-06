@@ -1138,9 +1138,45 @@ export default function Orders() {
 
   const handleStageStatusChange = async (orderId: string, field: string, newStatus: string) => {
     try {
+      // Boolean fields in order_fulfillment table that expect true/false, not status strings
+      const booleanFields = [
+        'sliding_doors_glass_installed',
+        'doors_glass_installed',
+        'glass_installed',
+        'frames_welded',
+        'doors_assembled',
+        'doors_glass_available',
+        'sliding_doors_assembled',
+        'sliding_doors_glass_available',
+        'frame_sash_assembled',
+        'glass_delivered',
+        'screens_made',
+        'screens_delivered',
+        'windows_delivered',
+        'doors_delivered',
+        'sliding_doors_delivered',
+        'screens_delivered_final',
+        'handles_delivered',
+        'glass_delivered_final',
+        'nailing_fins_delivered',
+        'brackets_delivered',
+        'shipping_handles_boxed',
+        'shipping_hinges_covers',
+        'shipping_weeping_covers',
+        'shipping_spec_labels',
+        'shipping_nailing_fins',
+        'shipping_brackets',
+      ];
+
+      // Convert string status to boolean for boolean columns
+      let processedValue: string | boolean = newStatus;
+      if (booleanFields.includes(field)) {
+        processedValue = newStatus === 'complete' || newStatus === 'partial';
+      }
+
       const { error } = await supabase
         .from("order_fulfillment")
-        .update({ [field]: newStatus })
+        .update({ [field]: processedValue })
         .eq("order_id", orderId);
       
       if (error) {
@@ -1181,12 +1217,12 @@ export default function Orders() {
         }
       }
       
-      // Update local state
+      // Update local state with the correct value type
       setFulfillments(prev => ({
         ...prev,
         [orderId]: {
           ...prev[orderId],
-          [field]: newStatus
+          [field]: processedValue
         }
       }));
       
