@@ -775,7 +775,7 @@ export function ShippingSelectionPanel({
           </div>
         )}
 
-        {/* Construction list */}
+        {/* Construction list - includes constructions + custom items */}
         <div className="space-y-2">
           {constructionStates.map(cs => {
             const { construction, expanded, units } = cs;
@@ -1174,184 +1174,166 @@ export function ShippingSelectionPanel({
               </div>
             );
           })}
-        </div>
 
-        {/* Order custom items section - row-based like construction items */}
-        {orderCustomItems.length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <Label className="text-sm">Order Shipping Items</Label>
-              <div className="space-y-1">
-                {orderCustomItems.map(item => {
-                  const isSelected = selectedOrderCustomItems.has(item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => canEdit && toggleOrderCustomItem(item.id)}
-                      className={cn(
-                        "flex items-center gap-2 p-2 rounded-lg border transition-all",
-                        isSelected
-                          ? "bg-green-500/20 border-green-500/50 ring-1 ring-green-500/30 cursor-pointer"
-                          : "bg-green-500/10 border-green-500/30 cursor-pointer hover:bg-green-500/20",
-                        !canEdit && "opacity-70 cursor-default"
-                      )}
-                    >
-                      {/* Status indicator - checkbox when selected, circle when not */}
-                      <div className="shrink-0">
-                        {isSelected ? (
-                          <Checkbox checked className="h-4 w-4" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-green-500" />
-                        )}
-                      </div>
-                      
-                      {/* Item name */}
-                      <span className={cn(
-                        "text-sm font-medium flex-1",
-                        isSelected 
-                          ? "text-green-700 dark:text-green-300" 
-                          : "text-green-600 dark:text-green-400"
-                      )}>
-                        {item.name}
-                      </span>
-                      
-                      {/* Quantity badge */}
-                      {item.quantity > 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          ×{item.quantity}
-                        </Badge>
-                      )}
-                      
-                      {/* Batch number badge when selected */}
-                      {isSelected && (
-                        <Badge className="bg-amber-400 text-amber-900 text-xs">
-                          Batch #{nextBatchNumber}
-                        </Badge>
-                      )}
-                      
-                      {/* Status label */}
-                      {!isSelected && (
-                        <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
-                          Ready to ship
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Custom items section - row-based like construction items */}
-        {canEdit && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <Label className="text-sm">Add Custom Shipping Items</Label>
-              {customItems.length > 0 && (
-                <div className="space-y-1 mb-2">
-                  {customItems.map((item, idx) => {
-                    const isSelected = selectedCustomItems.has(idx);
-                    return (
-                      <div
-                        key={idx}
-                        className={cn(
-                          "flex items-center gap-2 p-2 rounded-lg border transition-all",
-                          isSelected
-                            ? "bg-green-500/20 border-green-500/50 ring-1 ring-green-500/30"
-                            : "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
-                        )}
-                      >
-                        {/* Clickable row content */}
-                        <div 
-                          className="flex items-center gap-2 flex-1 cursor-pointer"
-                          onClick={() => toggleCustomItemSelection(idx)}
-                        >
-                          {/* Status indicator */}
-                          <div className="shrink-0">
-                            {isSelected ? (
-                              <Checkbox checked className="h-4 w-4" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                          
-                          {/* Item name */}
-                          <span className={cn(
-                            "text-sm font-medium flex-1",
-                            isSelected 
-                              ? "text-green-700 dark:text-green-300" 
-                              : "text-green-600 dark:text-green-400"
-                          )}>
-                            {item.name}
-                          </span>
-                          
-                          {/* Quantity badge */}
-                          {item.qty > 1 && (
-                            <Badge variant="outline" className="text-xs">
-                              ×{item.qty}
-                            </Badge>
-                          )}
-                          
-                          {/* Batch number badge when selected */}
-                          {isSelected && (
-                            <Badge className="bg-amber-400 text-amber-900 text-xs">
-                              Batch #{nextBatchNumber}
-                            </Badge>
-                          )}
-                          
-                          {/* Status label */}
-                          {!isSelected && (
-                            <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
-                              Ready to ship
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Delete button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCustomItem(idx);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    );
-                  })}
+          {/* Order custom items - inline with construction items */}
+          {orderCustomItems.map(item => {
+            const isSelected = selectedOrderCustomItems.has(item.id);
+            return (
+              <div
+                key={`order-custom-${item.id}`}
+                onClick={() => canEdit && toggleOrderCustomItem(item.id)}
+                className={cn(
+                  "flex items-center gap-2 p-2.5 rounded-lg border transition-all",
+                  isSelected
+                    ? "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30 cursor-pointer"
+                    : "bg-green-500/10 border-green-500/30 cursor-pointer hover:bg-green-500/20",
+                  !canEdit && "opacity-70 cursor-default"
+                )}
+              >
+                {/* Status indicator */}
+                <div className="shrink-0">
+                  {isSelected ? (
+                    <Checkbox checked className="h-4 w-4" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-green-500" />
+                  )}
                 </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Custom item name"
-                  value={customItemName}
-                  onChange={e => setCustomItemName(e.target.value)}
-                  className="flex-1 h-8 text-sm"
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  value={customItemQty}
-                  onChange={e => setCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 h-8 text-xs text-center"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addCustomItem}
-                  disabled={!customItemName.trim()}
+                
+                {/* Item name */}
+                <span className={cn(
+                  "text-sm font-medium flex-1",
+                  isSelected 
+                    ? "text-green-700 dark:text-green-300" 
+                    : "text-green-600 dark:text-green-400"
+                )}>
+                  {item.name}
+                </span>
+                
+                {/* Quantity badge */}
+                {item.quantity > 1 && (
+                  <Badge variant="outline" className="text-xs">
+                    ×{item.quantity}
+                  </Badge>
+                )}
+                
+                {/* Batch number badge when selected */}
+                {isSelected && (
+                  <Badge className="bg-amber-400 text-amber-900 text-xs">
+                    Batch #{nextBatchNumber}
+                  </Badge>
+                )}
+                
+                {/* Status label */}
+                {!isSelected && (
+                  <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                    Ready to ship
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Temporary custom items - inline with construction items */}
+          {customItems.map((item, idx) => {
+            const isSelected = selectedCustomItems.has(idx);
+            return (
+              <div
+                key={`temp-custom-${idx}`}
+                className={cn(
+                  "flex items-center gap-2 p-2.5 rounded-lg border transition-all",
+                  isSelected
+                    ? "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30"
+                    : "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                )}
+              >
+                {/* Clickable row content */}
+                <div 
+                  className="flex items-center gap-2 flex-1 cursor-pointer"
+                  onClick={() => toggleCustomItemSelection(idx)}
                 >
-                  <Plus className="h-4 w-4" />
+                  {/* Status indicator */}
+                  <div className="shrink-0">
+                    {isSelected ? (
+                      <Checkbox checked className="h-4 w-4" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-green-500" />
+                    )}
+                  </div>
+                  
+                  {/* Item name */}
+                  <span className={cn(
+                    "text-sm font-medium flex-1",
+                    isSelected 
+                      ? "text-green-700 dark:text-green-300" 
+                      : "text-green-600 dark:text-green-400"
+                  )}>
+                    {item.name}
+                  </span>
+                  
+                  {/* Quantity badge */}
+                  {item.qty > 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      ×{item.qty}
+                    </Badge>
+                  )}
+                  
+                  {/* Batch number badge when selected */}
+                  {isSelected && (
+                    <Badge className="bg-amber-400 text-amber-900 text-xs">
+                      Batch #{nextBatchNumber}
+                    </Badge>
+                  )}
+                  
+                  {/* Status label */}
+                  {!isSelected && (
+                    <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                      Ready to ship
+                    </span>
+                  )}
+                </div>
+                
+                {/* Delete button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeCustomItem(idx);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            </div>
-          </>
+            );
+          })}
+        </div>
+
+        {/* Add custom item input */}
+        {canEdit && (
+          <div className="flex gap-2 pt-2 border-t">
+            <Input
+              placeholder="Add custom shipping item..."
+              value={customItemName}
+              onChange={e => setCustomItemName(e.target.value)}
+              className="flex-1 h-8 text-sm"
+            />
+            <Input
+              type="number"
+              min={1}
+              value={customItemQty}
+              onChange={e => setCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-16 h-8 text-xs text-center"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addCustomItem}
+              disabled={!customItemName.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
