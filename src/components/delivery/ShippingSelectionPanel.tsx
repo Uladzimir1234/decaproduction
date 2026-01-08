@@ -114,6 +114,13 @@ interface ConstructionState {
   units: UnitState[];
 }
 
+interface OrderCustomItem {
+  id: string;
+  name: string;
+  quantity: number;
+  is_complete: boolean;
+}
+
 interface BatchInfo {
   batchId: string;
   batchNumber: number;
@@ -200,6 +207,10 @@ export function ShippingSelectionPanel({
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [customItems, setCustomItems] = useState<{ name: string; qty: number }[]>([]);
   const [customItemName, setCustomItemName] = useState("");
+  
+  // Order-level custom shipping items
+  const [orderCustomItems, setOrderCustomItems] = useState<OrderCustomItem[]>([]);
+  const [selectedOrderCustomItems, setSelectedOrderCustomItems] = useState<Set<string>>(new Set());
   const [customItemQty, setCustomItemQty] = useState(1);
 
   // Fetch manufacturing status for all constructions and order fulfillment as fallback
@@ -210,8 +221,8 @@ export function ShippingSelectionPanel({
       return;
     }
 
-    // Fetch construction manufacturing, order fulfillment, and batch info in parallel
-    const [constructionResult, fulfillmentResult, batchesResult, batchComponentsResult] = await Promise.all([
+    // Fetch construction manufacturing, order fulfillment, batch info, and order custom items in parallel
+    const [constructionResult, fulfillmentResult, batchesResult, batchComponentsResult, customItemsResult] = await Promise.all([
       supabase
         .from("construction_manufacturing")
         .select("construction_id, stage, status")
@@ -236,7 +247,12 @@ export function ShippingSelectionPanel({
             component_type
           )
         `)
-        .in("construction_id", constructionIds)
+        .in("construction_id", constructionIds),
+      supabase
+        .from("custom_shipping_items")
+        .select("id, name, quantity, is_complete")
+        .eq("order_id", orderId)
+        .eq("is_complete", false)
     ]);
 
     if (!constructionResult.error && constructionResult.data) {
@@ -273,6 +289,11 @@ export function ShippingSelectionPanel({
         }
       });
       setComponentBatchMap(compBatchMap);
+    }
+
+    // Set order custom items
+    if (!customItemsResult.error && customItemsResult.data) {
+      setOrderCustomItems(customItemsResult.data);
     }
 
     setLoading(false);
@@ -482,12 +503,24 @@ export function ShippingSelectionPanel({
     setCustomItems(customItems.filter((_, i) => i !== index));
   };
 
+  const toggleOrderCustomItem = (itemId: string) => {
+    setSelectedOrderCustomItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
   // Count selected items
   const selectedCount = constructionStates.reduce((sum, cs) => {
     return sum + cs.units.filter(u => u.status === "selected").length;
   }, 0);
 
-  const hasSelection = selectedCount > 0 || customItems.length > 0;
+  const hasSelection = selectedCount > 0 || customItems.length > 0 || selectedOrderCustomItems.size > 0;
 
   const createShipment = async () => {
     if (!deliveryPerson.trim()) {
@@ -519,7 +552,7 @@ export function ShippingSelectionPanel({
       if (batchError) throw batchError;
       const batchId = batchData.id;
 
-      // Insert custom items
+      // Insert custom items (new items added inline)
       if (customItems.length > 0) {
         const { error: customError } = await supabase
           .from("batch_custom_shipping_items")
@@ -530,6 +563,27 @@ export function ShippingSelectionPanel({
             is_complete: false,
           })));
         if (customError) throw customError;
+      }
+
+      // Insert selected order-level custom shipping items
+      if (selectedOrderCustomItems.size > 0) {
+        const selectedItems = orderCustomItems.filter(item => selectedOrderCustomItems.has(item.id));
+        const { error: orderCustomError } = await supabase
+          .from("batch_custom_shipping_items")
+          .insert(selectedItems.map(item => ({
+            batch_id: batchId,
+            name: item.name,
+            quantity: item.quantity,
+            is_complete: false,
+          })));
+        if (orderCustomError) throw orderCustomError;
+
+        // Mark original items as complete (shipped)
+        const { error: updateError } = await supabase
+          .from("custom_shipping_items")
+          .update({ is_complete: true })
+          .in("id", Array.from(selectedOrderCustomItems));
+        if (updateError) throw updateError;
       }
 
       // Insert construction items and components
@@ -589,6 +643,9 @@ export function ShippingSelectionPanel({
       // Reset selection state
       setDeliveryPerson("");
       setCustomItems([]);
+      setSelectedOrderCustomItems(new Set());
+      // Remove shipped items from local state
+      setOrderCustomItems(prev => prev.filter(item => !selectedOrderCustomItems.has(item.id)));
       setConstructionStates(prev =>
         prev.map(cs => ({
           ...cs,
@@ -1092,12 +1149,44 @@ export function ShippingSelectionPanel({
           })}
         </div>
 
+        {/* Order custom items section - selectable items from custom_shipping_items table */}
+        {orderCustomItems.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <Label className="text-sm">Order Shipping Items</Label>
+              <div className="space-y-1">
+                {orderCustomItems.map(item => (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors",
+                      selectedOrderCustomItems.has(item.id)
+                        ? "bg-green-500/20 border-green-500/50"
+                        : "bg-muted/30 border-border hover:bg-muted/50"
+                    )}
+                    onClick={() => canEdit && toggleOrderCustomItem(item.id)}
+                  >
+                    <Checkbox
+                      checked={selectedOrderCustomItems.has(item.id)}
+                      disabled={!canEdit}
+                      onCheckedChange={() => canEdit && toggleOrderCustomItem(item.id)}
+                    />
+                    <span className="flex-1 text-sm">{item.name}</span>
+                    <Badge variant="outline" className="text-xs">×{item.quantity}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Custom items section */}
         {canEdit && (
           <>
             <Separator />
             <div className="space-y-2">
-              <Label className="text-sm">Custom Shipping Items</Label>
+              <Label className="text-sm">Add Custom Shipping Items</Label>
               {customItems.length > 0 && (
                 <div className="space-y-1">
                   {customItems.map((item, idx) => (
