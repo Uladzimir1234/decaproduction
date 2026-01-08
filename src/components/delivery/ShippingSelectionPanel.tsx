@@ -1176,37 +1176,67 @@ export function ShippingSelectionPanel({
           })}
         </div>
 
-        {/* Order custom items section - selectable items as badges like construction components */}
+        {/* Order custom items section - row-based like construction items */}
         {orderCustomItems.length > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
               <Label className="text-sm">Order Shipping Items</Label>
-              <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 rounded-lg border">
+              <div className="space-y-1">
                 {orderCustomItems.map(item => {
                   const isSelected = selectedOrderCustomItems.has(item.id);
                   return (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
                       onClick={() => canEdit && toggleOrderCustomItem(item.id)}
-                      disabled={!canEdit}
                       className={cn(
-                        "relative text-xs px-2 py-1 rounded border transition-colors",
+                        "flex items-center gap-2 p-2 rounded-lg border transition-all",
                         isSelected
-                          ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
-                          : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20",
+                          ? "bg-green-500/20 border-green-500/50 ring-1 ring-green-500/30 cursor-pointer"
+                          : "bg-green-500/10 border-green-500/30 cursor-pointer hover:bg-green-500/20",
                         !canEdit && "opacity-70 cursor-default"
                       )}
                     >
-                      {item.name}
-                      {item.quantity > 1 && <span className="ml-1 opacity-70">×{item.quantity}</span>}
+                      {/* Status indicator - checkbox when selected, circle when not */}
+                      <div className="shrink-0">
+                        {isSelected ? (
+                          <Checkbox checked className="h-4 w-4" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-green-500" />
+                        )}
+                      </div>
+                      
+                      {/* Item name */}
+                      <span className={cn(
+                        "text-sm font-medium flex-1",
+                        isSelected 
+                          ? "text-green-700 dark:text-green-300" 
+                          : "text-green-600 dark:text-green-400"
+                      )}>
+                        {item.name}
+                      </span>
+                      
+                      {/* Quantity badge */}
+                      {item.quantity > 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          ×{item.quantity}
+                        </Badge>
+                      )}
+                      
+                      {/* Batch number badge when selected */}
                       {isSelected && (
-                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
-                          {nextBatchNumber}
+                        <Badge className="bg-amber-400 text-amber-900 text-xs">
+                          Batch #{nextBatchNumber}
+                        </Badge>
+                      )}
+                      
+                      {/* Status label */}
+                      {!isSelected && (
+                        <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                          Ready to ship
                         </span>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1214,43 +1244,83 @@ export function ShippingSelectionPanel({
           </>
         )}
 
-        {/* Custom items section */}
+        {/* Custom items section - row-based like construction items */}
         {canEdit && (
           <>
             <Separator />
             <div className="space-y-2">
               <Label className="text-sm">Add Custom Shipping Items</Label>
               {customItems.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 rounded-lg border mb-2">
+                <div className="space-y-1 mb-2">
                   {customItems.map((item, idx) => {
                     const isSelected = selectedCustomItems.has(idx);
                     return (
-                      <div key={idx} className="relative flex items-center gap-1">
-                        <button
-                          type="button"
+                      <div
+                        key={idx}
+                        className={cn(
+                          "flex items-center gap-2 p-2 rounded-lg border transition-all",
+                          isSelected
+                            ? "bg-green-500/20 border-green-500/50 ring-1 ring-green-500/30"
+                            : "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                        )}
+                      >
+                        {/* Clickable row content */}
+                        <div 
+                          className="flex items-center gap-2 flex-1 cursor-pointer"
                           onClick={() => toggleCustomItemSelection(idx)}
-                          className={cn(
-                            "relative text-xs px-2 py-1 rounded border transition-colors",
-                            isSelected
-                              ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
-                              : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
-                          )}
                         >
-                          {item.name}
-                          {item.qty > 1 && <span className="ml-1 opacity-70">×{item.qty}</span>}
+                          {/* Status indicator */}
+                          <div className="shrink-0">
+                            {isSelected ? (
+                              <Checkbox checked className="h-4 w-4" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-green-500" />
+                            )}
+                          </div>
+                          
+                          {/* Item name */}
+                          <span className={cn(
+                            "text-sm font-medium flex-1",
+                            isSelected 
+                              ? "text-green-700 dark:text-green-300" 
+                              : "text-green-600 dark:text-green-400"
+                          )}>
+                            {item.name}
+                          </span>
+                          
+                          {/* Quantity badge */}
+                          {item.qty > 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              ×{item.qty}
+                            </Badge>
+                          )}
+                          
+                          {/* Batch number badge when selected */}
                           {isSelected && (
-                            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
-                              {nextBatchNumber}
+                            <Badge className="bg-amber-400 text-amber-900 text-xs">
+                              Batch #{nextBatchNumber}
+                            </Badge>
+                          )}
+                          
+                          {/* Status label */}
+                          {!isSelected && (
+                            <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                              Ready to ship
                             </span>
                           )}
-                        </button>
+                        </div>
+                        
+                        {/* Delete button */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-5 w-5 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeCustomItem(idx)}
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCustomItem(idx);
+                          }}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     );
