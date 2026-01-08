@@ -205,14 +205,12 @@ export function ShippingSelectionPanel({
   // Batch creation fields
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(new Date());
   const [deliveryPerson, setDeliveryPerson] = useState("");
-  const [customItems, setCustomItems] = useState<{ name: string; qty: number }[]>([]);
   const [customItemName, setCustomItemName] = useState("");
-  const [selectedCustomItems, setSelectedCustomItems] = useState<Set<number>>(new Set());
+  const [customItemQty, setCustomItemQty] = useState(1);
   
-  // Order-level custom shipping items
+  // Order-level custom shipping items (persisted to database)
   const [orderCustomItems, setOrderCustomItems] = useState<OrderCustomItem[]>([]);
   const [selectedOrderCustomItems, setSelectedOrderCustomItems] = useState<Set<string>>(new Set());
-  const [customItemQty, setCustomItemQty] = useState(1);
 
   // Fetch manufacturing status for all constructions and order fulfillment as fallback
   const fetchManufacturingStatus = useCallback(async () => {
@@ -493,37 +491,50 @@ export function ShippingSelectionPanel({
     );
   };
 
-  const addCustomItem = () => {
+  const addCustomItem = async () => {
     if (!customItemName.trim()) return;
-    const newIndex = customItems.length;
-    setCustomItems([...customItems, { name: customItemName.trim(), qty: customItemQty }]);
-    // Auto-select the newly added item
-    setSelectedCustomItems(prev => new Set([...prev, newIndex]));
+    
+    // Save directly to the database
+    const { data, error } = await supabase
+      .from("custom_shipping_items")
+      .insert({
+        order_id: orderId,
+        name: customItemName.trim(),
+        quantity: customItemQty,
+        is_complete: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to add custom item", variant: "destructive" });
+      return;
+    }
+
+    // Add to local state and auto-select
+    setOrderCustomItems(prev => [...prev, data]);
+    setSelectedOrderCustomItems(prev => new Set([...prev, data.id]));
     setCustomItemName("");
     setCustomItemQty(1);
   };
 
-  const removeCustomItem = (index: number) => {
-    setCustomItems(customItems.filter((_, i) => i !== index));
-    // Update selection indices
-    setSelectedCustomItems(prev => {
-      const newSet = new Set<number>();
-      prev.forEach(i => {
-        if (i < index) newSet.add(i);
-        else if (i > index) newSet.add(i - 1);
-      });
-      return newSet;
-    });
-  };
+  const removeCustomItem = async (itemId: string) => {
+    // Delete from database
+    const { error } = await supabase
+      .from("custom_shipping_items")
+      .delete()
+      .eq("id", itemId);
 
-  const toggleCustomItemSelection = (index: number) => {
-    setSelectedCustomItems(prev => {
+    if (error) {
+      toast({ title: "Error", description: "Failed to remove item", variant: "destructive" });
+      return;
+    }
+
+    // Remove from local state
+    setOrderCustomItems(prev => prev.filter(item => item.id !== itemId));
+    setSelectedOrderCustomItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
+      newSet.delete(itemId);
       return newSet;
     });
   };
@@ -545,7 +556,7 @@ export function ShippingSelectionPanel({
     return sum + cs.units.filter(u => u.status === "selected").length;
   }, 0);
 
-  const hasSelection = selectedCount > 0 || selectedCustomItems.size > 0 || selectedOrderCustomItems.size > 0;
+  const hasSelection = selectedCount > 0 || selectedOrderCustomItems.size > 0;
 
   const createShipment = async () => {
     if (!deliveryPerson.trim()) {
@@ -577,19 +588,7 @@ export function ShippingSelectionPanel({
       if (batchError) throw batchError;
       const batchId = batchData.id;
 
-      // Insert selected custom items (new items added inline)
-      const selectedCustomItemsList = customItems.filter((_, idx) => selectedCustomItems.has(idx));
-      if (selectedCustomItemsList.length > 0) {
-        const { error: customError } = await supabase
-          .from("batch_custom_shipping_items")
-          .insert(selectedCustomItemsList.map(item => ({
-            batch_id: batchId,
-            name: item.name,
-            quantity: item.qty,
-            is_complete: false,
-          })));
-        if (customError) throw customError;
-      }
+      // Insert selected order-level custom shipping items to batch
 
       // Insert selected order-level custom shipping items
       if (selectedOrderCustomItems.size > 0) {
@@ -668,8 +667,6 @@ export function ShippingSelectionPanel({
       
       // Reset selection state
       setDeliveryPerson("");
-      setCustomItems([]);
-      setSelectedCustomItems(new Set());
       setSelectedOrderCustomItems(new Set());
       // Remove shipped items from local state
       setOrderCustomItems(prev => prev.filter(item => !selectedOrderCustomItems.has(item.id)));
@@ -1181,75 +1178,21 @@ export function ShippingSelectionPanel({
             return (
               <div
                 key={`order-custom-${item.id}`}
-                onClick={() => canEdit && toggleOrderCustomItem(item.id)}
-                className={cn(
-                  "flex items-center gap-2 p-2.5 rounded-lg border transition-all",
-                  isSelected
-                    ? "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30 cursor-pointer"
-                    : "bg-green-500/10 border-green-500/30 cursor-pointer hover:bg-green-500/20",
-                  !canEdit && "opacity-70 cursor-default"
-                )}
-              >
-                {/* Status indicator */}
-                <div className="shrink-0">
-                  {isSelected ? (
-                    <Checkbox checked className="h-4 w-4" />
-                  ) : (
-                    <Circle className="h-4 w-4 text-green-500" />
-                  )}
-                </div>
-                
-                {/* Item name */}
-                <span className={cn(
-                  "text-sm font-medium flex-1",
-                  isSelected 
-                    ? "text-green-700 dark:text-green-300" 
-                    : "text-green-600 dark:text-green-400"
-                )}>
-                  {item.name}
-                </span>
-                
-                {/* Quantity badge */}
-                {item.quantity > 1 && (
-                  <Badge variant="outline" className="text-xs">
-                    ×{item.quantity}
-                  </Badge>
-                )}
-                
-                {/* Batch number badge when selected */}
-                {isSelected && (
-                  <Badge className="bg-amber-400 text-amber-900 text-xs">
-                    Batch #{nextBatchNumber}
-                  </Badge>
-                )}
-                
-                {/* Status label */}
-                {!isSelected && (
-                  <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">
-                    Ready to ship
-                  </span>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Temporary custom items - inline with construction items */}
-          {customItems.map((item, idx) => {
-            const isSelected = selectedCustomItems.has(idx);
-            return (
-              <div
-                key={`temp-custom-${idx}`}
                 className={cn(
                   "flex items-center gap-2 p-2.5 rounded-lg border transition-all",
                   isSelected
                     ? "bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30"
-                    : "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                    : "bg-green-500/10 border-green-500/30 hover:bg-green-500/20",
+                  !canEdit && "opacity-70"
                 )}
               >
                 {/* Clickable row content */}
                 <div 
-                  className="flex items-center gap-2 flex-1 cursor-pointer"
-                  onClick={() => toggleCustomItemSelection(idx)}
+                  className={cn(
+                    "flex items-center gap-2 flex-1",
+                    canEdit && "cursor-pointer"
+                  )}
+                  onClick={() => canEdit && toggleOrderCustomItem(item.id)}
                 >
                   {/* Status indicator */}
                   <div className="shrink-0">
@@ -1271,9 +1214,9 @@ export function ShippingSelectionPanel({
                   </span>
                   
                   {/* Quantity badge */}
-                  {item.qty > 1 && (
+                  {item.quantity > 1 && (
                     <Badge variant="outline" className="text-xs">
-                      ×{item.qty}
+                      ×{item.quantity}
                     </Badge>
                   )}
                   
@@ -1293,17 +1236,19 @@ export function ShippingSelectionPanel({
                 </div>
                 
                 {/* Delete button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeCustomItem(idx);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeCustomItem(item.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             );
           })}
