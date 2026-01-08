@@ -1149,33 +1149,39 @@ export function ShippingSelectionPanel({
           })}
         </div>
 
-        {/* Order custom items section - selectable items from custom_shipping_items table */}
+        {/* Order custom items section - selectable items as badges like construction components */}
         {orderCustomItems.length > 0 && (
           <>
             <Separator />
             <div className="space-y-2">
               <Label className="text-sm">Order Shipping Items</Label>
-              <div className="space-y-1">
-                {orderCustomItems.map(item => (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      "flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors",
-                      selectedOrderCustomItems.has(item.id)
-                        ? "bg-green-500/20 border-green-500/50"
-                        : "bg-muted/30 border-border hover:bg-muted/50"
-                    )}
-                    onClick={() => canEdit && toggleOrderCustomItem(item.id)}
-                  >
-                    <Checkbox
-                      checked={selectedOrderCustomItems.has(item.id)}
+              <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 rounded-lg border">
+                {orderCustomItems.map(item => {
+                  const isSelected = selectedOrderCustomItems.has(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => canEdit && toggleOrderCustomItem(item.id)}
                       disabled={!canEdit}
-                      onCheckedChange={() => canEdit && toggleOrderCustomItem(item.id)}
-                    />
-                    <span className="flex-1 text-sm">{item.name}</span>
-                    <Badge variant="outline" className="text-xs">×{item.quantity}</Badge>
-                  </div>
-                ))}
+                      className={cn(
+                        "relative text-xs px-2 py-1 rounded border transition-colors",
+                        isSelected
+                          ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
+                          : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20",
+                        !canEdit && "opacity-70 cursor-default"
+                      )}
+                    >
+                      {item.name}
+                      {item.quantity > 1 && <span className="ml-1 opacity-70">×{item.quantity}</span>}
+                      {isSelected && (
+                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                          {nextBatchNumber}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </>
