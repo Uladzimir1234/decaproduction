@@ -207,6 +207,7 @@ export function ShippingSelectionPanel({
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [customItems, setCustomItems] = useState<{ name: string; qty: number }[]>([]);
   const [customItemName, setCustomItemName] = useState("");
+  const [selectedCustomItems, setSelectedCustomItems] = useState<Set<number>>(new Set());
   
   // Order-level custom shipping items
   const [orderCustomItems, setOrderCustomItems] = useState<OrderCustomItem[]>([]);
@@ -494,13 +495,37 @@ export function ShippingSelectionPanel({
 
   const addCustomItem = () => {
     if (!customItemName.trim()) return;
+    const newIndex = customItems.length;
     setCustomItems([...customItems, { name: customItemName.trim(), qty: customItemQty }]);
+    // Auto-select the newly added item
+    setSelectedCustomItems(prev => new Set([...prev, newIndex]));
     setCustomItemName("");
     setCustomItemQty(1);
   };
 
   const removeCustomItem = (index: number) => {
     setCustomItems(customItems.filter((_, i) => i !== index));
+    // Update selection indices
+    setSelectedCustomItems(prev => {
+      const newSet = new Set<number>();
+      prev.forEach(i => {
+        if (i < index) newSet.add(i);
+        else if (i > index) newSet.add(i - 1);
+      });
+      return newSet;
+    });
+  };
+
+  const toggleCustomItemSelection = (index: number) => {
+    setSelectedCustomItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
   };
 
   const toggleOrderCustomItem = (itemId: string) => {
@@ -520,7 +545,7 @@ export function ShippingSelectionPanel({
     return sum + cs.units.filter(u => u.status === "selected").length;
   }, 0);
 
-  const hasSelection = selectedCount > 0 || customItems.length > 0 || selectedOrderCustomItems.size > 0;
+  const hasSelection = selectedCount > 0 || selectedCustomItems.size > 0 || selectedOrderCustomItems.size > 0;
 
   const createShipment = async () => {
     if (!deliveryPerson.trim()) {
@@ -552,11 +577,12 @@ export function ShippingSelectionPanel({
       if (batchError) throw batchError;
       const batchId = batchData.id;
 
-      // Insert custom items (new items added inline)
-      if (customItems.length > 0) {
+      // Insert selected custom items (new items added inline)
+      const selectedCustomItemsList = customItems.filter((_, idx) => selectedCustomItems.has(idx));
+      if (selectedCustomItemsList.length > 0) {
         const { error: customError } = await supabase
           .from("batch_custom_shipping_items")
-          .insert(customItems.map(item => ({
+          .insert(selectedCustomItemsList.map(item => ({
             batch_id: batchId,
             name: item.name,
             quantity: item.qty,
@@ -643,6 +669,7 @@ export function ShippingSelectionPanel({
       // Reset selection state
       setDeliveryPerson("");
       setCustomItems([]);
+      setSelectedCustomItems(new Set());
       setSelectedOrderCustomItems(new Set());
       // Remove shipped items from local state
       setOrderCustomItems(prev => prev.filter(item => !selectedOrderCustomItems.has(item.id)));
@@ -1194,22 +1221,40 @@ export function ShippingSelectionPanel({
             <div className="space-y-2">
               <Label className="text-sm">Add Custom Shipping Items</Label>
               {customItems.length > 0 && (
-                <div className="space-y-1">
-                  {customItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                      <Badge variant="secondary" className="text-xs">Custom</Badge>
-                      <span className="flex-1 text-sm">{item.name}</span>
-                      <Badge variant="outline" className="text-xs">×{item.qty}</Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => removeCustomItem(idx)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
+                <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 rounded-lg border mb-2">
+                  {customItems.map((item, idx) => {
+                    const isSelected = selectedCustomItems.has(idx);
+                    return (
+                      <div key={idx} className="relative flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomItemSelection(idx)}
+                          className={cn(
+                            "relative text-xs px-2 py-1 rounded border transition-colors",
+                            isSelected
+                              ? "bg-green-500/30 border-green-500/50 text-green-700 dark:text-green-300 font-medium ring-1 ring-green-500/30"
+                              : "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/20"
+                          )}
+                        >
+                          {item.name}
+                          {item.qty > 1 && <span className="ml-1 opacity-70">×{item.qty}</span>}
+                          {isSelected && (
+                            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] font-bold shadow-sm">
+                              {nextBatchNumber}
+                            </span>
+                          )}
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeCustomItem(idx)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               <div className="flex gap-2">
