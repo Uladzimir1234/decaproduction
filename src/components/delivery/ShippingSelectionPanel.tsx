@@ -121,6 +121,13 @@ interface OrderCustomItem {
   is_complete: boolean;
 }
 
+interface ShippedCustomItem {
+  id: string;
+  name: string;
+  quantity: number;
+  batchNumber: number;
+}
+
 interface BatchInfo {
   batchId: string;
   batchNumber: number;
@@ -211,6 +218,7 @@ export function ShippingSelectionPanel({
   // Order-level custom shipping items (persisted to database)
   const [orderCustomItems, setOrderCustomItems] = useState<OrderCustomItem[]>([]);
   const [selectedOrderCustomItems, setSelectedOrderCustomItems] = useState<Set<string>>(new Set());
+  const [shippedCustomItems, setShippedCustomItems] = useState<ShippedCustomItem[]>([]);
 
   // Fetch manufacturing status for all constructions and order fulfillment as fallback
   const fetchManufacturingStatus = useCallback(async () => {
@@ -220,8 +228,8 @@ export function ShippingSelectionPanel({
       return;
     }
 
-    // Fetch construction manufacturing, order fulfillment, batch info, and order custom items in parallel
-    const [constructionResult, fulfillmentResult, batchesResult, batchComponentsResult, customItemsResult] = await Promise.all([
+    // Fetch construction manufacturing, order fulfillment, batch info, custom items, and shipped custom items in parallel
+    const [constructionResult, fulfillmentResult, batchesResult, batchComponentsResult, customItemsResult, shippedCustomResult] = await Promise.all([
       supabase
         .from("construction_manufacturing")
         .select("construction_id, stage, status")
@@ -251,7 +259,22 @@ export function ShippingSelectionPanel({
         .from("custom_shipping_items")
         .select("id, name, quantity, is_complete")
         .eq("order_id", orderId)
-        .eq("is_complete", false)
+        .eq("is_complete", false),
+      // Fetch shipped custom items with their batch info
+      supabase
+        .from("batch_custom_shipping_items")
+        .select(`
+          id,
+          name,
+          quantity,
+          batch_id,
+          delivery_batches!inner (
+            id,
+            created_at,
+            order_id
+          )
+        `)
+        .eq("delivery_batches.order_id", orderId)
     ]);
 
     if (!constructionResult.error && constructionResult.data) {
@@ -290,9 +313,25 @@ export function ShippingSelectionPanel({
       setComponentBatchMap(compBatchMap);
     }
 
-    // Set order custom items
+    // Set order custom items (unshipped)
     if (!customItemsResult.error && customItemsResult.data) {
       setOrderCustomItems(customItemsResult.data);
+    }
+
+    // Process shipped custom items with batch numbers
+    if (!shippedCustomResult.error && shippedCustomResult.data && !batchesResult.error && batchesResult.data) {
+      const batchToNumber = new Map<string, number>();
+      batchesResult.data.forEach((batch, idx) => {
+        batchToNumber.set(batch.id, idx + 1);
+      });
+      
+      const shipped: ShippedCustomItem[] = shippedCustomResult.data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        batchNumber: batchToNumber.get(item.batch_id) || 1,
+      }));
+      setShippedCustomItems(shipped);
     }
 
     setLoading(false);
@@ -1171,6 +1210,31 @@ export function ShippingSelectionPanel({
               </div>
             );
           })}
+
+          {/* Shipped custom items - displayed in blue */}
+          {shippedCustomItems.map(item => (
+            <div
+              key={`shipped-custom-${item.id}`}
+              className="flex items-center gap-2 p-2.5 rounded-lg border bg-blue-500/10 border-blue-500/30"
+            >
+              <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
+              <span className="text-sm font-medium text-blue-600 dark:text-blue-400 flex-1">
+                {item.name}
+              </span>
+              {item.quantity > 1 && (
+                <Badge variant="outline" className="text-xs">
+                  ×{item.quantity}
+                </Badge>
+              )}
+              {/* Yellow batch number badge */}
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-amber-900 text-[10px] font-bold shadow-sm">
+                {item.batchNumber}
+              </span>
+              <Badge variant="outline" className="bg-blue-500/10 border-blue-500/50 text-blue-600 text-[10px] px-1.5 py-0">
+                Shipped
+              </Badge>
+            </div>
+          ))}
 
           {/* Order custom items - inline with construction items */}
           {orderCustomItems.map(item => {
