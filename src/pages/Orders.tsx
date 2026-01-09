@@ -1999,40 +1999,19 @@ export default function Orders() {
         </CardHeader>
         <CardContent className="pt-0">
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="mb-4 flex flex-wrap h-auto gap-1">
+            <TabsList className="mb-4">
               <TabsTrigger value="active" className="gap-2">
-                <PlayCircle className="h-4 w-4" />
-                Active
+                <Wrench className="h-4 w-4" />
+                Active Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => getCurrentOrderStatus(o) === 'active').length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="on_hold" className="gap-2">
-                <Pause className="h-4 w-4" />
-                On Hold
-                <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => getCurrentOrderStatus(o) === 'on_hold').length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="ready_to_deliver" className="gap-2">
-                <Truck className="h-4 w-4" />
-                Ready to Deliver
-                <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => getCurrentOrderStatus(o) === 'ready_to_deliver').length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="delivered" className="gap-2">
-                <PackageCheck className="h-4 w-4" />
-                Delivered
-                <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => getCurrentOrderStatus(o) === 'delivered').length}
+                  {filteredOrders.filter(o => !o.delivery_complete).length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="finished" className="gap-2">
-                <CheckCircle className="h-4 w-4" />
-                Finished
+                <Archive className="h-4 w-4" />
+                Finished Orders
                 <Badge variant="secondary" className="ml-1">
-                  {filteredOrders.filter(o => getCurrentOrderStatus(o) === 'finished').length}
+                  {filteredOrders.filter(o => o.delivery_complete).length}
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -2063,8 +2042,9 @@ export default function Orders() {
               }
             });
             
-            // Filter orders by current status
-            const statusFilteredOrders = sortOrders(filteredOrders.filter(o => getCurrentOrderStatus(o) === 'active'));
+            // Split orders by delivery status
+            const activeOrders = sortOrders(filteredOrders.filter(o => !o.delivery_complete));
+            const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
             
             // Render orders list helper
             const renderOrdersList = (ordersList: Order[], emptyMessage: string) => {
@@ -2874,304 +2854,140 @@ export default function Orders() {
             
             return (
               <>
-                {renderOrdersList(statusFilteredOrders, "No active orders found.")}
+                {renderOrdersList(activeOrders, "No active orders found.")}
               </>
             );
           })()}
             </TabsContent>
-            <TabsContent value="on_hold">
+            <TabsContent value="finished">
               {(() => {
+                // Sort orders helper
                 const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  if (a.is_priority && !b.is_priority) return -1;
-                  if (!a.is_priority && b.is_priority) return 1;
                   switch (sortBy) {
-                    case 'time_left_asc': return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                    case 'time_left_desc': return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                    case 'order_date_asc': return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                    case 'order_date_desc': return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                    case 'fulfillment_asc': return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                    case 'fulfillment_desc': return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                    default: return 0;
+                    case 'time_left_asc':
+                      return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
+                    case 'time_left_desc':
+                      return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
+                    case 'order_date_asc':
+                      return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
+                    case 'order_date_desc':
+                      return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
+                    case 'fulfillment_asc':
+                      return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
+                    case 'fulfillment_desc':
+                      return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
+                    default:
+                      return 0;
                   }
                 });
-                const statusFilteredOrders = sortOrders(filteredOrders.filter(o => getCurrentOrderStatus(o) === 'on_hold'));
                 
-                if (statusFilteredOrders.length === 0) {
-                  return (<div className="text-center py-12 text-muted-foreground"><p>No orders on hold</p></div>);
+                const finishedOrders = sortOrders(filteredOrders.filter(o => o.delivery_complete));
+                
+                if (finishedOrders.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <p>No finished orders found.</p>
+                    </div>
+                  );
                 }
+                
                 return (
                   <div className="space-y-3">
-                    {statusFilteredOrders.map(order => {
+                    {finishedOrders.map(order => {
                       const daysUntil = getDaysUntilDelivery(order.delivery_date);
                       const orderBatches = getOrderDeliveryBatches(order.id);
                       const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
+                      const deliveredBatches = orderBatches.filter(b => b.status === 'delivered').length;
+                      
                       return (
-                        <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                          {order.is_priority && (<div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />)}
+                        <div 
+                          key={order.id} 
+                          id={`order-${order.id}`} 
+                          className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} 
+                          onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}
+                        >
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">#{order.order_number}</span>
-                              <span className="font-medium truncate">{order.customer_name}</span>
-                              <Badge variant="outline" className="gap-1 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 shrink-0">
-                                <Pause className="h-3 w-3" />
-                                On Hold ({getDaysOnHold(order.hold_started_at)}d)
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className={daysUntil < 0 ? 'text-destructive font-medium' : ''}>
-                                {daysUntil < 0 ? `${Math.abs(daysUntil)} days overdue` : `${daysUntil} days left`}
+                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">
+                                #{order.order_number}
                               </span>
-                            </div>
-                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                              {(isAdmin || isManager) && (
-                                <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, order)} className="shrink-0">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {(isAdmin || isManager) && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-7 gap-1.5">
-                                      <Badge variant="outline" className="text-xs gap-1">{getStatusIcon(getCurrentOrderStatus(order))}{getCurrentStatusLabel(order)}</Badge>
-                                      <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="bg-popover">
-                                    <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'active')} className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}><PlayCircle className="h-4 w-4 mr-2 text-success" />Active</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'on_hold')} className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}><Pause className="h-4 w-4 mr-2 text-amber-500" />On Hold</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')} className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}><Truck className="h-4 w-4 mr-2 text-green-500" />Ready to Deliver</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')} className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}><PackageCheck className="h-4 w-4 mr-2 text-purple-500" />Delivered</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'finished')} className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}><CheckCircle className="h-4 w-4 mr-2 text-blue-500" />Finished</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </TabsContent>
-            <TabsContent value="ready_to_deliver">
-              {(() => {
-                const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  if (a.is_priority && !b.is_priority) return -1;
-                  if (!a.is_priority && b.is_priority) return 1;
-                  switch (sortBy) {
-                    case 'time_left_asc': return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                    case 'time_left_desc': return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                    case 'order_date_asc': return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                    case 'order_date_desc': return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                    case 'fulfillment_asc': return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                    case 'fulfillment_desc': return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                    default: return 0;
-                  }
-                });
-                const statusFilteredOrders = sortOrders(filteredOrders.filter(o => getCurrentOrderStatus(o) === 'ready_to_deliver'));
-                
-                if (statusFilteredOrders.length === 0) {
-                  return (<div className="text-center py-12 text-muted-foreground"><p>No orders ready to deliver</p></div>);
-                }
-                return (
-                  <div className="space-y-3">
-                    {statusFilteredOrders.map(order => {
-                      const daysUntil = getDaysUntilDelivery(order.delivery_date);
-                      const orderBatches = getOrderDeliveryBatches(order.id);
-                      const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      return (
-                        <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                          {order.is_priority && (<div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />)}
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">#{order.order_number}</span>
-                              <span className="font-medium truncate">{order.customer_name}</span>
-                              <Badge variant="outline" className="gap-1 text-xs border-green-500/50 text-green-600 dark:text-green-400 shrink-0">
-                                <Truck className="h-3 w-3" />
-                                Ready to Deliver
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className={daysUntil < 0 ? 'text-destructive font-medium' : ''}>
-                                {daysUntil < 0 ? `${Math.abs(daysUntil)} days overdue` : `${daysUntil} days left`}
+                              <span className="font-medium truncate">
+                                {order.customer_name}
                               </span>
-                            </div>
-                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                              {(isAdmin || isManager) && (
-                                <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, order)} className="shrink-0">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {(isAdmin || isManager) && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-7 gap-1.5">
-                                      <Badge variant="outline" className="text-xs gap-1">{getStatusIcon(getCurrentOrderStatus(order))}{getCurrentStatusLabel(order)}</Badge>
-                                      <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="bg-popover">
-                                    <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'active')} className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}><PlayCircle className="h-4 w-4 mr-2 text-success" />Active</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'on_hold')} className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}><Pause className="h-4 w-4 mr-2 text-amber-500" />On Hold</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')} className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}><Truck className="h-4 w-4 mr-2 text-green-500" />Ready to Deliver</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')} className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}><PackageCheck className="h-4 w-4 mr-2 text-purple-500" />Delivered</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'finished')} className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}><CheckCircle className="h-4 w-4 mr-2 text-blue-500" />Finished</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </TabsContent>
-            <TabsContent value="delivered">
-              {(() => {
-                const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  if (a.is_priority && !b.is_priority) return -1;
-                  if (!a.is_priority && b.is_priority) return 1;
-                  switch (sortBy) {
-                    case 'time_left_asc': return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                    case 'time_left_desc': return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                    case 'order_date_asc': return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                    case 'order_date_desc': return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                    case 'fulfillment_asc': return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                    case 'fulfillment_desc': return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                    default: return 0;
-                  }
-                });
-                const statusFilteredOrders = sortOrders(filteredOrders.filter(o => getCurrentOrderStatus(o) === 'delivered'));
-                
-                if (statusFilteredOrders.length === 0) {
-                  return (<div className="text-center py-12 text-muted-foreground"><p>No delivered orders</p></div>);
-                }
-                return (
-                  <div className="space-y-3">
-                    {statusFilteredOrders.map(order => {
-                      const orderBatches = getOrderDeliveryBatches(order.id);
-                      const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      return (
-                        <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                          {order.is_priority && (<div className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent border-t-[28px] border-t-yellow-500 rounded-tr-lg" />)}
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">#{order.order_number}</span>
-                              <span className="font-medium truncate">{order.customer_name}</span>
-                              <Badge variant="outline" className="gap-1 text-xs border-purple-500/50 text-purple-600 dark:text-purple-400 shrink-0">
-                                <PackageCheck className="h-3 w-3" />
+                              <Badge variant="outline" className="gap-1 text-xs border-success/50 text-success shrink-0">
+                                <CheckCircle className="h-3 w-3" />
                                 Delivered
                               </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span>Delivered {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
                               {shippedBatches > 0 && (
-                                <Badge variant="secondary" className="text-xs">{shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped</Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped
+                                </Badge>
                               )}
                             </div>
                             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               {(isAdmin || isManager) && (
-                                <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, order)} className="shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => handleEditClick(e, order)}
+                                  className="shrink-0"
+                                >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
+                              {/* Order Status Dropdown */}
                               {(isAdmin || isManager) && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-7 gap-1.5">
-                                      <Badge variant="outline" className="text-xs gap-1">{getStatusIcon(getCurrentOrderStatus(order))}{getCurrentStatusLabel(order)}</Badge>
+                                      <Badge variant="outline" className="text-xs gap-1">
+                                        {getStatusIcon(getCurrentOrderStatus(order))}
+                                        {getCurrentStatusLabel(order)}
+                                      </Badge>
                                       <ChevronDown className="h-3 w-3" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="bg-popover">
                                     <DropdownMenuLabel>Change Status</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'active')} className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}><PlayCircle className="h-4 w-4 mr-2 text-success" />Active</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'on_hold')} className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}><Pause className="h-4 w-4 mr-2 text-amber-500" />On Hold</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')} className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}><Truck className="h-4 w-4 mr-2 text-green-500" />Ready to Deliver</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')} className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}><PackageCheck className="h-4 w-4 mr-2 text-purple-500" />Delivered</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'finished')} className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}><CheckCircle className="h-4 w-4 mr-2 text-blue-500" />Finished</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </TabsContent>
-            <TabsContent value="finished">
-              {(() => {
-                const sortOrders = (ordersToSort: Order[]) => [...ordersToSort].sort((a, b) => {
-                  switch (sortBy) {
-                    case 'time_left_asc': return getDaysUntilDelivery(a.delivery_date) - getDaysUntilDelivery(b.delivery_date);
-                    case 'time_left_desc': return getDaysUntilDelivery(b.delivery_date) - getDaysUntilDelivery(a.delivery_date);
-                    case 'order_date_asc': return new Date(a.order_date).getTime() - new Date(b.order_date).getTime();
-                    case 'order_date_desc': return new Date(b.order_date).getTime() - new Date(a.order_date).getTime();
-                    case 'fulfillment_asc': return (a.fulfillment_percentage || 0) - (b.fulfillment_percentage || 0);
-                    case 'fulfillment_desc': return (b.fulfillment_percentage || 0) - (a.fulfillment_percentage || 0);
-                    default: return 0;
-                  }
-                });
-                const statusFilteredOrders = sortOrders(filteredOrders.filter(o => getCurrentOrderStatus(o) === 'finished'));
-                
-                if (statusFilteredOrders.length === 0) {
-                  return (<div className="text-center py-12 text-muted-foreground"><p>No finished orders</p></div>);
-                }
-                return (
-                  <div className="space-y-3">
-                    {statusFilteredOrders.map(order => {
-                      const orderBatches = getOrderDeliveryBatches(order.id);
-                      const shippedBatches = orderBatches.filter(b => b.status === 'shipped').length;
-                      return (
-                        <div key={order.id} id={`order-${order.id}`} className={`relative block p-4 rounded-lg border bg-card transition-colors ${(isAdmin || isManager) ? 'hover:bg-muted/50 cursor-pointer' : ''}`} onClick={() => (isAdmin || isManager) && navigate(`/orders/${order.id}`)}>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="font-mono text-sm font-semibold bg-muted px-2 py-1 rounded">#{order.order_number}</span>
-                              <span className="font-medium truncate">{order.customer_name}</span>
-                              <Badge variant="outline" className="gap-1 text-xs border-blue-500/50 text-blue-600 dark:text-blue-400 shrink-0">
-                                <CheckCircle className="h-3 w-3" />
-                                Finished
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>Completed {format(new Date(order.delivery_date), 'MMM d, yyyy')}</span>
-                              {shippedBatches > 0 && (
-                                <Badge variant="secondary" className="text-xs">{shippedBatches} batch{shippedBatches > 1 ? 'es' : ''} shipped</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                              {(isAdmin || isManager) && (
-                                <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, order)} className="shrink-0">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {(isAdmin || isManager) && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-7 gap-1.5">
-                                      <Badge variant="outline" className="text-xs gap-1">{getStatusIcon(getCurrentOrderStatus(order))}{getCurrentStatusLabel(order)}</Badge>
-                                      <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="bg-popover">
-                                    <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'active')} className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}><PlayCircle className="h-4 w-4 mr-2 text-success" />Active</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'on_hold')} className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}><Pause className="h-4 w-4 mr-2 text-amber-500" />On Hold</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')} className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}><Truck className="h-4 w-4 mr-2 text-green-500" />Ready to Deliver</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'delivered')} className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}><PackageCheck className="h-4 w-4 mr-2 text-purple-500" />Delivered</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleOrderStatusChange(order.id, 'finished')} className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}><CheckCircle className="h-4 w-4 mr-2 text-blue-500" />Finished</DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'active')}
+                                      className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}
+                                    >
+                                      <PlayCircle className="h-4 w-4 mr-2 text-success" />
+                                      Active
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'on_hold')}
+                                      className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}
+                                    >
+                                      <Pause className="h-4 w-4 mr-2 text-amber-500" />
+                                      On Hold
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')}
+                                      className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}
+                                    >
+                                      <Truck className="h-4 w-4 mr-2 text-green-500" />
+                                      Ready to Deliver
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'delivered')}
+                                      className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}
+                                    >
+                                      <PackageCheck className="h-4 w-4 mr-2 text-purple-500" />
+                                      Delivered
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'finished')}
+                                      className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-2 text-blue-500" />
+                                      Finished
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               )}
