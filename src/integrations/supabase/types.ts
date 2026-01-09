@@ -1101,6 +1101,7 @@ export type Database = {
           plisse_screens_status: string | null
           plisse_window_count: number | null
           production_status: string
+          ready_to_deliver: boolean | null
           reinforcement_order_date: string | null
           reinforcement_status: string | null
           screen_profile_available: boolean | null
@@ -1158,6 +1159,7 @@ export type Database = {
           plisse_screens_status?: string | null
           plisse_window_count?: number | null
           production_status?: string
+          ready_to_deliver?: boolean | null
           reinforcement_order_date?: string | null
           reinforcement_status?: string | null
           screen_profile_available?: boolean | null
@@ -1215,6 +1217,7 @@ export type Database = {
           plisse_screens_status?: string | null
           plisse_window_count?: number | null
           production_status?: string
+          ready_to_deliver?: boolean | null
           reinforcement_order_date?: string | null
           reinforcement_status?: string | null
           screen_profile_available?: boolean | null
