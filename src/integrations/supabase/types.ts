@@ -1070,6 +1070,7 @@ export type Database = {
           created_by: string | null
           customer_id: string
           customer_name: string
+          delivered: boolean | null
           delivery_complete: boolean | null
           delivery_date: string
           doors_count: number | null
@@ -1128,6 +1129,7 @@ export type Database = {
           created_by?: string | null
           customer_id: string
           customer_name: string
+          delivered?: boolean | null
           delivery_complete?: boolean | null
           delivery_date: string
           doors_count?: number | null
@@ -1186,6 +1188,7 @@ export type Database = {
           created_by?: string | null
           customer_id?: string
           customer_name?: string
+          delivered?: boolean | null
           delivery_complete?: boolean | null
           delivery_date?: string
           doors_count?: number | null

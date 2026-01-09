@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, ChevronDown } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, ChevronDown, PackageCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1509,6 +1509,7 @@ export default function Orders() {
   // Order status helpers
   const getCurrentOrderStatus = (order: Order): string => {
     if (order.delivery_complete) return 'finished';
+    if ((order as any).delivered) return 'delivered';
     if ((order as any).ready_to_deliver) return 'ready_to_deliver';
     if (order.production_status === 'hold') return 'on_hold';
     return 'active';
@@ -1518,6 +1519,7 @@ export default function Orders() {
     const status = getCurrentOrderStatus(order);
     switch (status) {
       case 'finished': return 'Finished';
+      case 'delivered': return 'Delivered';
       case 'ready_to_deliver': return 'Ready to Deliver';
       case 'on_hold': return 'On Hold';
       default: return 'Active';
@@ -1527,6 +1529,7 @@ export default function Orders() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'finished': return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'delivered': return <PackageCheck className="h-4 w-4 text-purple-500" />;
       case 'ready_to_deliver': return <Truck className="h-4 w-4 text-green-500" />;
       case 'on_hold': return <Pause className="h-4 w-4 text-amber-500" />;
       default: return <PlayCircle className="h-4 w-4 text-success" />;
@@ -1540,24 +1543,35 @@ export default function Orders() {
       switch (newStatus) {
         case 'active':
           updates.delivery_complete = false;
+          updates.delivered = false;
           updates.ready_to_deliver = false;
           updates.production_status = 'production_ready';
           updates.hold_started_at = null;
           break;
         case 'on_hold':
           updates.delivery_complete = false;
+          updates.delivered = false;
           updates.ready_to_deliver = false;
           updates.production_status = 'hold';
           updates.hold_started_at = new Date().toISOString();
           break;
         case 'ready_to_deliver':
           updates.delivery_complete = false;
+          updates.delivered = false;
           updates.ready_to_deliver = true;
+          updates.production_status = 'production_ready';
+          updates.hold_started_at = null;
+          break;
+        case 'delivered':
+          updates.delivery_complete = false;
+          updates.delivered = true;
+          updates.ready_to_deliver = false;
           updates.production_status = 'production_ready';
           updates.hold_started_at = null;
           break;
         case 'finished':
           updates.delivery_complete = true;
+          updates.delivered = false;
           updates.ready_to_deliver = false;
           updates.production_status = 'production_ready';
           updates.hold_started_at = null;
@@ -1582,6 +1596,7 @@ export default function Orders() {
         'active': 'Active',
         'on_hold': 'On Hold',
         'ready_to_deliver': 'Ready to Deliver',
+        'delivered': 'Delivered',
         'finished': 'Finished'
       };
       
@@ -2814,6 +2829,13 @@ export default function Orders() {
                               Ready to Deliver
                             </DropdownMenuItem>
                             <DropdownMenuItem 
+                              onClick={() => handleOrderStatusChange(order.id, 'delivered')}
+                              className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}
+                            >
+                              <PackageCheck className="h-4 w-4 mr-2 text-purple-500" />
+                              Delivered
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
                               onClick={() => handleOrderStatusChange(order.id, 'finished')}
                               className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
                             >
@@ -2951,6 +2973,13 @@ export default function Orders() {
                                     >
                                       <Truck className="h-4 w-4 mr-2 text-green-500" />
                                       Ready to Deliver
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'delivered')}
+                                      className={getCurrentOrderStatus(order) === 'delivered' ? 'bg-accent' : ''}
+                                    >
+                                      <PackageCheck className="h-4 w-4 mr-2 text-purple-500" />
+                                      Delivered
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
                                       onClick={() => handleOrderStatusChange(order.id, 'finished')}
