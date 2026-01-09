@@ -1509,6 +1509,7 @@ export default function Orders() {
   // Order status helpers
   const getCurrentOrderStatus = (order: Order): string => {
     if (order.delivery_complete) return 'finished';
+    if ((order as any).ready_to_deliver) return 'ready_to_deliver';
     if (order.production_status === 'hold') return 'on_hold';
     return 'active';
   };
@@ -1517,6 +1518,7 @@ export default function Orders() {
     const status = getCurrentOrderStatus(order);
     switch (status) {
       case 'finished': return 'Finished';
+      case 'ready_to_deliver': return 'Ready to Deliver';
       case 'on_hold': return 'On Hold';
       default: return 'Active';
     }
@@ -1525,6 +1527,7 @@ export default function Orders() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'finished': return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'ready_to_deliver': return <Truck className="h-4 w-4 text-green-500" />;
       case 'on_hold': return <Pause className="h-4 w-4 text-amber-500" />;
       default: return <PlayCircle className="h-4 w-4 text-success" />;
     }
@@ -1537,16 +1540,25 @@ export default function Orders() {
       switch (newStatus) {
         case 'active':
           updates.delivery_complete = false;
+          updates.ready_to_deliver = false;
           updates.production_status = 'production_ready';
           updates.hold_started_at = null;
           break;
         case 'on_hold':
           updates.delivery_complete = false;
+          updates.ready_to_deliver = false;
           updates.production_status = 'hold';
           updates.hold_started_at = new Date().toISOString();
           break;
+        case 'ready_to_deliver':
+          updates.delivery_complete = false;
+          updates.ready_to_deliver = true;
+          updates.production_status = 'production_ready';
+          updates.hold_started_at = null;
+          break;
         case 'finished':
           updates.delivery_complete = true;
+          updates.ready_to_deliver = false;
           updates.production_status = 'production_ready';
           updates.hold_started_at = null;
           break;
@@ -1569,6 +1581,7 @@ export default function Orders() {
       const statusLabels: Record<string, string> = {
         'active': 'Active',
         'on_hold': 'On Hold',
+        'ready_to_deliver': 'Ready to Deliver',
         'finished': 'Finished'
       };
       
@@ -2794,11 +2807,18 @@ export default function Orders() {
                               On Hold
                             </DropdownMenuItem>
                             <DropdownMenuItem 
+                              onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')}
+                              className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}
+                            >
+                              <Truck className="h-4 w-4 mr-2 text-green-500" />
+                              Ready to Deliver
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
                               onClick={() => handleOrderStatusChange(order.id, 'finished')}
                               className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
                             >
                               <CheckCircle className="h-4 w-4 mr-2 text-blue-500" />
-                              Finished / Shipped
+                              Finished
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -2926,11 +2946,18 @@ export default function Orders() {
                                       On Hold
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'ready_to_deliver')}
+                                      className={getCurrentOrderStatus(order) === 'ready_to_deliver' ? 'bg-accent' : ''}
+                                    >
+                                      <Truck className="h-4 w-4 mr-2 text-green-500" />
+                                      Ready to Deliver
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
                                       onClick={() => handleOrderStatusChange(order.id, 'finished')}
                                       className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
                                     >
                                       <CheckCircle className="h-4 w-4 mr-2 text-blue-500" />
-                                      Finished / Shipped
+                                      Finished
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
