@@ -184,6 +184,8 @@ interface Order {
   production_status: string;
   hold_started_at: string | null;
   is_priority: boolean | null;
+  ready_to_deliver: boolean | null;
+  delivered: boolean | null;
   delivery_complete: boolean | null;
   // Ordering tracking fields
   ordering_updated_at: string | null;
@@ -1897,7 +1899,13 @@ export default function Orders() {
     
     if (!matchesSeller) return false;
     if (statusFilter === "all") return matchesSearch;
+    
+    // Order status filters
     if (statusFilter === "on_hold") return matchesSearch && order.production_status === 'hold';
+    if (statusFilter === "active") return matchesSearch && order.production_status === 'production_ready' && !order.ready_to_deliver && !order.delivered && !order.delivery_complete;
+    if (statusFilter === "ready_to_deliver") return matchesSearch && order.ready_to_deliver && !order.delivered && !order.delivery_complete;
+    if (statusFilter === "delivered") return matchesSearch && order.delivered && !order.delivery_complete;
+    if (statusFilter === "finished") return matchesSearch && order.delivery_complete;
     if (statusFilter === "production_ready") return matchesSearch && order.production_status === 'production_ready';
     if (statusFilter === "complete") return matchesSearch && order.fulfillment_percentage >= 90;
     
@@ -1946,11 +1954,19 @@ export default function Orders() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectLabel className="text-xs text-muted-foreground">Status</SelectLabel>
+                  <SelectLabel className="text-xs text-muted-foreground">Order Status</SelectLabel>
                   <SelectItem value="all">All Orders</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="ready_to_deliver">Ready to Deliver</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="finished">Finished</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">Production</SelectLabel>
                   <SelectItem value="production_ready">Production Ready</SelectItem>
-                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="complete">Complete (90%+)</SelectItem>
                 </SelectGroup>
                 <SelectSeparator />
                 <SelectGroup>
