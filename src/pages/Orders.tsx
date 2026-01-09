@@ -5,7 +5,15 @@ import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, AlertCircle, Clock, Wrench, Truck, BoxIcon, CheckCircle, Pause, PlayCircle, Grid3X3, Lock, Star, ShoppingCart, Archive, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProgressCircle } from "@/components/ui/progress-circle";
@@ -1498,6 +1506,85 @@ export default function Orders() {
     return Math.floor((now.getTime() - holdDate.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  // Order status helpers
+  const getCurrentOrderStatus = (order: Order): string => {
+    if (order.delivery_complete) return 'finished';
+    if (order.production_status === 'hold') return 'on_hold';
+    return 'active';
+  };
+
+  const getCurrentStatusLabel = (order: Order): string => {
+    const status = getCurrentOrderStatus(order);
+    switch (status) {
+      case 'finished': return 'Finished';
+      case 'on_hold': return 'On Hold';
+      default: return 'Active';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'finished': return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'on_hold': return <Pause className="h-4 w-4 text-amber-500" />;
+      default: return <PlayCircle className="h-4 w-4 text-success" />;
+    }
+  };
+
+  const handleOrderStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      const updates: Record<string, any> = {};
+      
+      switch (newStatus) {
+        case 'active':
+          updates.delivery_complete = false;
+          updates.production_status = 'production_ready';
+          updates.hold_started_at = null;
+          break;
+        case 'on_hold':
+          updates.delivery_complete = false;
+          updates.production_status = 'hold';
+          updates.hold_started_at = new Date().toISOString();
+          break;
+        case 'finished':
+          updates.delivery_complete = true;
+          updates.production_status = 'production_ready';
+          updates.hold_started_at = null;
+          break;
+      }
+      
+      const { error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, ...updates }
+          : order
+      ));
+      
+      const statusLabels: Record<string, string> = {
+        'active': 'Active',
+        'on_hold': 'On Hold',
+        'finished': 'Finished'
+      };
+      
+      toast({
+        title: "Status updated",
+        description: `Order status changed to ${statusLabels[newStatus]}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update order status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleComponentStatusChange = async (orderId: string, field: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -2674,6 +2761,49 @@ export default function Orders() {
                         />
                       </div>
                     )}
+
+                    {/* Order Status Dropdown */}
+                    {(isAdmin || isManager) && (
+                      <div className="mt-3 pt-3 border-t border-border" onClick={e => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 gap-1.5">
+                              <span className="text-xs text-muted-foreground">Status:</span>
+                              <Badge variant="outline" className="text-xs gap-1">
+                                {getStatusIcon(getCurrentOrderStatus(order))}
+                                {getCurrentStatusLabel(order)}
+                              </Badge>
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="bg-popover">
+                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleOrderStatusChange(order.id, 'active')}
+                              className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}
+                            >
+                              <PlayCircle className="h-4 w-4 mr-2 text-success" />
+                              Active
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleOrderStatusChange(order.id, 'on_hold')}
+                              className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}
+                            >
+                              <Pause className="h-4 w-4 mr-2 text-amber-500" />
+                              On Hold
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleOrderStatusChange(order.id, 'finished')}
+                              className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2 text-blue-500" />
+                              Finished / Shipped
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </div>;
                   })}
                 </div>
@@ -2765,6 +2895,45 @@ export default function Orders() {
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
+                              )}
+                              {/* Order Status Dropdown */}
+                              {(isAdmin || isManager) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-7 gap-1.5">
+                                      <Badge variant="outline" className="text-xs gap-1">
+                                        {getStatusIcon(getCurrentOrderStatus(order))}
+                                        {getCurrentStatusLabel(order)}
+                                      </Badge>
+                                      <ChevronDown className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-popover">
+                                    <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'active')}
+                                      className={getCurrentOrderStatus(order) === 'active' ? 'bg-accent' : ''}
+                                    >
+                                      <PlayCircle className="h-4 w-4 mr-2 text-success" />
+                                      Active
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'on_hold')}
+                                      className={getCurrentOrderStatus(order) === 'on_hold' ? 'bg-accent' : ''}
+                                    >
+                                      <Pause className="h-4 w-4 mr-2 text-amber-500" />
+                                      On Hold
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleOrderStatusChange(order.id, 'finished')}
+                                      className={getCurrentOrderStatus(order) === 'finished' ? 'bg-accent' : ''}
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-2 text-blue-500" />
+                                      Finished / Shipped
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </div>
                           </div>
