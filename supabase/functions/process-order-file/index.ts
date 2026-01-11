@@ -513,7 +513,11 @@ function compareResults(result1: ParsedOrder, result2: ParsedOrder) {
 }
 
 async function extractWithModel(model: string, textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
-  const GOOGLE_API_KEY = 'AIzaSyDx3gGccZCSaPw-zct5jK2JxwfvEwvN8w0';
+  const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+  
+  if (!GOOGLE_API_KEY) {
+    throw new Error("GOOGLE_API_KEY is not configured");
+  }
 
   const startTime = Date.now();
   console.log(`Extracting with ${model}...`);
