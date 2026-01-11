@@ -564,9 +564,9 @@ export function useDashboardData() {
         });
       }
 
-      // Process orders
+      // Process orders - include all non-delivery_complete orders for dashboard visibility
       const processedOrders: PriorityOrder[] = (ordersData || [])
-        .filter(order => (order.fulfillment_percentage || 0) < 100 && !order.delivery_complete)
+        .filter(order => !order.delivery_complete)
         .map(order => {
           const orderWithFulfillment: OrderWithFulfillment = {
             id: order.id,
