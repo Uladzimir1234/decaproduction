@@ -1910,7 +1910,7 @@ export default function Orders() {
     if (statusFilter === "delivered") return matchesSearch && order.delivered && !order.delivery_complete;
     if (statusFilter === "finished") return matchesSearch && order.delivery_complete;
     if (statusFilter === "production_ready") return matchesSearch && order.production_status === 'production_ready';
-    if (statusFilter === "complete") return matchesSearch && order.fulfillment_percentage >= 90;
+    if (statusFilter === "complete") return matchesSearch && (order.fulfillment_percentage || 0) >= 90;
     
     // Component "Needs Ordering" filters
     if (statusFilter === "needs_reinforcement") return matchesSearch && orderNeedsComponent(order, 'reinforcement');
