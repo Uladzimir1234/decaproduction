@@ -121,7 +121,7 @@ export default function Dashboard() {
       <OrderStatistics orders={orders.map(o => ({
         id: o.id,
         order_date: o.order_date,
-        fulfillment_percentage: o.fulfillment_percentage,
+        fulfillment_percentage: o.manufacturingProgress,
         delivery_complete: o.delivery_complete,
       }))} />
 
