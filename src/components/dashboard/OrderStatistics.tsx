@@ -219,28 +219,41 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
             >
               Orders by Completion
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Based on weighted manufacturing progress
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {ordersByCompletion.map((bucket) => (
               <div 
                 key={bucket.label} 
-                className="space-y-1 cursor-pointer hover:bg-muted/50 rounded-md p-2 -mx-2 transition-colors"
+                className="cursor-pointer hover:bg-muted/50 rounded-md p-2 -mx-2 transition-colors group"
                 onClick={() => handleNavigate(bucket.filterKey)}
               >
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{bucket.label}</span>
-                  <span className={bucket.count > 0 ? "font-medium text-primary" : "text-muted-foreground"}>
-                    {bucket.count} orders
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className={`font-medium ${bucket.count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {bucket.label}
+                  </span>
+                  <span className={`font-semibold ${bucket.count > 0 ? 'text-primary group-hover:underline' : 'text-muted-foreground'}`}>
+                    {bucket.count} order{bucket.count !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                   <div 
                     className={`h-full ${bucket.color} rounded-full transition-all duration-500`}
-                    style={{ width: `${Math.max(bucket.percentage, bucket.count > 0 ? 5 : 0)}%` }}
+                    style={{ width: `${Math.max(bucket.percentage, bucket.count > 0 ? 8 : 0)}%` }}
                   />
                 </div>
               </div>
             ))}
+            
+            {/* Summary footer */}
+            <div className="pt-3 mt-3 border-t border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total Active Orders</span>
+                <span className="font-bold text-foreground">{totalActive}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
