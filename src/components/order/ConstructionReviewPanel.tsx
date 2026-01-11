@@ -80,9 +80,9 @@ function FieldRow({
         <span className="text-sm text-muted-foreground w-32 shrink-0">{label}:</span>
         {type === "select" && options ? (
           <Select 
-            value={displayValue || ""} 
+            value={displayValue || "___none___"} 
             onValueChange={(v) => {
-              onEdit(v);
+              onEdit(v === "___none___" ? "" : v);
               setIsEditing(false);
             }}
           >
@@ -90,7 +90,7 @@ function FieldRow({
               <SelectValue placeholder={placeholder || "Select..."} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="___none___">None</SelectItem>
               {options.map(opt => (
                 <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
               ))}
