@@ -15,12 +15,13 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, X, FileText, AlertCircle, Sparkles, Loader2 } from "lucide-react";
-import { ParsedOrderData } from "./FileUploadZone";
+import { Check, X, FileText, AlertCircle, Sparkles, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { ParsedOrderData, ParsedConstruction } from "./FileUploadZone";
 import { supabase } from "@/integrations/supabase/client";
 import { createAuditLog } from "@/lib/auditLog";
 import { useToast } from "@/hooks/use-toast";
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ConstructionReviewPanel } from "./ConstructionReviewPanel";
 interface SlidingDoorEntry {
   type: string;
   count: number;
@@ -115,6 +116,12 @@ export function ExtractionConfirmationDialog({
   
   // Track what was detected from file
   const [detectedFields, setDetectedFields] = useState<Set<string>>(new Set());
+  
+  // Editable constructions - initialize from parsed data
+  const [editedConstructions, setEditedConstructions] = useState<ParsedConstruction[]>([]);
+  
+  // Collapsible state for constructions section
+  const [constructionsOpen, setConstructionsOpen] = useState(true);
 
   // Initialize form when parsedData changes
   if (parsedData && !initialized) {
@@ -259,8 +266,19 @@ export function ExtractionConfirmationDialog({
     setColorExterior(detectedColorExterior);
     setColorInterior(detectedColorInterior);
     setDetectedFields(detected);
+    // Initialize editable constructions from parsed data
+    setEditedConstructions([...parsedData.constructions]);
     setInitialized(true);
   }
+  
+  // Handler for construction edits
+  const handleConstructionChange = (index: number, updates: Partial<ParsedConstruction>) => {
+    setEditedConstructions(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], ...updates };
+      return updated;
+    });
+  };
 
   // Reset initialized when dialog closes
   const handleOpenChange = (newOpen: boolean) => {
@@ -339,8 +357,8 @@ export function ExtractionConfirmationDialog({
       
       if (orderError) throw orderError;
       
-      // Save constructions
-      const constructionsToInsert = parsedData.constructions.map((c, index) => ({
+      // Save constructions - use edited constructions instead of original parsed data
+      const constructionsToInsert = editedConstructions.map((c, index) => ({
         order_id: orderData.id,
         construction_number: c.construction_number,
         construction_type: c.construction_type,
@@ -400,10 +418,10 @@ export function ExtractionConfirmationDialog({
             
             await supabase.from('construction_components').insert(aggregatedComponentsToInsert);
           } else {
-            // Fallback: Aggregate components manually from constructions
+            // Fallback: Aggregate components manually from edited constructions
             const componentMap = new Map<string, { type: string; name: string | null; qty: number }>();
             
-            for (const construction of parsedData.constructions) {
+            for (const construction of editedConstructions) {
               if (construction.components && construction.components.length > 0) {
                 for (const comp of construction.components) {
                   const key = `${comp.component_type}::${comp.component_name || ''}`;
@@ -489,14 +507,14 @@ export function ExtractionConfirmationDialog({
       
       await createAuditLog({
         action: 'order_created',
-        description: `Created order #${orderNumber} for ${customerName} with ${parsedData.constructions.length} constructions`,
+        description: `Created order #${orderNumber} for ${customerName} with ${editedConstructions.length} constructions`,
         entityType: 'order',
         entityId: orderData.id,
       });
       
       toast({
         title: "Order created",
-        description: `Order #${orderNumber} created with ${parsedData.constructions.length} constructions`,
+        description: `Order #${orderNumber} created with ${editedConstructions.length} constructions`,
       });
       
       onOrderCreated();
@@ -577,6 +595,37 @@ export function ExtractionConfirmationDialog({
                 </p>
               </div>
             </div>
+
+            {/* Constructions Detail - Collapsible section to review AI extracted details */}
+            <Collapsible open={constructionsOpen} onOpenChange={setConstructionsOpen}>
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between py-2 border-b">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    {constructionsOpen ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Constructions Detail (AI Extracted)
+                    <Badge variant="secondary" className="ml-1">
+                      {editedConstructions.length} items
+                    </Badge>
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    Click to {constructionsOpen ? 'collapse' : 'expand'} • Click any field to edit
+                  </span>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  <ConstructionReviewPanel
+                    constructions={editedConstructions}
+                    onConstructionChange={handleConstructionChange}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Basic Info */}
             <div className="space-y-4">
