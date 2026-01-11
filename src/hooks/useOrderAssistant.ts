@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { BACKEND_PUBLISHABLE_KEY, BACKEND_URL } from "@/integrations/supabase/client-runtime";
 
 export interface Message {
   id: string;
@@ -41,7 +42,7 @@ export function useOrderAssistant() {
     };
 
     try {
-      const chatUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-assistant`;
+      const chatUrl = `${BACKEND_URL}/functions/v1/order-assistant`;
       
       // Build message history for context
       const historyMessages = [...messages, userMsg].slice(-10).map((m) => ({
@@ -53,7 +54,7 @@ export function useOrderAssistant() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${BACKEND_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({ messages: historyMessages }),
       });
