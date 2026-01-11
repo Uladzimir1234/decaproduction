@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, AlertCircle, TrendingUp, Clock } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { useNavigate } from "react-router-dom";
 
 interface Order {
   id: string;
@@ -15,22 +15,22 @@ interface OrderStatisticsProps {
 
 // Age buckets in days
 const AGE_BUCKETS = [
-  { label: "0-30 days", min: 0, max: 30 },
-  { label: "31-40 days", min: 31, max: 40 },
-  { label: "41-50 days", min: 41, max: 50 },
-  { label: "51-60 days", min: 51, max: 60 },
-  { label: "61-70 days", min: 61, max: 70 },
-  { label: "70+ days", min: 70, max: Infinity },
+  { label: "0-30 days", min: 0, max: 30, filterKey: "age_0_30" },
+  { label: "31-40 days", min: 31, max: 40, filterKey: "age_31_40" },
+  { label: "41-50 days", min: 41, max: 50, filterKey: "age_41_50" },
+  { label: "51-60 days", min: 51, max: 60, filterKey: "age_51_60" },
+  { label: "61-70 days", min: 61, max: 70, filterKey: "age_61_70" },
+  { label: "70+ days", min: 70, max: Infinity, filterKey: "age_70_plus" },
 ];
 
 // Completion buckets in percentage
 const COMPLETION_BUCKETS = [
-  { label: "0-20%", min: 0, max: 20 },
-  { label: "20-40%", min: 20, max: 40 },
-  { label: "40-60%", min: 40, max: 60 },
-  { label: "60-80%", min: 60, max: 80 },
-  { label: "80-90%", min: 80, max: 90 },
-  { label: "90-100%", min: 90, max: 100 },
+  { label: "0-20%", min: 0, max: 20, filterKey: "completion_0_20" },
+  { label: "20-40%", min: 20, max: 40, filterKey: "completion_20_40" },
+  { label: "40-60%", min: 40, max: 60, filterKey: "completion_40_60" },
+  { label: "60-80%", min: 60, max: 80, filterKey: "completion_60_80" },
+  { label: "80-90%", min: 80, max: 90, filterKey: "completion_80_90" },
+  { label: "90-100%", min: 90, max: 100, filterKey: "completion_90_100" },
 ];
 
 // Color progression for age (blue to red for urgency)
@@ -60,6 +60,8 @@ function getOrderAgeInDays(orderDate: string): number {
 }
 
 export function OrderStatistics({ orders }: OrderStatisticsProps) {
+  const navigate = useNavigate();
+  
   // Only count active orders (not delivery_complete)
   const activeOrders = orders.filter(o => !o.delivery_complete);
   const totalActive = activeOrders.length;
@@ -115,6 +117,7 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
       icon: Package,
       bgColor: "bg-blue-100 dark:bg-blue-900/30",
       iconColor: "text-blue-500",
+      filterKey: "all",
     },
     {
       label: "Urgent (70+ days)",
@@ -122,6 +125,7 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
       icon: AlertCircle,
       bgColor: "bg-red-100 dark:bg-red-900/30",
       iconColor: "text-red-500",
+      filterKey: "urgent_70_plus",
     },
     {
       label: "Near Completion",
@@ -129,6 +133,7 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
       icon: TrendingUp,
       bgColor: "bg-green-100 dark:bg-green-900/30",
       iconColor: "text-green-500",
+      filterKey: "near_completion",
     },
     {
       label: "In Progress",
@@ -136,15 +141,24 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
       icon: Clock,
       bgColor: "bg-amber-100 dark:bg-amber-900/30",
       iconColor: "text-amber-500",
+      filterKey: "in_progress",
     },
   ];
+
+  const handleNavigate = (filterKey: string) => {
+    navigate(`/orders?filter=${filterKey}`);
+  };
 
   return (
     <div className="space-y-6">
       {/* Summary Metrics Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {summaryMetrics.map((metric) => (
-          <Card key={metric.label} className="border-0 shadow-sm">
+          <Card 
+            key={metric.label} 
+            className="border-0 shadow-sm cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+            onClick={() => handleNavigate(metric.filterKey)}
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -165,11 +179,20 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
         {/* Orders by Age */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">Orders by Age</CardTitle>
+            <CardTitle 
+              className="text-lg font-semibold cursor-pointer hover:text-primary transition-colors"
+              onClick={() => handleNavigate("all")}
+            >
+              Orders by Age
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {ordersByAge.map((bucket, index) => (
-              <div key={bucket.label} className="space-y-1">
+            {ordersByAge.map((bucket) => (
+              <div 
+                key={bucket.label} 
+                className="space-y-1 cursor-pointer hover:bg-muted/50 rounded-md p-2 -mx-2 transition-colors"
+                onClick={() => handleNavigate(bucket.filterKey)}
+              >
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{bucket.label}</span>
                   <span className={bucket.count > 0 ? "font-medium text-primary" : "text-muted-foreground"}>
@@ -190,11 +213,20 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
         {/* Orders by Completion */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">Orders by Completion</CardTitle>
+            <CardTitle 
+              className="text-lg font-semibold cursor-pointer hover:text-primary transition-colors"
+              onClick={() => handleNavigate("all")}
+            >
+              Orders by Completion
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {ordersByCompletion.map((bucket, index) => (
-              <div key={bucket.label} className="space-y-1">
+            {ordersByCompletion.map((bucket) => (
+              <div 
+                key={bucket.label} 
+                className="space-y-1 cursor-pointer hover:bg-muted/50 rounded-md p-2 -mx-2 transition-colors"
+                onClick={() => handleNavigate(bucket.filterKey)}
+              >
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{bucket.label}</span>
                   <span className={bucket.count > 0 ? "font-medium text-primary" : "text-muted-foreground"}>

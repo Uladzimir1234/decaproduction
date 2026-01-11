@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -217,8 +217,11 @@ export default function Orders() {
   const [fulfillments, setFulfillments] = useState<Record<string, OrderFulfillment>>({});
   const [sellers, setSellers] = useState<Record<string, { email: string; full_name: string | null }>>({});
   const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    return searchParams.get('filter') || "all";
+  });
   const [sellerFilter, setSellerFilter] = useState<string>("all");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -1919,6 +1922,49 @@ export default function Orders() {
     if (statusFilter === "needs_plisse") return matchesSearch && orderNeedsComponent(order, 'plisse');
     if (statusFilter === "needs_blinds") return matchesSearch && orderNeedsComponent(order, 'blinds');
     
+    // Age-based filters (days since order_date)
+    const getOrderAge = (o: Order) => {
+      const orderDate = new Date(o.order_date);
+      const today = new Date();
+      return Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+    };
+    
+    if (statusFilter === "age_0_30") return matchesSearch && !order.delivery_complete && getOrderAge(order) <= 30;
+    if (statusFilter === "age_31_40") return matchesSearch && !order.delivery_complete && getOrderAge(order) >= 31 && getOrderAge(order) <= 40;
+    if (statusFilter === "age_41_50") return matchesSearch && !order.delivery_complete && getOrderAge(order) >= 41 && getOrderAge(order) <= 50;
+    if (statusFilter === "age_51_60") return matchesSearch && !order.delivery_complete && getOrderAge(order) >= 51 && getOrderAge(order) <= 60;
+    if (statusFilter === "age_61_70") return matchesSearch && !order.delivery_complete && getOrderAge(order) >= 61 && getOrderAge(order) <= 70;
+    if (statusFilter === "age_70_plus") return matchesSearch && !order.delivery_complete && getOrderAge(order) > 70;
+    
+    // Completion-based filters
+    const fulfillment = order.fulfillment_percentage || 0;
+    if (statusFilter === "completion_0_20") return matchesSearch && !order.delivery_complete && fulfillment < 20;
+    if (statusFilter === "completion_20_40") return matchesSearch && !order.delivery_complete && fulfillment >= 20 && fulfillment < 40;
+    if (statusFilter === "completion_40_60") return matchesSearch && !order.delivery_complete && fulfillment >= 40 && fulfillment < 60;
+    if (statusFilter === "completion_60_80") return matchesSearch && !order.delivery_complete && fulfillment >= 60 && fulfillment < 80;
+    if (statusFilter === "completion_80_90") return matchesSearch && !order.delivery_complete && fulfillment >= 80 && fulfillment < 90;
+    if (statusFilter === "completion_90_100") return matchesSearch && !order.delivery_complete && fulfillment >= 90;
+    
+    // Summary metrics from OrderStatistics
+    if (statusFilter === "urgent_70_plus") return matchesSearch && !order.delivery_complete && getOrderAge(order) >= 70;
+    if (statusFilter === "near_completion") return matchesSearch && !order.delivery_complete && fulfillment >= 80;
+    if (statusFilter === "in_progress") return matchesSearch && !order.delivery_complete && fulfillment > 0 && fulfillment < 80;
+    
+    // MetricsStrip filters - critical and at_risk based on days until delivery
+    const getDaysUntilDelivery = (o: Order) => {
+      const deliveryDate = new Date(o.delivery_date);
+      const today = new Date();
+      return Math.floor((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    };
+    
+    if (statusFilter === "critical") return matchesSearch && !order.delivery_complete && getDaysUntilDelivery(order) < 0;
+    if (statusFilter === "at_risk") return matchesSearch && !order.delivery_complete && getDaysUntilDelivery(order) >= 0 && getDaysUntilDelivery(order) <= 7;
+    
+    // Batch-related filters
+    const orderBatches = deliveryBatches.filter(b => b.order_id === order.id);
+    if (statusFilter === "batches_preparing") return matchesSearch && orderBatches.some(b => b.status === 'preparing');
+    if (statusFilter === "batches_shipped") return matchesSearch && orderBatches.some(b => b.status === 'shipped');
+    
     return matchesSearch;
   });
   if (loading) {
@@ -1979,6 +2025,34 @@ export default function Orders() {
                   <SelectItem value="needs_nail_fins">Nail Fins</SelectItem>
                   <SelectItem value="needs_plisse">Plisse Screens</SelectItem>
                   <SelectItem value="needs_blinds">Blinds</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">By Age (Days)</SelectLabel>
+                  <SelectItem value="age_0_30">0-30 Days</SelectItem>
+                  <SelectItem value="age_31_40">31-40 Days</SelectItem>
+                  <SelectItem value="age_41_50">41-50 Days</SelectItem>
+                  <SelectItem value="age_51_60">51-60 Days</SelectItem>
+                  <SelectItem value="age_61_70">61-70 Days</SelectItem>
+                  <SelectItem value="age_70_plus">70+ Days (Urgent)</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">By Completion</SelectLabel>
+                  <SelectItem value="completion_0_20">0-20%</SelectItem>
+                  <SelectItem value="completion_20_40">20-40%</SelectItem>
+                  <SelectItem value="completion_40_60">40-60%</SelectItem>
+                  <SelectItem value="completion_60_80">60-80%</SelectItem>
+                  <SelectItem value="completion_80_90">80-90%</SelectItem>
+                  <SelectItem value="completion_90_100">90-100%</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-muted-foreground">Delivery Status</SelectLabel>
+                  <SelectItem value="critical">Critical (Overdue)</SelectItem>
+                  <SelectItem value="at_risk">At Risk (≤7 days)</SelectItem>
+                  <SelectItem value="batches_preparing">Batches Preparing</SelectItem>
+                  <SelectItem value="batches_shipped">Batches Shipped</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
