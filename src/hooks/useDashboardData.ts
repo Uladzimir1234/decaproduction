@@ -500,8 +500,20 @@ export function useDashboardData() {
       const orderIds = (ordersData || []).map(o => o.id);
       let componentsMap: Record<string, ConstructionComponent[]> = {};
       let batchesMap: Record<string, DeliveryBatch[]> = {};
+      let fulfillmentMap: Record<string, any> = {};
       
       if (orderIds.length > 0) {
+        // Fetch order_fulfillment separately as fallback (in case nested join fails)
+        const { data: fulfillmentsData } = await supabase
+          .from('order_fulfillment')
+          .select('*')
+          .in('order_id', orderIds);
+        
+        // Create a map of order_id -> fulfillment for fallback
+        (fulfillmentsData || []).forEach((f: any) => {
+          fulfillmentMap[f.order_id] = f;
+        });
+
         // Fetch construction components
         const { data: componentsData } = await supabase
           .from('construction_components')
@@ -579,7 +591,8 @@ export function useDashboardData() {
             sliding_doors_hardware_status: order.sliding_doors_hardware_status,
             fileComponents: componentsMap[order.id] || [],
             deliveryBatches: batchesMap[order.id] || [],
-            fulfillment: order.fulfillment?.[0] || null,
+            // Use nested join fulfillment, or fallback to separately fetched fulfillment
+            fulfillment: order.fulfillment?.[0] || fulfillmentMap[order.id] || null,
           };
 
           const daysUntilDelivery = getDaysUntilDelivery(order.delivery_date);
