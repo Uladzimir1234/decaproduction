@@ -22,6 +22,7 @@ import { ComponentProcurement } from "@/components/dashboard/ComponentProcuremen
 import { ManufacturingWorkload } from "@/components/dashboard/ManufacturingWorkload";
 import { BlockersList } from "@/components/dashboard/BlockersList";
 import { PendingDeliveries, type PendingDeliveryOrder } from "@/components/dashboard/PendingDeliveries";
+import { OrderStatistics } from "@/components/dashboard/OrderStatistics";
 
 export default function Dashboard() {
   const { orders, metrics, componentSummary, manufacturingWorkload, loading } = useDashboardData();
@@ -115,6 +116,14 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Order Statistics - Age and Completion Breakdown */}
+      <OrderStatistics orders={orders.map(o => ({
+        id: o.id,
+        order_date: o.order_date,
+        fulfillment_percentage: o.fulfillment_percentage,
+        delivery_complete: o.delivery_complete,
+      }))} />
 
       {/* Metrics Strip */}
       <MetricsStrip metrics={metrics} />
