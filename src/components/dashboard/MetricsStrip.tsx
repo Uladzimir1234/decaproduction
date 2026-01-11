@@ -1,5 +1,6 @@
 import { AlertTriangle, Package, Truck, AlertCircle, Calendar, Pause, PlayCircle, PackageCheck, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 import type { DashboardMetrics } from '@/hooks/useDashboardData';
 
 interface MetricsStripProps {
@@ -7,6 +8,8 @@ interface MetricsStripProps {
 }
 
 export function MetricsStrip({ metrics }: MetricsStripProps) {
+  const navigate = useNavigate();
+  
   const items = [
     {
       label: 'Active Orders',
@@ -14,6 +17,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: Package,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
+      filterKey: 'active',
     },
     {
       label: 'On Hold',
@@ -22,6 +26,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       color: 'text-amber-500',
       bgColor: 'bg-amber-500/10',
       highlight: metrics.onHoldCount > 0,
+      filterKey: 'on_hold',
     },
     {
       label: 'Production Ready',
@@ -29,6 +34,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: PlayCircle,
       color: 'text-success',
       bgColor: 'bg-success/10',
+      filterKey: 'production_ready',
     },
     {
       label: 'Critical',
@@ -37,6 +43,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       color: 'text-destructive',
       bgColor: 'bg-destructive/10',
       highlight: metrics.criticalCount > 0,
+      filterKey: 'critical',
     },
     {
       label: 'At Risk',
@@ -45,6 +52,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       color: 'text-warning',
       bgColor: 'bg-warning/10',
       highlight: metrics.atRiskCount > 0,
+      filterKey: 'at_risk',
     },
     {
       label: 'Batches Preparing',
@@ -52,6 +60,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: PackageCheck,
       color: 'text-amber-500',
       bgColor: 'bg-amber-500/10',
+      filterKey: 'batches_preparing',
     },
     {
       label: 'Batches Shipped',
@@ -59,6 +68,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: Send,
       color: 'text-info',
       bgColor: 'bg-info/10',
+      filterKey: 'batches_shipped',
     },
     {
       label: 'Ready to Ship',
@@ -66,6 +76,7 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       icon: Truck,
       color: 'text-success',
       bgColor: 'bg-success/10',
+      filterKey: 'ready_to_deliver',
     },
     {
       label: 'Avg Days',
@@ -74,15 +85,25 @@ export function MetricsStrip({ metrics }: MetricsStripProps) {
       color: 'text-info',
       bgColor: 'bg-info/10',
       suffix: 'd',
+      filterKey: null, // Not clickable - it's an aggregate metric
     },
   ];
+
+  const handleClick = (filterKey: string | null) => {
+    if (filterKey) {
+      navigate(`/orders?filter=${filterKey}`);
+    }
+  };
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-3">
       {items.map((item) => (
         <Card
           key={item.label}
-          className={`${item.highlight ? 'border-destructive/30 animate-pulse-slow' : ''}`}
+          className={`${item.highlight ? 'border-destructive/30 animate-pulse-slow' : ''} ${
+            item.filterKey ? 'cursor-pointer hover:border-primary/50 hover:shadow-md transition-all' : ''
+          }`}
+          onClick={() => handleClick(item.filterKey)}
         >
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
