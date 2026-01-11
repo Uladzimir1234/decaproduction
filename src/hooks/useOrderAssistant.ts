@@ -94,7 +94,8 @@ export function useOrderAssistant() {
 
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            // Handle Google AI streaming format
+            const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
             if (content) upsertAssistant(content);
           } catch {
             // Incomplete JSON, put back and wait for more data
@@ -115,7 +116,8 @@ export function useOrderAssistant() {
           if (jsonStr === "[DONE]") continue;
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            // Handle Google AI streaming format
+            const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
             if (content) upsertAssistant(content);
           } catch {
             /* ignore partial */
