@@ -7,8 +7,8 @@ const corsHeaders = {
 };
 
 const MODELS = {
-  gemini15Pro: 'gemini-1.5-pro',
-  gemini15Flash: 'gemini-1.5-flash',
+  gemini15Pro: 'gemini-2.0-flash',
+  gemini15Flash: 'gemini-2.0-flash-lite',
 };
 
 const DEFAULT_MODEL = MODELS.gemini15Pro;
