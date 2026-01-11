@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 interface Order {
   id: string;
   order_date: string;
+  delivery_date: string;
   fulfillment_percentage: number;
   delivery_complete: boolean;
 }
@@ -13,14 +14,14 @@ interface OrderStatisticsProps {
   orders: Order[];
 }
 
-// Age buckets in days
-const AGE_BUCKETS = [
-  { label: "0-30 days", min: 0, max: 30, filterKey: "age_0_30" },
-  { label: "31-40 days", min: 31, max: 40, filterKey: "age_31_40" },
-  { label: "41-50 days", min: 41, max: 50, filterKey: "age_41_50" },
-  { label: "51-60 days", min: 51, max: 60, filterKey: "age_51_60" },
-  { label: "61-70 days", min: 61, max: 70, filterKey: "age_61_70" },
-  { label: "70+ days", min: 70, max: Infinity, filterKey: "age_70_plus" },
+// Time left buckets in days (based on delivery_date, same as Orders page)
+const TIME_LEFT_BUCKETS = [
+  { label: "Overdue", min: -Infinity, max: 0, filterKey: "critical" },
+  { label: "0-7 days", min: 0, max: 7, filterKey: "at_risk" },
+  { label: "8-14 days", min: 8, max: 14, filterKey: "time_8_14" },
+  { label: "15-30 days", min: 15, max: 30, filterKey: "time_15_30" },
+  { label: "31-60 days", min: 31, max: 60, filterKey: "time_31_60" },
+  { label: "60+ days", min: 61, max: Infinity, filterKey: "time_60_plus" },
 ];
 
 // Completion buckets in percentage
@@ -33,14 +34,14 @@ const COMPLETION_BUCKETS = [
   { label: "90-100%", min: 90, max: 100, filterKey: "completion_90_100" },
 ];
 
-// Color progression for age (blue to red for urgency)
-const AGE_COLORS = [
+// Color progression for time left (red to blue for urgency - reversed)
+const TIME_LEFT_COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-amber-400",
+  "bg-yellow-400",
   "bg-blue-400",
   "bg-blue-500",
-  "bg-amber-400",
-  "bg-amber-500",
-  "bg-orange-500",
-  "bg-red-500",
 ];
 
 // Color progression for completion (orange to green for progress)
@@ -53,10 +54,11 @@ const COMPLETION_COLORS = [
   "bg-green-500",
 ];
 
-function getOrderAgeInDays(orderDate: string): number {
-  const order = new Date(orderDate);
+// Calculate days until delivery (same as Orders page)
+function getDaysUntilDelivery(deliveryDate: string): number {
+  const delivery = new Date(deliveryDate);
   const now = new Date();
-  return Math.floor((now.getTime() - order.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.floor((delivery.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function OrderStatistics({ orders }: OrderStatisticsProps) {
@@ -66,20 +68,23 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
   const activeOrders = orders.filter(o => !o.delivery_complete);
   const totalActive = activeOrders.length;
   
-  // Calculate orders by age
-  const ordersByAge = AGE_BUCKETS.map((bucket, index) => {
+  // Calculate orders by time left (using delivery_date like Orders page)
+  const ordersByTimeLeft = TIME_LEFT_BUCKETS.map((bucket, index) => {
     const count = activeOrders.filter(order => {
-      const age = getOrderAgeInDays(order.order_date);
-      if (bucket.max === Infinity) {
-        return age >= bucket.min;
+      const daysLeft = getDaysUntilDelivery(order.delivery_date);
+      if (bucket.min === -Infinity) {
+        return daysLeft < 0; // Overdue
       }
-      return age >= bucket.min && age < bucket.max + 1;
+      if (bucket.max === Infinity) {
+        return daysLeft >= bucket.min;
+      }
+      return daysLeft >= bucket.min && daysLeft <= bucket.max;
     }).length;
     
     return {
       ...bucket,
       count,
-      color: AGE_COLORS[index],
+      color: TIME_LEFT_COLORS[index],
       percentage: totalActive > 0 ? (count / totalActive) * 100 : 0,
     };
   });
@@ -102,8 +107,8 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
     };
   });
   
-  // Calculate summary metrics
-  const urgentOrders = activeOrders.filter(o => getOrderAgeInDays(o.order_date) >= 70).length;
+  // Calculate summary metrics using delivery_date (days until delivery)
+  const overdueOrders = activeOrders.filter(o => getDaysUntilDelivery(o.delivery_date) < 0).length;
   const nearCompletion = activeOrders.filter(o => (o.fulfillment_percentage || 0) >= 80).length;
   const inProgress = activeOrders.filter(o => {
     const completion = o.fulfillment_percentage || 0;
@@ -120,12 +125,12 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
       filterKey: "all",
     },
     {
-      label: "Urgent (70+ days)",
-      value: urgentOrders,
+      label: "Overdue",
+      value: overdueOrders,
       icon: AlertCircle,
       bgColor: "bg-red-100 dark:bg-red-900/30",
       iconColor: "text-red-500",
-      filterKey: "urgent_70_plus",
+      filterKey: "critical",
     },
     {
       label: "Near Completion",
@@ -176,18 +181,18 @@ export function OrderStatistics({ orders }: OrderStatisticsProps) {
 
       {/* Orders by Age and Completion */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Orders by Age */}
+        {/* Orders by Time Left */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle 
               className="text-lg font-semibold cursor-pointer hover:text-primary transition-colors"
               onClick={() => handleNavigate("all")}
             >
-              Orders by Age
+              Orders by Time Left
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {ordersByAge.map((bucket) => (
+            {ordersByTimeLeft.map((bucket) => (
               <div 
                 key={bucket.label} 
                 className="space-y-1 cursor-pointer hover:bg-muted/50 rounded-md p-2 -mx-2 transition-colors"
