@@ -16,8 +16,8 @@ import {
 interface FieldDifference {
   field: string;
   constructionNumber?: string;
-  gemini25Value: string | null;
-  gemini3Value: string | null;
+  gemini15ProValue: string | null;
+  gemini15FlashValue: string | null;
 }
 
 interface ModelResult {
@@ -28,15 +28,15 @@ interface ModelResult {
 }
 
 interface ComparisonData {
-  gemini25: ModelResult;
-  gemini3: ModelResult;
+  gemini15Pro: ModelResult;
+  gemini15Flash: ModelResult;
   comparison: {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
     fieldDifferences: FieldDifference[];
-    gemini25Stats: { constructions: number; components: number; filledFields: number };
-    gemini3Stats: { constructions: number; components: number; filledFields: number };
+    gemini15ProStats: { constructions: number; components: number; filledFields: number };
+    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
   };
 }
 
@@ -47,20 +47,20 @@ interface ModelComparisonViewProps {
 }
 
 export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComparisonViewProps) {
-  const { gemini25, gemini3, comparison } = data;
-  
+  const { gemini15Pro, gemini15Flash, comparison } = data;
+
   const getWinner = () => {
     // Prefer model with more constructions, then more components, then more filled fields
-    if (comparison.gemini25Stats.constructions > comparison.gemini3Stats.constructions) return 'gemini25';
-    if (comparison.gemini3Stats.constructions > comparison.gemini25Stats.constructions) return 'gemini3';
-    if (comparison.gemini25Stats.components > comparison.gemini3Stats.components) return 'gemini25';
-    if (comparison.gemini3Stats.components > comparison.gemini25Stats.components) return 'gemini3';
-    if (comparison.gemini25Stats.filledFields > comparison.gemini3Stats.filledFields) return 'gemini25';
-    if (comparison.gemini3Stats.filledFields > comparison.gemini25Stats.filledFields) return 'gemini3';
-    // Default to Gemini 3 (newer)
-    return 'gemini3';
+    if (comparison.gemini15ProStats.constructions > comparison.gemini15FlashStats.constructions) return 'gemini15Pro';
+    if (comparison.gemini15FlashStats.constructions > comparison.gemini15ProStats.constructions) return 'gemini15Flash';
+    if (comparison.gemini15ProStats.components > comparison.gemini15FlashStats.components) return 'gemini15Pro';
+    if (comparison.gemini15FlashStats.components > comparison.gemini15ProStats.components) return 'gemini15Flash';
+    if (comparison.gemini15ProStats.filledFields > comparison.gemini15FlashStats.filledFields) return 'gemini15Pro';
+    if (comparison.gemini15FlashStats.filledFields > comparison.gemini15ProStats.filledFields) return 'gemini15Flash';
+    // Default to Gemini 1.5 Pro (most accurate)
+    return 'gemini15Pro';
   };
-  
+
   const winner = getWinner();
   
   // Group field differences by construction number
@@ -112,51 +112,51 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
       
       {/* Model Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Gemini 2.5 Pro */}
-        <Card className={`relative ${winner === 'gemini25' ? 'ring-2 ring-green-500' : ''}`}>
-          {winner === 'gemini25' && (
+        {/* Gemini 1.5 Pro */}
+        <Card className={`relative ${winner === 'gemini15Pro' ? 'ring-2 ring-green-500' : ''}`}>
+          {winner === 'gemini15Pro' && (
             <Badge className="absolute -top-2 left-4 bg-green-500">Recommended</Badge>
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 2.5 Pro
-              {gemini25.error && <Badge variant="destructive">Error</Badge>}
+              Gemini 1.5 Pro
+              {gemini15Pro.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {gemini25.error ? (
-              <p className="text-sm text-destructive">{gemini25.error}</p>
+            {gemini15Pro.error ? (
+              <p className="text-sm text-destructive">{gemini15Pro.error}</p>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{(gemini25.processingTimeMs / 1000).toFixed(1)}s</span>
+                    <span>{(gemini15Pro.processingTimeMs / 1000).toFixed(1)}s</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini25Stats.constructions} constructions</span>
+                    <span>{comparison.gemini15ProStats.constructions} constructions</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini25Stats.components} components</span>
+                    <span>{comparison.gemini15ProStats.components} components</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini25Stats.filledFields} fields</span>
+                    <span>{comparison.gemini15ProStats.filledFields} fields</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 text-xs">
-                  <Badge variant="outline">{gemini25.data.windows_count}W</Badge>
-                  <Badge variant="outline">{gemini25.data.doors_count}D</Badge>
-                  <Badge variant="outline">{gemini25.data.sliding_doors_count}S</Badge>
+                  <Badge variant="outline">{gemini15Pro.data.windows_count}W</Badge>
+                  <Badge variant="outline">{gemini15Pro.data.doors_count}D</Badge>
+                  <Badge variant="outline">{gemini15Pro.data.sliding_doors_count}S</Badge>
                 </div>
-                
-                <Button 
-                  className="w-full" 
-                  variant={winner === 'gemini25' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini25.data, 'Gemini 2.5 Pro')}
+
+                <Button
+                  className="w-full"
+                  variant={winner === 'gemini15Pro' ? 'default' : 'outline'}
+                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 1.5 Pro')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -165,53 +165,53 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
             )}
           </CardContent>
         </Card>
-        
-        {/* Gemini 3 Pro Preview */}
-        <Card className={`relative ${winner === 'gemini3' ? 'ring-2 ring-green-500' : ''}`}>
-          {winner === 'gemini3' && (
+
+        {/* Gemini 1.5 Flash */}
+        <Card className={`relative ${winner === 'gemini15Flash' ? 'ring-2 ring-green-500' : ''}`}>
+          {winner === 'gemini15Flash' && (
             <Badge className="absolute -top-2 left-4 bg-green-500">Recommended</Badge>
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 3 Pro Preview
-              <Badge variant="secondary" className="text-xs">New</Badge>
-              {gemini3.error && <Badge variant="destructive">Error</Badge>}
+              Gemini 1.5 Flash
+              <Badge variant="secondary" className="text-xs">Faster</Badge>
+              {gemini15Flash.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {gemini3.error ? (
-              <p className="text-sm text-destructive">{gemini3.error}</p>
+            {gemini15Flash.error ? (
+              <p className="text-sm text-destructive">{gemini15Flash.error}</p>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{(gemini3.processingTimeMs / 1000).toFixed(1)}s</span>
+                    <span>{(gemini15Flash.processingTimeMs / 1000).toFixed(1)}s</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini3Stats.constructions} constructions</span>
+                    <span>{comparison.gemini15FlashStats.constructions} constructions</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini3Stats.components} components</span>
+                    <span>{comparison.gemini15FlashStats.components} components</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.gemini3Stats.filledFields} fields</span>
+                    <span>{comparison.gemini15FlashStats.filledFields} fields</span>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 text-xs">
-                  <Badge variant="outline">{gemini3.data.windows_count}W</Badge>
-                  <Badge variant="outline">{gemini3.data.doors_count}D</Badge>
-                  <Badge variant="outline">{gemini3.data.sliding_doors_count}S</Badge>
+                  <Badge variant="outline">{gemini15Flash.data.windows_count}W</Badge>
+                  <Badge variant="outline">{gemini15Flash.data.doors_count}D</Badge>
+                  <Badge variant="outline">{gemini15Flash.data.sliding_doors_count}S</Badge>
                 </div>
-                
-                <Button 
-                  className="w-full" 
-                  variant={winner === 'gemini3' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini3.data, 'Gemini 3 Pro Preview')}
+
+                <Button
+                  className="w-full"
+                  variant={winner === 'gemini15Flash' ? 'default' : 'outline'}
+                  onClick={() => onSelectModel(gemini15Flash.data, 'Gemini 1.5 Flash')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -241,8 +241,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[150px]">Field</TableHead>
-                        <TableHead className="text-blue-600">Gemini 2.5</TableHead>
-                        <TableHead className="text-purple-600">Gemini 3</TableHead>
+                        <TableHead className="text-blue-600">Gemini 1.5 Pro</TableHead>
+                        <TableHead className="text-purple-600">Gemini 1.5 Flash</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -250,15 +250,15 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                         <TableRow key={i}>
                           <TableCell className="font-medium text-sm">{diff.field}</TableCell>
                           <TableCell className="text-sm">
-                            {diff.gemini25Value ? (
-                              <span className="text-foreground">{diff.gemini25Value}</span>
+                            {diff.gemini15ProValue ? (
+                              <span className="text-foreground">{diff.gemini15ProValue}</span>
                             ) : (
                               <span className="text-muted-foreground italic">empty</span>
                             )}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {diff.gemini3Value ? (
-                              <span className="text-foreground">{diff.gemini3Value}</span>
+                            {diff.gemini15FlashValue ? (
+                              <span className="text-foreground">{diff.gemini15FlashValue}</span>
                             ) : (
                               <span className="text-muted-foreground italic">empty</span>
                             )}
@@ -281,8 +281,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[150px]">Field</TableHead>
-                            <TableHead className="text-blue-600">Gemini 2.5</TableHead>
-                            <TableHead className="text-purple-600">Gemini 3</TableHead>
+                            <TableHead className="text-blue-600">Gemini 1.5 Pro</TableHead>
+                            <TableHead className="text-purple-600">Gemini 1.5 Flash</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -290,15 +290,15 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                             <TableRow key={i}>
                               <TableCell className="font-medium text-sm">{diff.field}</TableCell>
                               <TableCell className="text-sm">
-                                {diff.gemini25Value ? (
-                                  <span className="text-foreground">{diff.gemini25Value}</span>
+                                {diff.gemini15ProValue ? (
+                                  <span className="text-foreground">{diff.gemini15ProValue}</span>
                                 ) : (
                                   <span className="text-muted-foreground italic">empty</span>
                                 )}
                               </TableCell>
                               <TableCell className="text-sm">
-                                {diff.gemini3Value ? (
-                                  <span className="text-foreground">{diff.gemini3Value}</span>
+                                {diff.gemini15FlashValue ? (
+                                  <span className="text-foreground">{diff.gemini15FlashValue}</span>
                                 ) : (
                                   <span className="text-muted-foreground italic">empty</span>
                                 )}

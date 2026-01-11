@@ -1,18 +1,17 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-// Available models for comparison
 const MODELS = {
-  gemini25: 'google/gemini-2.5-pro',
-  gemini3: 'google/gemini-3-pro-preview',
+  gemini15Pro: 'gemini-1.5-pro',
+  gemini15Flash: 'gemini-1.5-flash',
 };
 
-// Default model
-const DEFAULT_MODEL = MODELS.gemini3;
+const DEFAULT_MODEL = MODELS.gemini15Pro;
 
 interface ConstructionComponent {
   component_type: string;
@@ -68,8 +67,8 @@ interface ParsedOrder {
 interface FieldDifference {
   field: string;
   constructionNumber?: string;
-  gemini25Value: string | null;
-  gemini3Value: string | null;
+  gemini15ProValue: string | null;
+  gemini15FlashValue: string | null;
 }
 
 interface ModelResult {
@@ -80,94 +79,89 @@ interface ModelResult {
 }
 
 interface ComparisonResult {
-  gemini25: ModelResult;
-  gemini3: ModelResult;
+  gemini15Pro: ModelResult;
+  gemini15Flash: ModelResult;
   comparison: {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
     fieldDifferences: FieldDifference[];
-    gemini25Stats: { constructions: number; components: number; filledFields: number };
-    gemini3Stats: { constructions: number; components: number; filledFields: number };
+    gemini15ProStats: { constructions: number; components: number; filledFields: number };
+    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
   };
 }
 
-// Shared tool definition for extraction
-const extractionTool = {
-  type: 'function',
-  function: {
-    name: 'extract_order_data',
-    description: 'Extract structured order data from window/door manufacturing documents',
-    parameters: {
-      type: 'object',
-      properties: {
-        quote_number: { type: 'string', nullable: true, description: 'Quote or order number from the document' },
-        customer_name: { type: 'string', nullable: true, description: 'Customer or client name' },
-        order_date: { type: 'string', nullable: true, description: 'Order date in YYYY-MM-DD format' },
-        constructions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              construction_number: { type: 'string', description: 'Unique ID like "1", "2", "W-01"' },
-              construction_type: { type: 'string', enum: ['window', 'door', 'sliding_door'] },
-              width_inches: { type: 'number', nullable: true },
-              height_inches: { type: 'number', nullable: true },
-              width_mm: { type: 'number', nullable: true },
-              height_mm: { type: 'number', nullable: true },
-              rough_opening: { type: 'string', nullable: true, description: 'Rough opening dimensions if specified' },
-              location: { type: 'string', nullable: true, description: 'Installation location/room' },
-              model: { type: 'string', nullable: true, description: 'Profile model/system name (e.g., DECA GEALAN LINEAR, S8000)' },
-              opening_type: { type: 'string', nullable: true, description: 'How it opens (tilt-turn, casement, fixed, etc.)' },
-              color_exterior: { type: 'string', nullable: true, description: 'Exact exterior color as shown' },
-              color_interior: { type: 'string', nullable: true, description: 'Exact interior color as shown' },
-              glass_type: { type: 'string', nullable: true, description: 'EXACT glass specification as shown (e.g., "3M Triple Pane Low-E Argon 366/180")' },
-              screen_type: { type: 'string', nullable: true, description: 'Screen type - use EXACT value: "Flex screen FlexView" OR "DECA aluminum screen"' },
-              handle_type: { type: 'string', nullable: true, description: 'Handle specification with color (e.g., "Std. handle black", "Premium handle white")' },
-              has_blinds: { type: 'boolean', description: 'Whether blinds are included' },
-              blinds_color: { type: 'string', nullable: true, description: 'EXACT blinds color (e.g., "Cream", "White", "Gray") - REQUIRED if has_blinds=true' },
-              center_seal: { type: 'boolean', description: 'Whether center seal is present' },
-              comments: { type: 'string', nullable: true, description: 'Any additional notes or comments' },
-              quantity: { type: 'number', description: 'Number of this exact construction' },
-              components: {
-                type: 'array',
-                description: 'Components that need ordering for this construction',
-                items: {
-                  type: 'object',
-                  properties: {
-                    component_type: { 
-                      type: 'string', 
-                      enum: ['glass', 'blinds', 'screens', 'hardware', 'nailing_fins', 'coupling_profile', 'profile'],
-                      description: 'Type of component'
-                    },
-                    component_name: { 
-                      type: 'string', 
-                      nullable: true, 
-                      description: 'EXACT name/specification of component. For screens use "Flex screen FlexView" or "DECA aluminum screen". For blinds include color.' 
-                    },
-                    quantity: { type: 'number', description: 'Quantity matching construction quantity' }
+const extractionFunctionDeclaration = {
+  name: 'extract_order_data',
+  description: 'Extract structured order data from window/door manufacturing documents',
+  parameters: {
+    type: 'object',
+    properties: {
+      quote_number: { type: 'string', nullable: true, description: 'Quote or order number from the document' },
+      customer_name: { type: 'string', nullable: true, description: 'Customer or client name' },
+      order_date: { type: 'string', nullable: true, description: 'Order date in YYYY-MM-DD format' },
+      constructions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            construction_number: { type: 'string', description: 'Unique ID like "1", "2", "W-01"' },
+            construction_type: { type: 'string', enum: ['window', 'door', 'sliding_door'] },
+            width_inches: { type: 'number', nullable: true },
+            height_inches: { type: 'number', nullable: true },
+            width_mm: { type: 'number', nullable: true },
+            height_mm: { type: 'number', nullable: true },
+            rough_opening: { type: 'string', nullable: true, description: 'Rough opening dimensions if specified' },
+            location: { type: 'string', nullable: true, description: 'Installation location/room' },
+            model: { type: 'string', nullable: true, description: 'Profile model/system name (e.g., DECA GEALAN LINEAR, S8000)' },
+            opening_type: { type: 'string', nullable: true, description: 'How it opens (tilt-turn, casement, fixed, etc.)' },
+            color_exterior: { type: 'string', nullable: true, description: 'Exact exterior color as shown' },
+            color_interior: { type: 'string', nullable: true, description: 'Exact interior color as shown' },
+            glass_type: { type: 'string', nullable: true, description: 'EXACT glass specification as shown (e.g., "3M Triple Pane Low-E Argon 366/180")' },
+            screen_type: { type: 'string', nullable: true, description: 'Screen type - use EXACT value: "Flex screen FlexView" OR "DECA aluminum screen"' },
+            handle_type: { type: 'string', nullable: true, description: 'Handle specification with color (e.g., "Std. handle black", "Premium handle white")' },
+            has_blinds: { type: 'boolean', description: 'Whether blinds are included' },
+            blinds_color: { type: 'string', nullable: true, description: 'EXACT blinds color (e.g., "Cream", "White", "Gray") - REQUIRED if has_blinds=true' },
+            center_seal: { type: 'boolean', description: 'Whether center seal is present' },
+            comments: { type: 'string', nullable: true, description: 'Any additional notes or comments' },
+            quantity: { type: 'number', description: 'Number of this exact construction' },
+            components: {
+              type: 'array',
+              description: 'Components that need ordering for this construction',
+              items: {
+                type: 'object',
+                properties: {
+                  component_type: {
+                    type: 'string',
+                    enum: ['glass', 'blinds', 'screens', 'hardware', 'nailing_fins', 'coupling_profile', 'profile'],
+                    description: 'Type of component'
                   },
-                  required: ['component_type', 'quantity']
-                }
+                  component_name: {
+                    type: 'string',
+                    nullable: true,
+                    description: 'EXACT name/specification of component. For screens use "Flex screen FlexView" or "DECA aluminum screen". For blinds include color.'
+                  },
+                  quantity: { type: 'number', description: 'Quantity matching construction quantity' }
+                },
+                required: ['component_type', 'quantity']
               }
-            },
-            required: ['construction_number', 'construction_type', 'quantity']
-          }
+            }
+          },
+          required: ['construction_number', 'construction_type', 'quantity']
         }
-      },
-      required: ['constructions']
-    }
+      }
+    },
+    required: ['constructions']
   }
 };
 
-// Enhanced system prompt for accurate and consistent extraction
 const SYSTEM_PROMPT = `You are a specialized AI for extracting window and door order data from IT Okna software exports and manufacturing documents.
 
 ## CRITICAL ACCURACY REQUIREMENTS
 
 ### 1. CONSTRUCTION TYPES
 - "Window" / "Fenster" = window
-- "Entrance" / "Door" / "Tür" = door  
+- "Entrance" / "Door" / "Tür" = door
 - "Sliding" / "PSK" / "Lift" / "Multi-slide" / "Smart-slide" = sliding_door
 
 ### 2. EXACT VALUE EXTRACTION (DO NOT PARAPHRASE)
@@ -189,7 +183,7 @@ Use ONLY these exact values for screen_type:
 For EACH construction, populate the components array:
 
 | If this field has value | Add component_type | component_name should be |
-|------------------------|-------------------|--------------------------|
+|------------------------|-------------------|--------------------------|  
 | glass_type | "glass" | EXACT glass_type value |
 | has_blinds = true | "blinds" | EXACT blinds_color (e.g., "Cream") |
 | screen_type | "screens" | EXACT screen_type value |
@@ -251,9 +245,8 @@ function processExtractedData(extracted: any): ParsedOrder {
     .filter((c: Construction) => c.construction_type === 'sliding_door')
     .reduce((sum: number, c: Construction) => sum + c.quantity, 0);
 
-  // Aggregate components across all constructions
   const componentMap = new Map<string, { type: string; name: string; qty: number }>();
-  
+
   for (const construction of constructions) {
     for (const component of construction.components) {
       const key = `${component.component_type}::${component.component_name || 'unnamed'}`;
@@ -268,8 +261,7 @@ function processExtractedData(extracted: any): ParsedOrder {
         });
       }
     }
-    
-    // Fallback: if no components but has data, create them
+
     if (construction.components.length === 0) {
       if (construction.glass_type) {
         const key = `glass::${construction.glass_type}`;
@@ -280,7 +272,7 @@ function processExtractedData(extracted: any): ParsedOrder {
           componentMap.set(key, { type: 'glass', name: construction.glass_type, qty: construction.quantity });
         }
       }
-      
+
       if (construction.has_blinds && construction.blinds_color) {
         const key = `blinds::${construction.blinds_color}`;
         const existing = componentMap.get(key);
@@ -290,10 +282,10 @@ function processExtractedData(extracted: any): ParsedOrder {
           componentMap.set(key, { type: 'blinds', name: construction.blinds_color, qty: construction.quantity });
         }
       }
-      
+
       if (construction.screen_type) {
-        const screenName = construction.screen_type.toLowerCase().includes('flex') 
-          ? 'Flex screen FlexView' 
+        const screenName = construction.screen_type.toLowerCase().includes('flex')
+          ? 'Flex screen FlexView'
           : 'DECA aluminum screen';
         const key = `screens::${screenName}`;
         const existing = componentMap.get(key);
@@ -303,7 +295,7 @@ function processExtractedData(extracted: any): ParsedOrder {
           componentMap.set(key, { type: 'screens', name: screenName, qty: construction.quantity });
         }
       }
-      
+
       if (construction.handle_type) {
         const key = `hardware::${construction.handle_type}`;
         const existing = componentMap.get(key);
@@ -313,8 +305,7 @@ function processExtractedData(extracted: any): ParsedOrder {
           componentMap.set(key, { type: 'hardware', name: construction.handle_type, qty: construction.quantity });
         }
       }
-      
-      // Add profile from model + colors
+
       if (construction.model) {
         const profileName = `${construction.model} (${construction.color_exterior || 'N/A'} / ${construction.color_interior || 'N/A'})`;
         const key = `profile::${profileName}`;
@@ -334,7 +325,6 @@ function processExtractedData(extracted: any): ParsedOrder {
     total_quantity: c.qty,
   }));
 
-  // Extract profile info from first construction with data
   let profile_info = null;
   for (const c of constructions) {
     if (c.model || c.color_exterior || c.color_interior) {
@@ -360,17 +350,14 @@ function processExtractedData(extracted: any): ParsedOrder {
   };
 }
 
-// Count non-null fields in constructions for completeness comparison
 function countFilledFields(data: ParsedOrder): number {
   let count = 0;
-  const fieldsToCheck = [
-    'quote_number', 'customer_name', 'order_date'
-  ];
-  
+  const fieldsToCheck = ['quote_number', 'customer_name', 'order_date'];
+
   for (const field of fieldsToCheck) {
     if ((data as any)[field]) count++;
   }
-  
+
   for (const c of data.constructions) {
     const constructionFields = [
       'width_mm', 'height_mm', 'width_inches', 'height_inches',
@@ -382,164 +369,123 @@ function countFilledFields(data: ParsedOrder): number {
       if ((c as any)[field]) count++;
     }
   }
-  
+
   return count;
 }
 
-// Compare two extraction results with field-level detail
-function compareResults(result25: ParsedOrder, result3: ParsedOrder) {
+function compareResults(result1: ParsedOrder, result2: ParsedOrder) {
   const differences: string[] = [];
   const fieldDifferences: FieldDifference[] = [];
-  
-  // Helper to format value for display
+
   const formatValue = (val: any): string | null => {
     if (val === null || val === undefined) return null;
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
     if (typeof val === 'number') return String(val);
     return String(val);
   };
-  
-  // Compare order-level fields
+
   const orderFields = ['quote_number', 'customer_name', 'order_date'];
   for (const field of orderFields) {
-    const val25 = (result25 as any)[field];
-    const val3 = (result3 as any)[field];
-    if (val25 !== val3) {
+    const val1 = (result1 as any)[field];
+    const val2 = (result2 as any)[field];
+    if (val1 !== val2) {
       fieldDifferences.push({
         field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        gemini25Value: formatValue(val25),
-        gemini3Value: formatValue(val3),
+        gemini15ProValue: formatValue(val1),
+        gemini15FlashValue: formatValue(val2),
       });
     }
   }
-  
-  // Compare construction counts
-  if (result25.constructions.length !== result3.constructions.length) {
-    differences.push(`Construction count: Gemini 2.5 found ${result25.constructions.length}, Gemini 3 found ${result3.constructions.length}`);
+
+  if (result1.constructions.length !== result2.constructions.length) {
+    differences.push(`Construction count: Pro found ${result1.constructions.length}, Flash found ${result2.constructions.length}`);
   }
-  
-  // Compare component counts
-  if (result25.aggregated_components.length !== result3.aggregated_components.length) {
-    differences.push(`Component types: Gemini 2.5 found ${result25.aggregated_components.length}, Gemini 3 found ${result3.aggregated_components.length}`);
+
+  if (result1.aggregated_components.length !== result2.aggregated_components.length) {
+    differences.push(`Component types: Pro found ${result1.aggregated_components.length}, Flash found ${result2.aggregated_components.length}`);
   }
-  
-  // Compare window/door/sliding counts
-  if (result25.windows_count !== result3.windows_count) {
+
+  if (result1.windows_count !== result2.windows_count) {
     fieldDifferences.push({
       field: 'Windows Count',
-      gemini25Value: String(result25.windows_count),
-      gemini3Value: String(result3.windows_count),
+      gemini15ProValue: String(result1.windows_count),
+      gemini15FlashValue: String(result2.windows_count),
     });
   }
-  if (result25.doors_count !== result3.doors_count) {
+  if (result1.doors_count !== result2.doors_count) {
     fieldDifferences.push({
       field: 'Doors Count',
-      gemini25Value: String(result25.doors_count),
-      gemini3Value: String(result3.doors_count),
+      gemini15ProValue: String(result1.doors_count),
+      gemini15FlashValue: String(result2.doors_count),
     });
   }
-  if (result25.sliding_doors_count !== result3.sliding_doors_count) {
+  if (result1.sliding_doors_count !== result2.sliding_doors_count) {
     fieldDifferences.push({
       field: 'Sliding Doors Count',
-      gemini25Value: String(result25.sliding_doors_count),
-      gemini3Value: String(result3.sliding_doors_count),
+      gemini15ProValue: String(result1.sliding_doors_count),
+      gemini15FlashValue: String(result2.sliding_doors_count),
     });
   }
-  
-  // Compare construction-level fields
+
   const constructionFields = [
     'construction_type', 'width_mm', 'height_mm', 'width_inches', 'height_inches',
     'model', 'opening_type', 'color_exterior', 'color_interior',
     'glass_type', 'screen_type', 'handle_type', 'has_blinds', 'blinds_color',
     'location', 'rough_opening', 'comments', 'quantity', 'center_seal'
   ];
-  
-  // Build a map of constructions by number for comparison
-  const constructions25Map = new Map(result25.constructions.map(c => [c.construction_number, c]));
-  const constructions3Map = new Map(result3.constructions.map(c => [c.construction_number, c]));
-  
-  // Get all unique construction numbers
+
+  const constructions1Map = new Map(result1.constructions.map(c => [c.construction_number, c]));
+  const constructions2Map = new Map(result2.constructions.map(c => [c.construction_number, c]));
+
   const allConstructionNumbers = new Set([
-    ...result25.constructions.map(c => c.construction_number),
-    ...result3.constructions.map(c => c.construction_number),
+    ...result1.constructions.map(c => c.construction_number),
+    ...result2.constructions.map(c => c.construction_number),
   ]);
-  
+
   for (const cNum of allConstructionNumbers) {
-    const c25 = constructions25Map.get(cNum);
-    const c3 = constructions3Map.get(cNum);
-    
-    if (!c25 && c3) {
+    const c1 = constructions1Map.get(cNum);
+    const c2 = constructions2Map.get(cNum);
+
+    if (!c1 && c2) {
       fieldDifferences.push({
         field: 'Construction',
         constructionNumber: cNum,
-        gemini25Value: null,
-        gemini3Value: `Found (${c3.construction_type})`,
+        gemini15ProValue: null,
+        gemini15FlashValue: `Found (${c2.construction_type})`,
       });
       continue;
     }
-    
-    if (c25 && !c3) {
+
+    if (c1 && !c2) {
       fieldDifferences.push({
         field: 'Construction',
         constructionNumber: cNum,
-        gemini25Value: `Found (${c25.construction_type})`,
-        gemini3Value: null,
+        gemini15ProValue: `Found (${c1.construction_type})`,
+        gemini15FlashValue: null,
       });
       continue;
     }
-    
-    if (c25 && c3) {
+
+    if (c1 && c2) {
       for (const field of constructionFields) {
-        const val25 = (c25 as any)[field];
-        const val3 = (c3 as any)[field];
-        if (val25 !== val3) {
+        const val1 = (c1 as any)[field];
+        const val2 = (c2 as any)[field];
+        if (val1 !== val2) {
           fieldDifferences.push({
             field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
             constructionNumber: cNum,
-            gemini25Value: formatValue(val25),
-            gemini3Value: formatValue(val3),
+            gemini15ProValue: formatValue(val1),
+            gemini15FlashValue: formatValue(val2),
           });
         }
       }
     }
   }
-  
-  // Compare aggregated components
-  const comp25Map = new Map(result25.aggregated_components.map(c => [`${c.component_type}::${c.component_name}`, c]));
-  const comp3Map = new Map(result3.aggregated_components.map(c => [`${c.component_type}::${c.component_name}`, c]));
-  
-  const allCompKeys = new Set([...comp25Map.keys(), ...comp3Map.keys()]);
-  
-  for (const key of allCompKeys) {
-    const c25 = comp25Map.get(key);
-    const c3 = comp3Map.get(key);
-    
-    if (!c25 && c3) {
-      fieldDifferences.push({
-        field: `Component: ${c3.component_type}`,
-        gemini25Value: null,
-        gemini3Value: `${c3.component_name} x${c3.total_quantity}`,
-      });
-    } else if (c25 && !c3) {
-      fieldDifferences.push({
-        field: `Component: ${c25.component_type}`,
-        gemini25Value: `${c25.component_name} x${c25.total_quantity}`,
-        gemini3Value: null,
-      });
-    } else if (c25 && c3 && c25.total_quantity !== c3.total_quantity) {
-      fieldDifferences.push({
-        field: `Component: ${c25.component_type}`,
-        gemini25Value: `${c25.component_name} x${c25.total_quantity}`,
-        gemini3Value: `${c3.component_name} x${c3.total_quantity}`,
-      });
-    }
-  }
-  
-  // Generate summary differences
+
   if (fieldDifferences.length > 0) {
     const constructionDiffs = fieldDifferences.filter(d => d.constructionNumber);
     const orderDiffs = fieldDifferences.filter(d => !d.constructionNumber);
-    
+
     if (orderDiffs.length > 0) {
       differences.push(`${orderDiffs.length} order-level field differences`);
     }
@@ -547,87 +493,97 @@ function compareResults(result25: ParsedOrder, result3: ParsedOrder) {
       differences.push(`${constructionDiffs.length} construction-level field differences`);
     }
   }
-  
+
   return {
-    constructionCountMatch: result25.constructions.length === result3.constructions.length,
-    componentCountMatch: result25.aggregated_components.length === result3.aggregated_components.length,
+    constructionCountMatch: result1.constructions.length === result2.constructions.length,
+    componentCountMatch: result1.aggregated_components.length === result2.aggregated_components.length,
     differences,
     fieldDifferences,
-    gemini25Stats: {
-      constructions: result25.constructions.length,
-      components: result25.aggregated_components.length,
-      filledFields: countFilledFields(result25),
+    gemini15ProStats: {
+      constructions: result1.constructions.length,
+      components: result1.aggregated_components.length,
+      filledFields: countFilledFields(result1),
     },
-    gemini3Stats: {
-      constructions: result3.constructions.length,
-      components: result3.aggregated_components.length,
-      filledFields: countFilledFields(result3),
+    gemini15FlashStats: {
+      constructions: result2.constructions.length,
+      components: result2.aggregated_components.length,
+      filledFields: countFilledFields(result2),
     },
   };
 }
 
-async function extractWithModel(model: string, content: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
-  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    throw new Error('LOVABLE_API_KEY is not configured');
-  }
+async function extractWithModel(model: string, textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
+  const GOOGLE_API_KEY = 'AIzaSyDx3gGccZCSaPw-zct5jK2JxwfvEwvN8w0';
 
   const startTime = Date.now();
   console.log(`Extracting with ${model}...`);
 
   try {
-    let messages: any[];
-    
+    let parts: any[];
+
     if (contentType === 'pdf' && base64Content) {
-      messages = [
-        { role: 'system', content: SYSTEM_PROMPT },
+      parts = [
         {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.' },
-            { type: 'image_url', image_url: { url: `data:application/pdf;base64,${base64Content}` } }
-          ]
+          text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
+        },
+        {
+          inline_data: {
+            mime_type: 'application/pdf',
+            data: base64Content
+          }
         }
       ];
     } else {
-      messages = [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Extract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${content}` }
+      parts = [
+        {
+          text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
+        }
       ];
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: [extractionTool],
-        tool_choice: { type: 'function', function: { name: 'extract_order_data' } }
-      }),
-    });
+    const requestBody = {
+      contents: [{ parts }],
+      tools: [{
+        function_declarations: [extractionFunctionDeclaration]
+      }],
+      tool_config: {
+        function_calling_config: {
+          mode: 'ANY',
+          allowed_function_names: ['extract_order_data']
+        }
+      }
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`AI error for ${model}:`, response.status, errorText);
+      console.error(`Google AI error for ${model}:`, response.status, errorText);
       throw new Error(`AI processing failed: ${response.status}`);
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall?.function?.arguments) {
-      throw new Error('Failed to extract data');
+    const functionCall = data.candidates?.[0]?.content?.parts?.[0]?.functionCall;
+
+    if (!functionCall?.args) {
+      console.error('No function call in response:', JSON.stringify(data, null, 2));
+      throw new Error('Failed to extract data - no function call returned');
     }
 
-    const extracted = JSON.parse(toolCall.function.arguments);
+    const extracted = functionCall.args;
     const processingTimeMs = Date.now() - startTime;
-    
+
     console.log(`${model} completed in ${processingTimeMs}ms`);
-    
+
     return {
       model,
       data: processExtractedData(extracted),
@@ -672,7 +628,6 @@ async function processPDFWithAI(base64Content: string, model: string = DEFAULT_M
 async function parseExcelWithAI(base64Content: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
   console.log('Converting Excel to text...');
 
-  // Extract text from Excel binary
   const binaryString = atob(base64Content);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
@@ -703,24 +658,23 @@ async function parseExcelWithAI(base64Content: string, model: string = DEFAULT_M
     .join('\n');
 
   console.log('Extracted text preview:', textContent.substring(0, 500));
-  
+
   const result = await extractWithModel(model, textContent, 'excel');
   if (result.error) throw new Error(result.error);
   return result.data;
 }
 
 async function runComparison(
-  fileContent: string, 
+  fileContent: string,
   fileType: 'csv' | 'pdf' | 'excel',
   base64Content: string
 ): Promise<ComparisonResult> {
   console.log('Running model comparison...');
-  
+
   let content = '';
   if (fileType === 'csv') {
     content = atob(base64Content);
   } else if (fileType === 'excel') {
-    // Extract text for Excel
     const binaryString = atob(base64Content);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -747,37 +701,38 @@ async function runComparison(
       .filter(line => !/^[\x00-\x1F\x7F]+$/.test(line))
       .join('\n');
   }
-  
-  // Run both models in parallel
-  const [result25, result3] = await Promise.all([
-    extractWithModel(MODELS.gemini25, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-    extractWithModel(MODELS.gemini3, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+
+  const [resultPro, resultFlash] = await Promise.all([
+    extractWithModel(MODELS.gemini15Pro, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+    extractWithModel(MODELS.gemini15Flash, content, fileType, fileType === 'pdf' ? base64Content : undefined),
   ]);
-  
-  const comparison = compareResults(result25.data, result3.data);
-  
+
+  const comparison = compareResults(resultPro.data, resultFlash.data);
+
   console.log('Comparison complete:');
-  console.log(`  Gemini 2.5: ${result25.processingTimeMs}ms, ${result25.data.constructions.length} constructions`);
-  console.log(`  Gemini 3: ${result3.processingTimeMs}ms, ${result3.data.constructions.length} constructions`);
+  console.log(`  Gemini 1.5 Pro: ${resultPro.processingTimeMs}ms, ${resultPro.data.constructions.length} constructions`);
+  console.log(`  Gemini 1.5 Flash: ${resultFlash.processingTimeMs}ms, ${resultFlash.data.constructions.length} constructions`);
   console.log(`  Differences: ${comparison.differences.length}`);
-  
+
   return {
-    gemini25: result25,
-    gemini3: result3,
+    gemini15Pro: resultPro,
+    gemini15Flash: resultFlash,
     comparison,
   };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders
+    });
   }
 
   try {
     const { file_content, file_type, file_name, compare_models } = await req.json();
     console.log(`Processing ${file_type} file: ${file_name}${compare_models ? ' (COMPARISON MODE)' : ''}`);
 
-    // Comparison mode - run both models
     if (compare_models) {
       const comparisonResult = await runComparison(file_content, file_type, file_content);
       return new Response(JSON.stringify(comparisonResult), {
@@ -785,7 +740,6 @@ serve(async (req) => {
       });
     }
 
-    // Normal mode - single model
     let result: ParsedOrder;
 
     if (file_type === 'csv') {
@@ -809,7 +763,10 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
   }
 });

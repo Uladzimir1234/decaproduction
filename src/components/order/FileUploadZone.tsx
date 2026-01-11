@@ -72,20 +72,20 @@ interface ModelResult {
 interface FieldDifference {
   field: string;
   constructionNumber?: string;
-  gemini25Value: string | null;
-  gemini3Value: string | null;
+  gemini15ProValue: string | null;
+  gemini15FlashValue: string | null;
 }
 
 interface ComparisonData {
-  gemini25: ModelResult;
-  gemini3: ModelResult;
+  gemini15Pro: ModelResult;
+  gemini15Flash: ModelResult;
   comparison: {
     constructionCountMatch: boolean;
     componentCountMatch: boolean;
     differences: string[];
     fieldDifferences: FieldDifference[];
-    gemini25Stats: { constructions: number; components: number; filledFields: number };
-    gemini3Stats: { constructions: number; components: number; filledFields: number };
+    gemini15ProStats: { constructions: number; components: number; filledFields: number };
+    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
   };
 }
 
@@ -158,12 +158,12 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      if (compareModels && data.gemini25 && data.gemini3) {
+      if (compareModels && data.gemini15Pro && data.gemini15Flash) {
         // Comparison mode - show comparison UI
         setComparisonData(data as ComparisonData);
         toast({
           title: "Comparison complete",
-          description: `Compared Gemini 2.5 Pro vs Gemini 3 Pro Preview`,
+          description: `Compared Gemini 1.5 Pro vs Gemini 1.5 Flash`,
         });
       } else {
         // Normal mode
@@ -294,8 +294,8 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
                 {compareModels ? 'Comparing models...' : `Processing ${fileName}...`}
               </p>
               <p className="text-xs text-muted-foreground">
-                {compareModels 
-                  ? 'Running Gemini 2.5 Pro and Gemini 3 Pro Preview in parallel...'
+                {compareModels
+                  ? 'Running Gemini 1.5 Pro and Gemini 1.5 Flash in parallel...'
                   : 'Using AI for accurate extraction...'}
               </p>
             </div>
@@ -319,12 +319,12 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           onCheckedChange={(checked) => setCompareModels(checked === true)}
           disabled={isProcessing}
         />
-        <Label 
-          htmlFor="compare-models" 
+        <Label
+          htmlFor="compare-models"
           className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
         >
           <GitCompare className="h-3.5 w-3.5" />
-          Compare Gemini 2.5 Pro vs Gemini 3 Pro Preview
+          Compare Gemini 1.5 Pro vs Gemini 1.5 Flash
         </Label>
       </div>
     </div>
