@@ -30,6 +30,7 @@ import { format } from "date-fns";
 import { OrderMapInline } from "@/components/order/OrderMapInline";
 import { useProcurementCart } from "@/contexts/ProcurementCartContext";
 import { ManufacturingPipelineSection } from "@/components/order/ManufacturingPipeline";
+import { calculateFulfillmentPercentage } from "@/lib/fulfillmentCalculation";
 interface OrderFulfillment {
   order_id: string;
   reinforcement_cutting: string | null;
@@ -1097,56 +1098,9 @@ export default function Orders() {
     return stages;
   };
 
-  const calculateFulfillmentPercentage = (order: Order) => {
+  const getOrderFulfillmentPercentage = (order: Order) => {
     const f = fulfillments[order.id];
-    if (!f) return order.fulfillment_percentage || 0;
-    
-    let totalSteps = 0;
-    let completedSteps = 0;
-
-    const getStatusPoints = (status: string | null | undefined, weight: number) => {
-      if (status === 'complete') return weight;
-      if (status === 'partial') return weight * 0.5;
-      return 0;
-    };
-
-    // Reinforcement cutting (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(f.reinforcement_cutting, 10);
-
-    // Profile cutting (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(f.profile_cutting, 10);
-
-    // Welding (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(f.welding_status, 10);
-
-    // Doors assembled (if applicable) (weight: 10%)
-    if (order.doors_count && order.doors_count > 0) {
-      totalSteps += 10;
-      completedSteps += getStatusPoints(f.doors_status, 10);
-    }
-
-    // Sliding doors assembled (if applicable) (weight: 10%)
-    if (order.has_sliding_doors) {
-      totalSteps += 10;
-      completedSteps += getStatusPoints(f.sliding_doors_status, 10);
-    }
-
-    // Frame/sash assembled (weight: 15%)
-    totalSteps += 15;
-    completedSteps += getStatusPoints(f.assembly_status, 15);
-
-    // Glass installed (weight: 25%)
-    totalSteps += 25;
-    completedSteps += getStatusPoints(f.glass_status, 25);
-
-    // Screens (weight: 10%)
-    totalSteps += 10;
-    completedSteps += getStatusPoints(f.screens_cutting, 10);
-
-    return Math.round(completedSteps / totalSteps * 100);
+    return calculateFulfillmentPercentage(order, f);
   };
 
   const handleStageStatusChange = async (orderId: string, field: string, newStatus: string) => {
@@ -2829,7 +2783,7 @@ export default function Orders() {
                         </div>
                         
                         <ProgressCircle
-                          value={calculateFulfillmentPercentage(order)}
+                          value={getOrderFulfillmentPercentage(order)}
                           size="sm"
                           colorVariant="gradient"
                           label="Fulfillment"

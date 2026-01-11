@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateFulfillmentPercentage } from '@/lib/fulfillmentCalculation';
 
 interface ConstructionComponent {
   id: string;
@@ -287,25 +288,7 @@ const calculateComponentReadiness = (order: OrderWithFulfillment): number => {
 };
 
 const calculateManufacturingProgress = (order: OrderWithFulfillment): number => {
-  if (!order.fulfillment) return 0;
-  let points = 0;
-  let total = 0;
-  
-  const stages = getManufacturingStages(order);
-  
-  stages.forEach(({ field }) => {
-    // Skip doors if no doors
-    if (field === 'doors_status' && !order.doors_count) return;
-    // Skip sliding doors stages if no sliding doors
-    if (field.startsWith('sliding_doors') && !order.sliding_doors_count) return;
-    
-    total += 1;
-    const status = getManufacturingStatus(order, field);
-    if (status === 'complete') points += 1;
-    else if (status === 'partial') points += 0.5;
-  });
-  
-  return total > 0 ? Math.round((points / total) * 100) : 0;
+  return calculateFulfillmentPercentage(order, order.fulfillment);
 };
 
 const getBlockers = (order: OrderWithFulfillment): string[] => {
