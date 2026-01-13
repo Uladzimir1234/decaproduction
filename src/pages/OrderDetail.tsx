@@ -435,6 +435,15 @@ export default function OrderDetail() {
     if (hardwareComponents.length > 0) {
       return hardwareComponents.some(c => c.status === 'available');
     }
+    
+    // Check custom ordering steps for hardware
+    const hardwareStep = customSteps.find(s => 
+      s.step_type === 'ordering' && 
+      s.name.toLowerCase().includes('hardware') &&
+      s.status === 'available'
+    );
+    if (hardwareStep) return true;
+    
     // Fall back to legacy order field
     return order?.hardware_status === 'available';
   };
