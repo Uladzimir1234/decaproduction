@@ -2526,6 +2526,11 @@ export default function Orders() {
                                 construction_type: c.construction_type,
                                 screen_type: c.screen_type,
                               }))}
+                              customSteps={customSteps.filter(s => s.order_id === order.id).map(s => ({
+                                step_type: s.step_type,
+                                name: s.name,
+                                status: s.status,
+                              }))}
                               canUpdateManufacturing={canUpdateManufacturing}
                               updateFulfillment={(field, value) => handleStageStatusChange(order.id, field, value)}
                               size="default"

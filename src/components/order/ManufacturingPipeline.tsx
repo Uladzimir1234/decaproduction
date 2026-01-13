@@ -242,6 +242,11 @@ interface ManufacturingPipelineSectionProps {
     construction_type: string;
     screen_type: string | null;
   }>;
+  customSteps?: Array<{
+    step_type: string;
+    name: string;
+    status: string;
+  }>;
   canUpdateManufacturing: boolean;
   updateFulfillment: (field: string, value: any) => void;
   size?: "default" | "compact";
@@ -254,6 +259,7 @@ export function ManufacturingPipelineSection({
   fulfillment,
   aggregatedComponents,
   constructions = [],
+  customSteps = [],
   canUpdateManufacturing,
   updateFulfillment,
   size = "default",
@@ -278,10 +284,23 @@ export function ManufacturingPipelineSection({
   };
 
   const isHardwareAvailable = () => {
+    // Check construction_components first
     const hardwareComponents = aggregatedComponents.filter(c => c.component_type === 'hardware');
     if (hardwareComponents.length > 0) {
       return hardwareComponents.some(c => c.status === 'available');
     }
+    
+    // Check custom ordering steps for hardware
+    if (customSteps.length > 0) {
+      const hardwareStep = customSteps.find(s => 
+        s.step_type === 'ordering' && 
+        s.name.toLowerCase().includes('hardware') &&
+        s.status === 'available'
+      );
+      if (hardwareStep) return true;
+    }
+    
+    // Fallback to legacy order field
     return order?.hardware_status === 'available';
   };
 
