@@ -69,8 +69,6 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [compareModels, setCompareModels] = useState(false);
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const { toast } = useToast();
 
   const processFile = useCallback(async (file: File) => {
