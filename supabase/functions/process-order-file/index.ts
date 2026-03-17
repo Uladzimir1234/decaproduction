@@ -624,7 +624,7 @@ async function parseCSVWithAI(csvContent: string, model: string = AI_MODEL): Pro
   return result.data;
 }
 
-async function processPDFWithAI(base64Content: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
+async function processPDFWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
   console.log(`Processing PDF with ${model}...`);
   const result = await extractWithModel(model, '', 'pdf', base64Content);
   if (result.error) throw new Error(result.error);
