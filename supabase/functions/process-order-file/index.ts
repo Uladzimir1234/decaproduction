@@ -617,7 +617,7 @@ async function extractWithModel(model: string, textContent: string, contentType:
   }
 }
 
-async function parseCSVWithAI(csvContent: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
+async function parseCSVWithAI(csvContent: string, model: string = AI_MODEL): Promise<ParsedOrder> {
   console.log(`Parsing CSV with ${model}...`);
   const result = await extractWithModel(model, csvContent, 'csv');
   if (result.error) throw new Error(result.error);
