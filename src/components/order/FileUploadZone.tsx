@@ -142,7 +142,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
     } finally {
       setIsProcessing(false);
     }
-  }, [onDataParsed, toast, compareModels]);
+  }, [onDataParsed, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
