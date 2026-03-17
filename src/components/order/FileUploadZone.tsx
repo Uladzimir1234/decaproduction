@@ -95,7 +95,6 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
     setIsProcessing(true);
     setFileName(file.name);
-    setComparisonData(null);
 
     try {
       const reader = new FileReader();
