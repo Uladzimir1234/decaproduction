@@ -2,16 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const MODELS = {
-  gemini15Pro: 'gemini-2.5-pro',
-  gemini15Flash: 'gemini-2.5-pro',
-};
-
-const DEFAULT_MODEL = MODELS.gemini15Pro;
+const AI_MODEL = 'google/gemini-3-flash-preview';
 
 interface ConstructionComponent {
   component_type: string;
