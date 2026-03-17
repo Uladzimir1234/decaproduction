@@ -1,11 +1,8 @@
 import { useState, useCallback } from "react";
-import { Upload, FileText, Loader2, X, GitCompare } from "lucide-react";
+import { Upload, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { ModelComparisonView } from "./ModelComparisonView";
 
 export interface ParsedComponent {
   component_type: string;
