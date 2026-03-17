@@ -437,63 +437,6 @@ async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
   return extractWithModel(textContent, 'excel');
 }
 
-async function runComparison(
-  fileContent: string,
-  fileType: 'csv' | 'pdf' | 'excel',
-  base64Content: string
-): Promise<ComparisonResult> {
-  console.log('Running model comparison...');
-
-  let content = '';
-  if (fileType === 'csv') {
-    content = atob(base64Content);
-  } else if (fileType === 'excel') {
-    const binaryString = atob(base64Content);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    let currentString = '';
-    for (let i = 0; i < bytes.length; i++) {
-      const byte = bytes[i];
-      if ((byte >= 32 && byte <= 126) || byte === 10 || byte === 13 || byte === 9) {
-        currentString += String.fromCharCode(byte);
-      } else if (currentString.length > 3) {
-        content += currentString + '\n';
-        currentString = '';
-      } else {
-        currentString = '';
-      }
-    }
-    if (currentString.length > 3) {
-      content += currentString;
-    }
-    content = content
-      .split('\n')
-      .filter(line => line.trim().length > 2)
-      .filter(line => !/^[\x00-\x1F\x7F]+$/.test(line))
-      .join('\n');
-  }
-
-  const [resultPro, resultFlash] = await Promise.all([
-    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-  ]);
-
-  const comparison = compareResults(resultPro.data, resultFlash.data);
-
-  console.log('Comparison complete:');
-  console.log(`  Run A: ${resultPro.processingTimeMs}ms, ${resultPro.data.constructions.length} constructions`);
-  console.log(`  Run B: ${resultFlash.processingTimeMs}ms, ${resultFlash.data.constructions.length} constructions`);
-  console.log(`  Differences: ${comparison.differences.length}`);
-
-  return {
-    gemini15Pro: resultPro,
-    gemini15Flash: resultFlash,
-    comparison,
-  };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
