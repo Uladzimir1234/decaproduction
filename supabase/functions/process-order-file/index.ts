@@ -631,7 +631,7 @@ async function processPDFWithAI(base64Content: string, model: string = AI_MODEL)
   return result.data;
 }
 
-async function parseExcelWithAI(base64Content: string, model: string = DEFAULT_MODEL): Promise<ParsedOrder> {
+async function parseExcelWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
   console.log('Converting Excel to text...');
 
   const binaryString = atob(base64Content);
