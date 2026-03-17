@@ -59,33 +59,6 @@ export interface ParsedOrderData {
   profile_info?: ProfileInfo | null;
 }
 
-interface ModelResult {
-  model: string;
-  data: ParsedOrderData;
-  processingTimeMs: number;
-  error?: string;
-}
-
-interface FieldDifference {
-  field: string;
-  constructionNumber?: string;
-  gemini15ProValue: string | null;
-  gemini15FlashValue: string | null;
-}
-
-interface ComparisonData {
-  gemini15Pro: ModelResult;
-  gemini15Flash: ModelResult;
-  comparison: {
-    constructionCountMatch: boolean;
-    componentCountMatch: boolean;
-    differences: string[];
-    fieldDifferences: FieldDifference[];
-    gemini15ProStats: { constructions: number; components: number; filledFields: number };
-    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
-  };
-}
-
 interface FileUploadZoneProps {
   onDataParsed: (data: ParsedOrderData) => void;
   onClear: () => void;
