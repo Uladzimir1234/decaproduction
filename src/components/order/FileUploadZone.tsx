@@ -295,7 +295,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
               </p>
               <p className="text-xs text-muted-foreground">
                 {compareModels
-                  ? 'Running Gemini 2.5 Pro comparison in parallel...'
+                  ? 'Running Gemini 3.0 Flash comparison in parallel...'
                   : 'Using AI for accurate extraction...'}
               </p>
             </div>
