@@ -295,7 +295,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
               </p>
               <p className="text-xs text-muted-foreground">
                 {compareModels
-                  ? 'Running Gemini 2.5 Pro comparison in parallel...'
+                  ? 'Running Gemini 3.0 Flash comparison in parallel...'
                   : 'Using AI for accurate extraction...'}
               </p>
             </div>
@@ -324,7 +324,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
         >
           <GitCompare className="h-3.5 w-3.5" />
-          Compare Gemini 2.5 Pro (dual run)
+          Compare Gemini 3.0 Flash (dual run)
         </Label>
       </div>
     </div>

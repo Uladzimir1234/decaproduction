@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const AI_MODEL = 'google/gemini-3-flash-preview';
+const AI_MODEL = 'gemini-3.0-flash-preview';
 
 interface ConstructionComponent {
   component_type: string;
@@ -507,85 +507,73 @@ function compareResults(result1: ParsedOrder, result2: ParsedOrder) {
 }
 
 async function extractWithModel(model: string, textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
   
-  if (!LOVABLE_API_KEY) {
-    throw new Error("LOVABLE_API_KEY is not configured");
+  if (!GOOGLE_API_KEY) {
+    throw new Error("GOOGLE_API_KEY is not configured");
   }
 
   const startTime = Date.now();
   console.log(`Extracting with ${model}...`);
 
   try {
-    // Build messages for OpenAI-compatible API
-    const userContent: any[] = [];
+    const parts: any[] = [];
 
     if (contentType === 'pdf' && base64Content) {
-      userContent.push({
-        type: "text",
+      parts.push({
         text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
       });
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: `data:application/pdf;base64,${base64Content}`
+      parts.push({
+        inlineData: {
+          mimeType: 'application/pdf',
+          data: base64Content,
         }
       });
     } else {
-      userContent.push({
-        type: "text",
+      parts.push({
         text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
       });
     }
 
-    // Convert Google function declaration to OpenAI tools format
-    const tools = [{
-      type: "function" as const,
-      function: {
-        name: extractionFunctionDeclaration.name,
-        description: extractionFunctionDeclaration.description,
-        parameters: extractionFunctionDeclaration.parameters,
-      }
-    }];
-
     const requestBody = {
-      model,
-      messages: [
-        { role: "user", content: userContent }
-      ],
-      tools,
-      tool_choice: { type: "function", function: { name: "extract_order_data" } },
+      contents: [{ parts }],
+      tools: [{
+        functionDeclarations: [extractionFunctionDeclaration]
+      }],
+      toolConfig: {
+        functionCallingConfig: {
+          mode: 'ANY',
+          allowedFunctionNames: ['extract_order_data']
+        }
+      }
     };
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`AI Gateway error for ${model}:`, response.status, errorText);
-      throw new Error(`AI processing failed: ${response.status}`);
+      console.error(`Google API error for ${model}:`, response.status, errorText);
+      throw new Error(`AI processing failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     
-    // Parse OpenAI tool call response
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    // Parse Google native function call response
+    const candidate = data.candidates?.[0];
+    const functionCall = candidate?.content?.parts?.[0]?.functionCall;
     
-    if (!toolCall?.function?.arguments) {
-      console.error('No tool call in response:', JSON.stringify(data, null, 2));
-      throw new Error('Failed to extract data - no tool call returned');
+    if (!functionCall?.args) {
+      console.error('No function call in response:', JSON.stringify(data, null, 2));
+      throw new Error('Failed to extract data - no function call returned');
     }
 
-    const extracted = JSON.parse(toolCall.function.arguments);
+    const extracted = functionCall.args;
     const processingTimeMs = Date.now() - startTime;
 
     console.log(`${model} completed in ${processingTimeMs}ms`);

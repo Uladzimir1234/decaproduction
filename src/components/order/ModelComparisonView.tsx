@@ -57,7 +57,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
     if (comparison.gemini15FlashStats.components > comparison.gemini15ProStats.components) return 'gemini15Flash';
     if (comparison.gemini15ProStats.filledFields > comparison.gemini15FlashStats.filledFields) return 'gemini15Pro';
     if (comparison.gemini15FlashStats.filledFields > comparison.gemini15ProStats.filledFields) return 'gemini15Flash';
-    // Default to Gemini 2.5 Pro (most accurate)
+    // Default to Run A
     return 'gemini15Pro';
   };
 
@@ -119,7 +119,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 2.5 Pro (Run A)
+              Gemini 3.0 Flash (Run A)
               {gemini15Pro.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
           </CardHeader>
@@ -156,7 +156,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                 <Button
                   className="w-full"
                   variant={winner === 'gemini15Pro' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 2.5 Pro (Run A)')}
+                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 3.0 Flash (Run A)')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -173,7 +173,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 2.5 Pro (Run B)
+              Gemini 3.0 Flash (Run B)
               <Badge variant="secondary" className="text-xs">Same Model</Badge>
               {gemini15Flash.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
@@ -211,7 +211,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                 <Button
                   className="w-full"
                   variant={winner === 'gemini15Flash' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini15Flash.data, 'Gemini 2.5 Pro (Run B)')}
+                  onClick={() => onSelectModel(gemini15Flash.data, 'Gemini 3.0 Flash (Run B)')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -241,8 +241,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[150px]">Field</TableHead>
-                        <TableHead className="text-blue-600">Gemini 2.5 Pro (A)</TableHead>
-                        <TableHead className="text-purple-600">Gemini 2.5 Pro (B)</TableHead>
+                        <TableHead className="text-blue-600">Gemini 3.0 Flash (A)</TableHead>
+                        <TableHead className="text-purple-600">Gemini 3.0 Flash (B)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -281,8 +281,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[150px]">Field</TableHead>
-                            <TableHead className="text-blue-600">Gemini 2.5 Pro (A)</TableHead>
-                            <TableHead className="text-purple-600">Gemini 2.5 Pro (B)</TableHead>
+                            <TableHead className="text-blue-600">Gemini 3.0 Flash (A)</TableHead>
+                            <TableHead className="text-purple-600">Gemini 3.0 Flash (B)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
