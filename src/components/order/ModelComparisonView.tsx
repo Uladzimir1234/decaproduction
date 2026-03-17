@@ -57,7 +57,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
     if (comparison.gemini15FlashStats.components > comparison.gemini15ProStats.components) return 'gemini15Flash';
     if (comparison.gemini15ProStats.filledFields > comparison.gemini15FlashStats.filledFields) return 'gemini15Pro';
     if (comparison.gemini15FlashStats.filledFields > comparison.gemini15ProStats.filledFields) return 'gemini15Flash';
-    // Default to Gemini 2.5 Pro (most accurate)
+    // Default to Run A
     return 'gemini15Pro';
   };
 
