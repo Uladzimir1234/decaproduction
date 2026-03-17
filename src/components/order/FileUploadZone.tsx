@@ -119,29 +119,18 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           file_content: base64Content,
           file_type: fileType,
           file_name: file.name,
-          compare_models: compareModels,
         },
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      if (compareModels && data.gemini15Pro && data.gemini15Flash) {
-        // Comparison mode - show comparison UI
-        setComparisonData(data as ComparisonData);
-        toast({
-          title: "Comparison complete",
-          description: `Compared Gemini 1.5 Pro vs Gemini 1.5 Flash`,
-        });
-      } else {
-        // Normal mode
-        onDataParsed(data);
-        const componentCount = data.aggregated_components?.length || 0;
-        toast({
-          title: "File processed",
-          description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
-        });
-      }
+      onDataParsed(data);
+      const componentCount = data.aggregated_components?.length || 0;
+      toast({
+        title: "File processed",
+        description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
+      });
     } catch (error: any) {
       console.error('Error processing file:', error);
       toast({
