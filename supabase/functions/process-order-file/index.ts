@@ -58,32 +58,6 @@ interface ParsedOrder {
   } | null;
 }
 
-interface FieldDifference {
-  field: string;
-  constructionNumber?: string;
-  gemini15ProValue: string | null;
-  gemini15FlashValue: string | null;
-}
-
-interface ModelResult {
-  model: string;
-  data: ParsedOrder;
-  processingTimeMs: number;
-  error?: string;
-}
-
-interface ComparisonResult {
-  gemini15Pro: ModelResult;
-  gemini15Flash: ModelResult;
-  comparison: {
-    constructionCountMatch: boolean;
-    componentCountMatch: boolean;
-    differences: string[];
-    fieldDifferences: FieldDifference[];
-    gemini15ProStats: { constructions: number; components: number; filledFields: number };
-    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
-  };
-}
 
 const extractionFunctionDeclaration = {
   name: 'extract_order_data',
