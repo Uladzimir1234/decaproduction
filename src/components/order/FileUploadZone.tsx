@@ -324,7 +324,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
         >
           <GitCompare className="h-3.5 w-3.5" />
-          Compare Gemini 1.5 Pro vs Gemini 1.5 Flash
+          Compare Gemini 2.5 Pro (dual run)
         </Label>
       </div>
     </div>
