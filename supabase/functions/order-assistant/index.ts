@@ -191,7 +191,7 @@ If asked about a specific order not in the list, say you don't have data for tha
     ];
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${GOOGLE_API_KEY}&alt=sse`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?key=${GOOGLE_API_KEY}&alt=sse`,
       {
         method: "POST",
         headers: {

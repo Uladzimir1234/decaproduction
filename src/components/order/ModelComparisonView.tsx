@@ -57,7 +57,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
     if (comparison.gemini15FlashStats.components > comparison.gemini15ProStats.components) return 'gemini15Flash';
     if (comparison.gemini15ProStats.filledFields > comparison.gemini15FlashStats.filledFields) return 'gemini15Pro';
     if (comparison.gemini15FlashStats.filledFields > comparison.gemini15ProStats.filledFields) return 'gemini15Flash';
-    // Default to Gemini 1.5 Pro (most accurate)
+    // Default to Gemini 2.5 Pro (most accurate)
     return 'gemini15Pro';
   };
 
@@ -119,7 +119,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 1.5 Pro
+              Gemini 2.5 Pro (Run A)
               {gemini15Pro.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
           </CardHeader>
@@ -156,7 +156,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                 <Button
                   className="w-full"
                   variant={winner === 'gemini15Pro' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 1.5 Pro')}
+                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 2.5 Pro (Run A)')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -173,8 +173,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 1.5 Flash
-              <Badge variant="secondary" className="text-xs">Faster</Badge>
+              Gemini 2.5 Pro (Run B)
+              <Badge variant="secondary" className="text-xs">Same Model</Badge>
               {gemini15Flash.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
           </CardHeader>
@@ -211,7 +211,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                 <Button
                   className="w-full"
                   variant={winner === 'gemini15Flash' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini15Flash.data, 'Gemini 1.5 Flash')}
+                  onClick={() => onSelectModel(gemini15Flash.data, 'Gemini 2.5 Pro (Run B)')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -241,8 +241,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[150px]">Field</TableHead>
-                        <TableHead className="text-blue-600">Gemini 1.5 Pro</TableHead>
-                        <TableHead className="text-purple-600">Gemini 1.5 Flash</TableHead>
+                        <TableHead className="text-blue-600">Gemini 2.5 Pro (A)</TableHead>
+                        <TableHead className="text-purple-600">Gemini 2.5 Pro (B)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -281,8 +281,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[150px]">Field</TableHead>
-                            <TableHead className="text-blue-600">Gemini 1.5 Pro</TableHead>
-                            <TableHead className="text-purple-600">Gemini 1.5 Flash</TableHead>
+                            <TableHead className="text-blue-600">Gemini 2.5 Pro (A)</TableHead>
+                            <TableHead className="text-purple-600">Gemini 2.5 Pro (B)</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
