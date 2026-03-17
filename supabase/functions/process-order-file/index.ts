@@ -390,21 +390,17 @@ async function extractWithModel(textContent: string, contentType: 'csv' | 'pdf' 
   return processExtractedData(extracted);
 }
 
-async function parseCSVWithAI(csvContent: string, model: string = AI_MODEL): Promise<ParsedOrder> {
-  console.log(`Parsing CSV with ${model}...`);
-  const result = await extractWithModel(model, csvContent, 'csv');
-  if (result.error) throw new Error(result.error);
-  return result.data;
+async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
+  console.log('Parsing CSV...');
+  return extractWithModel(csvContent, 'csv');
 }
 
-async function processPDFWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
-  console.log(`Processing PDF with ${model}...`);
-  const result = await extractWithModel(model, '', 'pdf', base64Content);
-  if (result.error) throw new Error(result.error);
-  return result.data;
+async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
+  console.log('Processing PDF...');
+  return extractWithModel('', 'pdf', base64Content);
 }
 
-async function parseExcelWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
+async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
   console.log('Converting Excel to text...');
 
   const binaryString = atob(base64Content);
@@ -438,9 +434,7 @@ async function parseExcelWithAI(base64Content: string, model: string = AI_MODEL)
 
   console.log('Extracted text preview:', textContent.substring(0, 500));
 
-  const result = await extractWithModel(model, textContent, 'excel');
-  if (result.error) throw new Error(result.error);
-  return result.data;
+  return extractWithModel(textContent, 'excel');
 }
 
 async function runComparison(
