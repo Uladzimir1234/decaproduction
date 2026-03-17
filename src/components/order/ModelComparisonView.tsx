@@ -241,8 +241,8 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[150px]">Field</TableHead>
-                        <TableHead className="text-blue-600">Gemini 2.5 Pro (A)</TableHead>
-                        <TableHead className="text-purple-600">Gemini 2.5 Pro (B)</TableHead>
+                        <TableHead className="text-blue-600">Gemini 3.0 Flash (A)</TableHead>
+                        <TableHead className="text-purple-600">Gemini 3.0 Flash (B)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
