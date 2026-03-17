@@ -173,29 +173,8 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
   const handleClear = useCallback(() => {
     setFileName(null);
-    setComparisonData(null);
     onClear();
   }, [onClear]);
-
-  const handleSelectModel = useCallback((modelData: ParsedOrderData, modelName: string) => {
-    onDataParsed(modelData);
-    setComparisonData(null);
-    toast({
-      title: "Model selected",
-      description: `Using extraction from ${modelName}`,
-    });
-  }, [onDataParsed, toast]);
-
-  // Show comparison view
-  if (comparisonData) {
-    return (
-      <ModelComparisonView 
-        data={comparisonData}
-        onSelectModel={handleSelectModel}
-        onCancel={handleClear}
-      />
-    );
-  }
 
   if (parsedData) {
     const componentCount = parsedData.aggregated_components?.length || 0;
