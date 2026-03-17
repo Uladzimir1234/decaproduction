@@ -173,7 +173,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
           )}
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              Gemini 2.5 Pro (Run B)
+              Gemini 3.0 Flash (Run B)
               <Badge variant="secondary" className="text-xs">Same Model</Badge>
               {gemini15Flash.error && <Badge variant="destructive">Error</Badge>}
             </CardTitle>
