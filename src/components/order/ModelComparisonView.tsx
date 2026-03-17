@@ -156,7 +156,7 @@ export function ModelComparisonView({ data, onSelectModel, onCancel }: ModelComp
                 <Button
                   className="w-full"
                   variant={winner === 'gemini15Pro' ? 'default' : 'outline'}
-                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 1.5 Pro')}
+                  onClick={() => onSelectModel(gemini15Pro.data, 'Gemini 2.5 Pro (Run A)')}
                 >
                   Use This Result
                   <ArrowRight className="h-4 w-4 ml-2" />
