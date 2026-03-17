@@ -319,7 +319,7 @@ function processExtractedData(extracted: any): ParsedOrder {
 }
 
 
-async function extractWithModel(model: string, textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
+async function extractWithModel(textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ParsedOrder> {
   const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
   
   if (!GOOGLE_API_KEY) {
@@ -327,95 +327,67 @@ async function extractWithModel(model: string, textContent: string, contentType:
   }
 
   const startTime = Date.now();
-  console.log(`Extracting with ${model}...`);
+  console.log(`Extracting with ${AI_MODEL}...`);
 
-  try {
-    const parts: any[] = [];
+  const parts: any[] = [];
 
-    if (contentType === 'pdf' && base64Content) {
-      parts.push({
-        text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
-      });
-      parts.push({
-        inlineData: {
-          mimeType: 'application/pdf',
-          data: base64Content,
-        }
-      });
-    } else {
-      parts.push({
-        text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
-      });
-    }
-
-    const requestBody = {
-      contents: [{ parts }],
-      tools: [{
-        functionDeclarations: [extractionFunctionDeclaration]
-      }],
-      toolConfig: {
-        functionCallingConfig: {
-          mode: 'ANY',
-          allowedFunctionNames: ['extract_order_data']
-        }
-      }
-    };
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
+  if (contentType === 'pdf' && base64Content) {
+    parts.push({
+      text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Google API error for ${model}:`, response.status, errorText);
-      throw new Error(`AI processing failed: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Parse Google native function call response
-    const candidate = data.candidates?.[0];
-    const functionCall = candidate?.content?.parts?.[0]?.functionCall;
-    
-    if (!functionCall?.args) {
-      console.error('No function call in response:', JSON.stringify(data, null, 2));
-      throw new Error('Failed to extract data - no function call returned');
-    }
-
-    const extracted = functionCall.args;
-    const processingTimeMs = Date.now() - startTime;
-
-    console.log(`${model} completed in ${processingTimeMs}ms`);
-
-    return {
-      model,
-      data: processExtractedData(extracted),
-      processingTimeMs,
-    };
-  } catch (error) {
-    const processingTimeMs = Date.now() - startTime;
-    console.error(`Error with ${model}:`, error);
-    return {
-      model,
-      data: {
-        quote_number: null,
-        customer_name: null,
-        order_date: null,
-        constructions: [],
-        windows_count: 0,
-        doors_count: 0,
-        sliding_doors_count: 0,
-        aggregated_components: [],
-        profile_info: null,
-      },
-      processingTimeMs,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    parts.push({
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: base64Content,
+      }
+    });
+  } else {
+    parts.push({
+      text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
+    });
   }
+
+  const requestBody = {
+    contents: [{ parts }],
+    tools: [{
+      functionDeclarations: [extractionFunctionDeclaration]
+    }],
+    toolConfig: {
+      functionCallingConfig: {
+        mode: 'ANY',
+        allowedFunctionNames: ['extract_order_data']
+      }
+    }
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}:generateContent?key=${GOOGLE_API_KEY}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Google API error:`, response.status, errorText);
+    throw new Error(`AI processing failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  const candidate = data.candidates?.[0];
+  const functionCall = candidate?.content?.parts?.[0]?.functionCall;
+  
+  if (!functionCall?.args) {
+    console.error('No function call in response:', JSON.stringify(data, null, 2));
+    throw new Error('Failed to extract data - no function call returned');
+  }
+
+  const extracted = functionCall.args;
+  console.log(`${AI_MODEL} completed in ${Date.now() - startTime}ms`);
+
+  return processExtractedData(extracted);
 }
 
 async function parseCSVWithAI(csvContent: string, model: string = AI_MODEL): Promise<ParsedOrder> {
