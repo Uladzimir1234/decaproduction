@@ -503,15 +503,8 @@ serve(async (req) => {
   }
 
   try {
-    const { file_content, file_type, file_name, compare_models } = await req.json();
-    console.log(`Processing ${file_type} file: ${file_name}${compare_models ? ' (COMPARISON MODE)' : ''}`);
-
-    if (compare_models) {
-      const comparisonResult = await runComparison(file_content, file_type, file_content);
-      return new Response(JSON.stringify(comparisonResult), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { file_content, file_type, file_name } = await req.json();
+    console.log(`Processing ${file_type} file: ${file_name}`);
 
     let result: ParsedOrder;
 

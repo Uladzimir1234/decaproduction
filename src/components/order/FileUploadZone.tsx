@@ -203,66 +203,43 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   }
 
   return (
-    <div className="space-y-3">
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`
-          border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
-          ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-          ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
-        `}
-      >
-        <input
-          type="file"
-          accept=".csv,.pdf,.xls,.xlsx"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="file-upload"
-          disabled={isProcessing}
-        />
-        <label htmlFor="file-upload" className="cursor-pointer">
-          {isProcessing ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <p className="text-sm font-medium">
-                {compareModels ? 'Comparing models...' : `Processing ${fileName}...`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {compareModels
-                  ? 'Running Gemini 3.0 Flash comparison in parallel...'
-                  : 'Using AI for accurate extraction...'}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm font-medium">Upload Order File</p>
-              <p className="text-xs text-muted-foreground">
-                PDF, CSV, or Excel
-              </p>
-            </div>
-          )}
-        </label>
-      </div>
-      
-      {/* Compare Models Toggle */}
-      <div className="flex items-center gap-2 px-1">
-        <Checkbox 
-          id="compare-models" 
-          checked={compareModels}
-          onCheckedChange={(checked) => setCompareModels(checked === true)}
-          disabled={isProcessing}
-        />
-        <Label
-          htmlFor="compare-models"
-          className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
-        >
-          <GitCompare className="h-3.5 w-3.5" />
-          Compare Gemini 3.0 Flash (dual run)
-        </Label>
-      </div>
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`
+        border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+        ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+        ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
+      `}
+    >
+      <input
+        type="file"
+        accept=".csv,.pdf,.xls,.xlsx"
+        onChange={handleFileSelect}
+        className="hidden"
+        id="file-upload"
+        disabled={isProcessing}
+      />
+      <label htmlFor="file-upload" className="cursor-pointer">
+        {isProcessing ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <p className="text-sm font-medium">Processing {fileName}...</p>
+            <p className="text-xs text-muted-foreground">
+              Using AI for accurate extraction...
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Upload Order File</p>
+            <p className="text-xs text-muted-foreground">
+              PDF, CSV, or Excel
+            </p>
+          </div>
+        )}
+      </label>
     </div>
   );
 }
