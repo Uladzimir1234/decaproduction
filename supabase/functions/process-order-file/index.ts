@@ -58,32 +58,6 @@ interface ParsedOrder {
   } | null;
 }
 
-interface FieldDifference {
-  field: string;
-  constructionNumber?: string;
-  gemini15ProValue: string | null;
-  gemini15FlashValue: string | null;
-}
-
-interface ModelResult {
-  model: string;
-  data: ParsedOrder;
-  processingTimeMs: number;
-  error?: string;
-}
-
-interface ComparisonResult {
-  gemini15Pro: ModelResult;
-  gemini15Flash: ModelResult;
-  comparison: {
-    constructionCountMatch: boolean;
-    componentCountMatch: boolean;
-    differences: string[];
-    fieldDifferences: FieldDifference[];
-    gemini15ProStats: { constructions: number; components: number; filledFields: number };
-    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
-  };
-}
 
 const extractionFunctionDeclaration = {
   name: 'extract_order_data',
@@ -344,169 +318,8 @@ function processExtractedData(extracted: any): ParsedOrder {
   };
 }
 
-function countFilledFields(data: ParsedOrder): number {
-  let count = 0;
-  const fieldsToCheck = ['quote_number', 'customer_name', 'order_date'];
 
-  for (const field of fieldsToCheck) {
-    if ((data as any)[field]) count++;
-  }
-
-  for (const c of data.constructions) {
-    const constructionFields = [
-      'width_mm', 'height_mm', 'width_inches', 'height_inches',
-      'model', 'opening_type', 'color_exterior', 'color_interior',
-      'glass_type', 'screen_type', 'handle_type', 'blinds_color',
-      'location', 'rough_opening', 'comments'
-    ];
-    for (const field of constructionFields) {
-      if ((c as any)[field]) count++;
-    }
-  }
-
-  return count;
-}
-
-function compareResults(result1: ParsedOrder, result2: ParsedOrder) {
-  const differences: string[] = [];
-  const fieldDifferences: FieldDifference[] = [];
-
-  const formatValue = (val: any): string | null => {
-    if (val === null || val === undefined) return null;
-    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-    if (typeof val === 'number') return String(val);
-    return String(val);
-  };
-
-  const orderFields = ['quote_number', 'customer_name', 'order_date'];
-  for (const field of orderFields) {
-    const val1 = (result1 as any)[field];
-    const val2 = (result2 as any)[field];
-    if (val1 !== val2) {
-      fieldDifferences.push({
-        field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        gemini15ProValue: formatValue(val1),
-        gemini15FlashValue: formatValue(val2),
-      });
-    }
-  }
-
-  if (result1.constructions.length !== result2.constructions.length) {
-    differences.push(`Construction count: Pro found ${result1.constructions.length}, Flash found ${result2.constructions.length}`);
-  }
-
-  if (result1.aggregated_components.length !== result2.aggregated_components.length) {
-    differences.push(`Component types: Pro found ${result1.aggregated_components.length}, Flash found ${result2.aggregated_components.length}`);
-  }
-
-  if (result1.windows_count !== result2.windows_count) {
-    fieldDifferences.push({
-      field: 'Windows Count',
-      gemini15ProValue: String(result1.windows_count),
-      gemini15FlashValue: String(result2.windows_count),
-    });
-  }
-  if (result1.doors_count !== result2.doors_count) {
-    fieldDifferences.push({
-      field: 'Doors Count',
-      gemini15ProValue: String(result1.doors_count),
-      gemini15FlashValue: String(result2.doors_count),
-    });
-  }
-  if (result1.sliding_doors_count !== result2.sliding_doors_count) {
-    fieldDifferences.push({
-      field: 'Sliding Doors Count',
-      gemini15ProValue: String(result1.sliding_doors_count),
-      gemini15FlashValue: String(result2.sliding_doors_count),
-    });
-  }
-
-  const constructionFields = [
-    'construction_type', 'width_mm', 'height_mm', 'width_inches', 'height_inches',
-    'model', 'opening_type', 'color_exterior', 'color_interior',
-    'glass_type', 'screen_type', 'handle_type', 'has_blinds', 'blinds_color',
-    'location', 'rough_opening', 'comments', 'quantity', 'center_seal'
-  ];
-
-  const constructions1Map = new Map(result1.constructions.map(c => [c.construction_number, c]));
-  const constructions2Map = new Map(result2.constructions.map(c => [c.construction_number, c]));
-
-  const allConstructionNumbers = new Set([
-    ...result1.constructions.map(c => c.construction_number),
-    ...result2.constructions.map(c => c.construction_number),
-  ]);
-
-  for (const cNum of allConstructionNumbers) {
-    const c1 = constructions1Map.get(cNum);
-    const c2 = constructions2Map.get(cNum);
-
-    if (!c1 && c2) {
-      fieldDifferences.push({
-        field: 'Construction',
-        constructionNumber: cNum,
-        gemini15ProValue: null,
-        gemini15FlashValue: `Found (${c2.construction_type})`,
-      });
-      continue;
-    }
-
-    if (c1 && !c2) {
-      fieldDifferences.push({
-        field: 'Construction',
-        constructionNumber: cNum,
-        gemini15ProValue: `Found (${c1.construction_type})`,
-        gemini15FlashValue: null,
-      });
-      continue;
-    }
-
-    if (c1 && c2) {
-      for (const field of constructionFields) {
-        const val1 = (c1 as any)[field];
-        const val2 = (c2 as any)[field];
-        if (val1 !== val2) {
-          fieldDifferences.push({
-            field: field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-            constructionNumber: cNum,
-            gemini15ProValue: formatValue(val1),
-            gemini15FlashValue: formatValue(val2),
-          });
-        }
-      }
-    }
-  }
-
-  if (fieldDifferences.length > 0) {
-    const constructionDiffs = fieldDifferences.filter(d => d.constructionNumber);
-    const orderDiffs = fieldDifferences.filter(d => !d.constructionNumber);
-
-    if (orderDiffs.length > 0) {
-      differences.push(`${orderDiffs.length} order-level field differences`);
-    }
-    if (constructionDiffs.length > 0) {
-      differences.push(`${constructionDiffs.length} construction-level field differences`);
-    }
-  }
-
-  return {
-    constructionCountMatch: result1.constructions.length === result2.constructions.length,
-    componentCountMatch: result1.aggregated_components.length === result2.aggregated_components.length,
-    differences,
-    fieldDifferences,
-    gemini15ProStats: {
-      constructions: result1.constructions.length,
-      components: result1.aggregated_components.length,
-      filledFields: countFilledFields(result1),
-    },
-    gemini15FlashStats: {
-      constructions: result2.constructions.length,
-      components: result2.aggregated_components.length,
-      filledFields: countFilledFields(result2),
-    },
-  };
-}
-
-async function extractWithModel(model: string, textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ModelResult> {
+async function extractWithModel(textContent: string, contentType: 'csv' | 'pdf' | 'excel', base64Content?: string): Promise<ParsedOrder> {
   const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
   
   if (!GOOGLE_API_KEY) {
@@ -514,112 +327,80 @@ async function extractWithModel(model: string, textContent: string, contentType:
   }
 
   const startTime = Date.now();
-  console.log(`Extracting with ${model}...`);
+  console.log(`Extracting with ${AI_MODEL}...`);
 
-  try {
-    const parts: any[] = [];
+  const parts: any[] = [];
 
-    if (contentType === 'pdf' && base64Content) {
-      parts.push({
-        text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
-      });
-      parts.push({
-        inlineData: {
-          mimeType: 'application/pdf',
-          data: base64Content,
-        }
-      });
-    } else {
-      parts.push({
-        text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
-      });
-    }
-
-    const requestBody = {
-      contents: [{ parts }],
-      tools: [{
-        functionDeclarations: [extractionFunctionDeclaration]
-      }],
-      toolConfig: {
-        functionCallingConfig: {
-          mode: 'ANY',
-          allowedFunctionNames: ['extract_order_data']
-        }
-      }
-    };
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
+  if (contentType === 'pdf' && base64Content) {
+    parts.push({
+      text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.`
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Google API error for ${model}:`, response.status, errorText);
-      throw new Error(`AI processing failed: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Parse Google native function call response
-    const candidate = data.candidates?.[0];
-    const functionCall = candidate?.content?.parts?.[0]?.functionCall;
-    
-    if (!functionCall?.args) {
-      console.error('No function call in response:', JSON.stringify(data, null, 2));
-      throw new Error('Failed to extract data - no function call returned');
-    }
-
-    const extracted = functionCall.args;
-    const processingTimeMs = Date.now() - startTime;
-
-    console.log(`${model} completed in ${processingTimeMs}ms`);
-
-    return {
-      model,
-      data: processExtractedData(extracted),
-      processingTimeMs,
-    };
-  } catch (error) {
-    const processingTimeMs = Date.now() - startTime;
-    console.error(`Error with ${model}:`, error);
-    return {
-      model,
-      data: {
-        quote_number: null,
-        customer_name: null,
-        order_date: null,
-        constructions: [],
-        windows_count: 0,
-        doors_count: 0,
-        sliding_doors_count: 0,
-        aggregated_components: [],
-        profile_info: null,
-      },
-      processingTimeMs,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    parts.push({
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: base64Content,
+      }
+    });
+  } else {
+    parts.push({
+      text: `${SYSTEM_PROMPT}\n\nExtract all constructions and their components from this order document. Pay special attention to extracting EXACT specifications for glass, blinds, screens, hardware, and profile.\n\n${textContent}`
+    });
   }
+
+  const requestBody = {
+    contents: [{ parts }],
+    tools: [{
+      functionDeclarations: [extractionFunctionDeclaration]
+    }],
+    toolConfig: {
+      functionCallingConfig: {
+        mode: 'ANY',
+        allowedFunctionNames: ['extract_order_data']
+      }
+    }
+  };
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}:generateContent?key=${GOOGLE_API_KEY}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Google API error:`, response.status, errorText);
+    throw new Error(`AI processing failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  const candidate = data.candidates?.[0];
+  const functionCall = candidate?.content?.parts?.[0]?.functionCall;
+  
+  if (!functionCall?.args) {
+    console.error('No function call in response:', JSON.stringify(data, null, 2));
+    throw new Error('Failed to extract data - no function call returned');
+  }
+
+  const extracted = functionCall.args;
+  console.log(`${AI_MODEL} completed in ${Date.now() - startTime}ms`);
+
+  return processExtractedData(extracted);
 }
 
-async function parseCSVWithAI(csvContent: string, model: string = AI_MODEL): Promise<ParsedOrder> {
-  console.log(`Parsing CSV with ${model}...`);
-  const result = await extractWithModel(model, csvContent, 'csv');
-  if (result.error) throw new Error(result.error);
-  return result.data;
+async function parseCSVWithAI(csvContent: string): Promise<ParsedOrder> {
+  console.log('Parsing CSV...');
+  return extractWithModel(csvContent, 'csv');
 }
 
-async function processPDFWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
-  console.log(`Processing PDF with ${model}...`);
-  const result = await extractWithModel(model, '', 'pdf', base64Content);
-  if (result.error) throw new Error(result.error);
-  return result.data;
+async function processPDFWithAI(base64Content: string): Promise<ParsedOrder> {
+  console.log('Processing PDF...');
+  return extractWithModel('', 'pdf', base64Content);
 }
 
-async function parseExcelWithAI(base64Content: string, model: string = AI_MODEL): Promise<ParsedOrder> {
+async function parseExcelWithAI(base64Content: string): Promise<ParsedOrder> {
   console.log('Converting Excel to text...');
 
   const binaryString = atob(base64Content);
@@ -653,66 +434,7 @@ async function parseExcelWithAI(base64Content: string, model: string = AI_MODEL)
 
   console.log('Extracted text preview:', textContent.substring(0, 500));
 
-  const result = await extractWithModel(model, textContent, 'excel');
-  if (result.error) throw new Error(result.error);
-  return result.data;
-}
-
-async function runComparison(
-  fileContent: string,
-  fileType: 'csv' | 'pdf' | 'excel',
-  base64Content: string
-): Promise<ComparisonResult> {
-  console.log('Running model comparison...');
-
-  let content = '';
-  if (fileType === 'csv') {
-    content = atob(base64Content);
-  } else if (fileType === 'excel') {
-    const binaryString = atob(base64Content);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    let currentString = '';
-    for (let i = 0; i < bytes.length; i++) {
-      const byte = bytes[i];
-      if ((byte >= 32 && byte <= 126) || byte === 10 || byte === 13 || byte === 9) {
-        currentString += String.fromCharCode(byte);
-      } else if (currentString.length > 3) {
-        content += currentString + '\n';
-        currentString = '';
-      } else {
-        currentString = '';
-      }
-    }
-    if (currentString.length > 3) {
-      content += currentString;
-    }
-    content = content
-      .split('\n')
-      .filter(line => line.trim().length > 2)
-      .filter(line => !/^[\x00-\x1F\x7F]+$/.test(line))
-      .join('\n');
-  }
-
-  const [resultPro, resultFlash] = await Promise.all([
-    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-  ]);
-
-  const comparison = compareResults(resultPro.data, resultFlash.data);
-
-  console.log('Comparison complete:');
-  console.log(`  Run A: ${resultPro.processingTimeMs}ms, ${resultPro.data.constructions.length} constructions`);
-  console.log(`  Run B: ${resultFlash.processingTimeMs}ms, ${resultFlash.data.constructions.length} constructions`);
-  console.log(`  Differences: ${comparison.differences.length}`);
-
-  return {
-    gemini15Pro: resultPro,
-    gemini15Flash: resultFlash,
-    comparison,
-  };
+  return extractWithModel(textContent, 'excel');
 }
 
 serve(async (req) => {
@@ -724,15 +446,8 @@ serve(async (req) => {
   }
 
   try {
-    const { file_content, file_type, file_name, compare_models } = await req.json();
-    console.log(`Processing ${file_type} file: ${file_name}${compare_models ? ' (COMPARISON MODE)' : ''}`);
-
-    if (compare_models) {
-      const comparisonResult = await runComparison(file_content, file_type, file_content);
-      return new Response(JSON.stringify(comparisonResult), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { file_content, file_type, file_name } = await req.json();
+    console.log(`Processing ${file_type} file: ${file_name}`);
 
     let result: ParsedOrder;
 

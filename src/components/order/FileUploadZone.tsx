@@ -1,11 +1,8 @@
 import { useState, useCallback } from "react";
-import { Upload, FileText, Loader2, X, GitCompare } from "lucide-react";
+import { Upload, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { ModelComparisonView } from "./ModelComparisonView";
 
 export interface ParsedComponent {
   component_type: string;
@@ -62,33 +59,6 @@ export interface ParsedOrderData {
   profile_info?: ProfileInfo | null;
 }
 
-interface ModelResult {
-  model: string;
-  data: ParsedOrderData;
-  processingTimeMs: number;
-  error?: string;
-}
-
-interface FieldDifference {
-  field: string;
-  constructionNumber?: string;
-  gemini15ProValue: string | null;
-  gemini15FlashValue: string | null;
-}
-
-interface ComparisonData {
-  gemini15Pro: ModelResult;
-  gemini15Flash: ModelResult;
-  comparison: {
-    constructionCountMatch: boolean;
-    componentCountMatch: boolean;
-    differences: string[];
-    fieldDifferences: FieldDifference[];
-    gemini15ProStats: { constructions: number; components: number; filledFields: number };
-    gemini15FlashStats: { constructions: number; components: number; filledFields: number };
-  };
-}
-
 interface FileUploadZoneProps {
   onDataParsed: (data: ParsedOrderData) => void;
   onClear: () => void;
@@ -99,8 +69,6 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [compareModels, setCompareModels] = useState(false);
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const { toast } = useToast();
 
   const processFile = useCallback(async (file: File) => {
@@ -127,7 +95,6 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
     setIsProcessing(true);
     setFileName(file.name);
-    setComparisonData(null);
 
     try {
       const reader = new FileReader();
@@ -151,29 +118,18 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
           file_content: base64Content,
           file_type: fileType,
           file_name: file.name,
-          compare_models: compareModels,
         },
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      if (compareModels && data.gemini15Pro && data.gemini15Flash) {
-        // Comparison mode - show comparison UI
-        setComparisonData(data as ComparisonData);
-        toast({
-          title: "Comparison complete",
-          description: `Compared Gemini 1.5 Pro vs Gemini 1.5 Flash`,
-        });
-      } else {
-        // Normal mode
-        onDataParsed(data);
-        const componentCount = data.aggregated_components?.length || 0;
-        toast({
-          title: "File processed",
-          description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
-        });
-      }
+      onDataParsed(data);
+      const componentCount = data.aggregated_components?.length || 0;
+      toast({
+        title: "File processed",
+        description: `Extracted ${data.constructions?.length || 0} constructions, ${componentCount} unique component types`,
+      });
     } catch (error: any) {
       console.error('Error processing file:', error);
       toast({
@@ -185,7 +141,7 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
     } finally {
       setIsProcessing(false);
     }
-  }, [onDataParsed, toast, compareModels]);
+  }, [onDataParsed, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -216,29 +172,8 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
 
   const handleClear = useCallback(() => {
     setFileName(null);
-    setComparisonData(null);
     onClear();
   }, [onClear]);
-
-  const handleSelectModel = useCallback((modelData: ParsedOrderData, modelName: string) => {
-    onDataParsed(modelData);
-    setComparisonData(null);
-    toast({
-      title: "Model selected",
-      description: `Using extraction from ${modelName}`,
-    });
-  }, [onDataParsed, toast]);
-
-  // Show comparison view
-  if (comparisonData) {
-    return (
-      <ModelComparisonView 
-        data={comparisonData}
-        onSelectModel={handleSelectModel}
-        onCancel={handleClear}
-      />
-    );
-  }
 
   if (parsedData) {
     const componentCount = parsedData.aggregated_components?.length || 0;
@@ -267,66 +202,43 @@ export function FileUploadZone({ onDataParsed, onClear, parsedData }: FileUpload
   }
 
   return (
-    <div className="space-y-3">
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`
-          border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
-          ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-          ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
-        `}
-      >
-        <input
-          type="file"
-          accept=".csv,.pdf,.xls,.xlsx"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="file-upload"
-          disabled={isProcessing}
-        />
-        <label htmlFor="file-upload" className="cursor-pointer">
-          {isProcessing ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <p className="text-sm font-medium">
-                {compareModels ? 'Comparing models...' : `Processing ${fileName}...`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {compareModels
-                  ? 'Running Gemini 3.0 Flash comparison in parallel...'
-                  : 'Using AI for accurate extraction...'}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm font-medium">Upload Order File</p>
-              <p className="text-xs text-muted-foreground">
-                PDF, CSV, or Excel
-              </p>
-            </div>
-          )}
-        </label>
-      </div>
-      
-      {/* Compare Models Toggle */}
-      <div className="flex items-center gap-2 px-1">
-        <Checkbox 
-          id="compare-models" 
-          checked={compareModels}
-          onCheckedChange={(checked) => setCompareModels(checked === true)}
-          disabled={isProcessing}
-        />
-        <Label
-          htmlFor="compare-models"
-          className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1.5"
-        >
-          <GitCompare className="h-3.5 w-3.5" />
-          Compare Gemini 3.0 Flash (dual run)
-        </Label>
-      </div>
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`
+        border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+        ${isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+        ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
+      `}
+    >
+      <input
+        type="file"
+        accept=".csv,.pdf,.xls,.xlsx"
+        onChange={handleFileSelect}
+        className="hidden"
+        id="file-upload"
+        disabled={isProcessing}
+      />
+      <label htmlFor="file-upload" className="cursor-pointer">
+        {isProcessing ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <p className="text-sm font-medium">Processing {fileName}...</p>
+            <p className="text-xs text-muted-foreground">
+              Using AI for accurate extraction...
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">Upload Order File</p>
+            <p className="text-xs text-muted-foreground">
+              PDF, CSV, or Excel
+            </p>
+          </div>
+        )}
+      </label>
     </div>
   );
 }
