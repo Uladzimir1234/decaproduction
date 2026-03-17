@@ -709,15 +709,15 @@ async function runComparison(
   }
 
   const [resultPro, resultFlash] = await Promise.all([
-    extractWithModel(MODELS.gemini15Pro, content, fileType, fileType === 'pdf' ? base64Content : undefined),
-    extractWithModel(MODELS.gemini15Flash, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
+    extractWithModel(AI_MODEL, content, fileType, fileType === 'pdf' ? base64Content : undefined),
   ]);
 
   const comparison = compareResults(resultPro.data, resultFlash.data);
 
   console.log('Comparison complete:');
-  console.log(`  Gemini 1.5 Pro: ${resultPro.processingTimeMs}ms, ${resultPro.data.constructions.length} constructions`);
-  console.log(`  Gemini 1.5 Flash: ${resultFlash.processingTimeMs}ms, ${resultFlash.data.constructions.length} constructions`);
+  console.log(`  Run A: ${resultPro.processingTimeMs}ms, ${resultPro.data.constructions.length} constructions`);
+  console.log(`  Run B: ${resultFlash.processingTimeMs}ms, ${resultFlash.data.constructions.length} constructions`);
   console.log(`  Differences: ${comparison.differences.length}`);
 
   return {
